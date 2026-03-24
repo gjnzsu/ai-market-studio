@@ -1,0 +1,116 @@
+from typing import Any
+from backend.connectors.base import MarketDataConnector, ConnectorError
+
+# ---------------------------------------------------------------------------
+# Tool JSON schemas (sent to GPT-4o as function definitions)
+# ---------------------------------------------------------------------------
+
+TOOL_DEFINITIONS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_exchange_rate",
+            "description": (
+                "Get the exchange rate for a single currency pair. "
+                "Use this when the user asks about one specific pair."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "base": {
+                        "type": "string",
+                        "description": "Base currency ISO 4217 code, e.g. 'EUR'.",
+                    },
+                    "target": {
+                        "type": "string",
+                        "description": "Target currency ISO 4217 code, e.g. 'USD'.",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Optional date in YYYY-MM-DD format for historical rates.",
+                    },
+                },
+                "required": ["base", "target"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_exchange_rates",
+            "description": (
+                "Get exchange rates for multiple target currencies from a single base. "
+                "Use this when the user asks to compare one currency against several others."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "base": {
+                        "type": "string",
+                        "description": "Base currency ISO 4217 code, e.g. 'USD'.",
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of target currency codes, e.g. ['EUR', 'GBP', 'JPY'].",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Optional date in YYYY-MM-DD format for historical rates.",
+                    },
+                },
+                "required": ["base", "targets"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_supported_currencies",
+            "description": "List all currency codes supported by the current data connector.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+]
+
+
+class AgentError(Exception):
+    """Raised when the agent cannot complete a request."""
+
+
+# ---------------------------------------------------------------------------
+# Tool dispatch
+# ---------------------------------------------------------------------------
+
+async def dispatch_tool(
+    tool_name: str,
+    tool_args: dict[str, Any],
+    connector: MarketDataConnector,
+) -> Any:
+    """Execute a tool call and return the result.
+
+    Raises:
+        AgentError: If the tool name is unknown.
+        ConnectorError: Propagated from the connector layer.
+    """
+    if tool_name == "get_exchange_rate":
+        return await connector.get_exchange_rate(
+            base=tool_args["base"],
+            target=tool_args["target"],
+            date=tool_args.get("date"),
+        )
+    elif tool_name == "get_exchange_rates":
+        return await connector.get_exchange_rates(
+            base=tool_args["base"],
+            targets=tool_args["targets"],
+            date=tool_args.get("date"),
+        )
+    elif tool_name == "list_supported_currencies":
+        currencies = await connector.list_supported_currencies()
+        return {"currencies": currencies}
+    else:
+        raise AgentError(f"Unknown tool: {tool_name}")

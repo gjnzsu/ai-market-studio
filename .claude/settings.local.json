@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:exchangerate.host)",
+      "WebFetch(domain:apilayer.com)",
+      "WebSearch"
+    ]
+  }
+}

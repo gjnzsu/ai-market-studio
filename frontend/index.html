@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Market Studio</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      padding: 1rem 1.5rem;
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; color: #a5b4fc; }
+    header span { font-size: 0.75rem; color: #64748b; }
+    #chat-window {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .bubble {
+      max-width: 75%;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      line-height: 1.55;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .bubble.user {
+      align-self: flex-end;
+      background: #4f46e5;
+      color: #fff;
+      border-bottom-right-radius: 3px;
+    }
+    .bubble.assistant {
+      align-self: flex-start;
+      background: #1e2235;
+      color: #e2e8f0;
+      border: 1px solid #2d3148;
+      border-bottom-left-radius: 3px;
+    }
+    .bubble.error {
+      align-self: flex-start;
+      background: #2d1b1b;
+      color: #f87171;
+      border: 1px solid #7f1d1d;
+      border-bottom-left-radius: 3px;
+    }
+    .bubble.thinking {
+      align-self: flex-start;
+      background: #1e2235;
+      color: #64748b;
+      border: 1px solid #2d3148;
+      font-style: italic;
+      border-bottom-left-radius: 3px;
+    }
+    .data-block {
+      margin-top: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      font-family: monospace;
+    }
+    #input-area {
+      padding: 1rem 1.5rem;
+      background: #1a1d27;
+      border-top: 1px solid #2d3148;
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-end;
+    }
+    #user-input {
+      flex: 1;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      color: #e2e8f0;
+      padding: 0.65rem 0.9rem;
+      font-size: 0.9rem;
+      resize: none;
+      min-height: 42px;
+      max-height: 120px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #user-input:focus { border-color: #4f46e5; }
+    #send-btn {
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.65rem 1.1rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    #send-btn:hover:not(:disabled) { background: #4338ca; }
+    #send-btn:disabled { background: #2d3148; color: #64748b; cursor: not-allowed; }
+    .examples {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0 1.5rem 1rem;
+    }
+    .example-chip {
+      background: #1e2235;
+      border: 1px solid #2d3148;
+      border-radius: 20px;
+      padding: 0.3rem 0.75rem;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .example-chip:hover { border-color: #4f46e5; color: #a5b4fc; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>AI Market Studio</h1>
+  <span>FX Chatbot PoC</span>
+</header>
+
+<div id="chat-window">
+  <div class="bubble assistant">Hello! I'm your FX market data assistant. Ask me about exchange rates — for example, "What is EUR/USD right now?" or "Compare USD against GBP, JPY, and AUD."</div>
+</div>
+
+<div class="examples">
+  <div class="example-chip" onclick="sendExample(this)">What is EUR/USD?</div>
+  <div class="example-chip" onclick="sendExample(this)">Compare USD vs GBP, JPY, AUD</div>
+  <div class="example-chip" onclick="sendExample(this)">What was GBP/USD on 2026-01-15?</div>
+  <div class="example-chip" onclick="sendExample(this)">List supported currencies</div>
+</div>
+
+<div id="input-area">
+  <textarea id="user-input" placeholder="Ask about FX rates..." rows="1"></textarea>
+  <button id="send-btn" onclick="sendMessage()">Send</button>
+</div>
+
+<script>
+  const API_URL = 'http://localhost:8000/api/chat';
+  const chatWindow = document.getElementById('chat-window');
+  const userInput = document.getElementById('user-input');
+  const sendBtn = document.getElementById('send-btn');
+  let history = [];
+
+  userInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  userInput.addEventListener('input', () => {
+    userInput.style.height = 'auto';
+    userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
+  });
+
+  function sendExample(el) { userInput.value = el.textContent; sendMessage(); }
+
+  function addBubble(role, text, data) {
+    const div = document.createElement('div');
+    div.className = 'bubble ' + role;
+    div.textContent = text;
+    if (data) {
+      const block = document.createElement('div');
+      block.className = 'data-block';
+      block.textContent = JSON.stringify(data, null, 2);
+      div.appendChild(block);
+    }
+    chatWindow.appendChild(div);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+    return div;
+  }
+
+  async function sendMessage() {
+    const msg = userInput.value.trim();
+    if (!msg) return;
+    userInput.value = '';
+    userInput.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    addBubble('user', msg);
+    const thinking = addBubble('thinking', 'Fetching data...');
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, history }),
+      });
+      chatWindow.removeChild(thinking);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+        addBubble('error', 'Error: ' + (err.detail || res.statusText));
+      } else {
+        const data = await res.json();
+        history.push({ role: 'user', content: msg });
+        history.push({ role: 'assistant', content: data.reply });
+        addBubble('assistant', data.reply, data.data);
+      }
+    } catch (e) {
+      chatWindow.removeChild(thinking);
+      addBubble('error', 'Network error: could not reach the backend.');
+    } finally {
+      sendBtn.disabled = false;
+      userInput.focus();
+    }
+  }
+</script>
+</body>
+</html>
