@@ -5,10 +5,11 @@ from backend.connectors.mock_connector import MockConnector
 
 def test_tool_definitions_are_valid():
     assert isinstance(TOOL_DEFINITIONS, list)
-    assert len(TOOL_DEFINITIONS) == 3
+    assert len(TOOL_DEFINITIONS) == 4
     names = [t["function"]["name"] for t in TOOL_DEFINITIONS]
     assert "get_exchange_rate" in names
     assert "get_exchange_rates" in names
+    assert "get_historical_rates" in names
     assert "list_supported_currencies" in names
 
 
@@ -50,3 +51,24 @@ async def test_dispatch_unknown_tool_raises_agent_error():
     connector = MockConnector()
     with pytest.raises(AgentError):
         await dispatch_tool("unknown_tool", {}, connector)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_tool_get_historical_rates():
+    """dispatch_tool routes get_historical_rates to connector correctly."""
+    connector = MockConnector()
+    result = await dispatch_tool(
+        "get_historical_rates",
+        {
+            "base": "USD",
+            "targets": ["EUR", "GBP"],
+            "start_date": "2025-01-01",
+            "end_date": "2025-01-03",
+        },
+        connector,
+    )
+    assert isinstance(result, dict)
+    assert "2025-01-01" in result
+    assert "2025-01-03" in result
+    assert "EUR" in result["2025-01-01"]
+    assert "GBP" in result["2025-01-01"]

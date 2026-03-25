@@ -1,5 +1,6 @@
+import math
 from typing import Optional
-from datetime import date as date_type
+from datetime import date as date_type, timedelta
 
 from .base import MarketDataConnector, RateFetchError, UnsupportedPairError
 
@@ -95,3 +96,32 @@ class MockConnector(MarketDataConnector):
 
     async def list_supported_currencies(self) -> list[str]:
         return SUPPORTED_CURRENCIES
+
+    async def get_historical_rates(
+        self,
+        base: str,
+        targets: list[str],
+        start_date: str,
+        end_date: str,
+    ) -> dict[str, dict[str, float]]:
+        base = base.upper()
+        targets = [t.upper() for t in targets]
+        start = date_type.fromisoformat(start_date)
+        end = date_type.fromisoformat(end_date)
+        result: dict[str, dict[str, float]] = {}
+        current = start
+        i = 0
+        while current <= end:
+            day_str = current.isoformat()
+            result[day_str] = {}
+            for t in targets:
+                if t not in SUPPORTED_CURRENCIES:
+                    from backend.connectors.base import UnsupportedPairError
+                    raise UnsupportedPairError(f"{base}/{t} not supported (mock)")
+                seed = abs(hash(base + t)) % 10_000
+                base_rate = (seed / 10_000) * 1.5 + 0.5
+                delta = math.sin(i * 0.3) * 0.02
+                result[day_str][t] = round(base_rate + delta, 6)
+            current += timedelta(days=1)
+            i += 1
+        return result

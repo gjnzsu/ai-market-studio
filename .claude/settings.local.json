@@ -16,7 +16,9 @@
       "Bash(cmd /c \"taskkill /PID 21300 /F\")",
       "Bash(cmd /c \"taskkill /F /PID 21300\")",
       "Bash(cmd /c taskkill /F /PID 21300 2>&1)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash('c:/SourceCode/ai-market-studio/docs/product_documentation.md':*)",
+      "Bash(git:*)"
     ]
   }
 }

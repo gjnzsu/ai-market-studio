@@ -75,3 +75,25 @@ class MarketDataConnector(ABC):
     @abstractmethod
     async def list_supported_currencies(self) -> list[str]:
         """Return a list of supported ISO 4217 currency codes."""
+
+    @abstractmethod
+    async def get_historical_rates(
+        self,
+        base: str,
+        targets: list[str],
+        start_date: str,
+        end_date: str,
+    ) -> dict[str, dict[str, float]]:
+        """
+        Return daily closing rates for each target currency.
+
+        Returns:
+            {
+                "2025-01-01": {"EUR": 0.92, "GBP": 0.79},
+                "2025-01-02": {"EUR": 0.921, "GBP": 0.791},
+                ...
+            }
+        Raises:
+            RateFetchError: on network / API failure.
+            UnsupportedPairError: if base or any target is unsupported.
+        """

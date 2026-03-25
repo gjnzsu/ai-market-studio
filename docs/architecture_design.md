@@ -1,625 +1,623 @@
 # AI Market Studio — Architecture Design
 
 > Author: SRE/AI Architect Agent
-> Date: 2026-03-25
-> Status: Draft — PoC scope
+> Date: 2026-03-26
+> Status: Draft — Feature 02 (FX Rate Trend Dashboard)
 
 ---
 
 ## 1. System Overview
 
-AI Market Studio is a Proof-of-Concept FX market data chatbot. Users ask natural-language questions about foreign exchange rates; the system retrieves live or historical data and replies in plain language.
-
-The architecture is intentionally layered so each concern is isolated and replaceable:
+AI Market Studio is a Proof-of-Concept FX market data chatbot. Users ask natural-language questions about foreign exchange rates; the system retrieves live or historical data and replies in plain language. Feature 02 extends this with a visual dashboard layer: users can request trend charts, multi-pair comparisons, and rate heatmaps rendered in-browser using the Canvas 2D API.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Chat UI (Browser)                        │
-│              frontend/index.html — HTML + Vanilla JS            │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │  POST /api/chat  { messages: [...] }
-                            ▼
+│                   Chat + Dashboard UI (Browser)                  │
+│         frontend/index.html — HTML + Vanilla JS + Canvas 2D      │
+└──────────────┬──────────────────────────┬───────────────────────┘
+               │  POST /api/chat          │  POST /api/dashboard
+               ▼                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Backend API (FastAPI)                        │
-│   main.py · router.py · models.py · config.py · middleware      │
+│   main.py · router.py · models.py · config.py · middleware       │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │  await agent.run(messages)
+                            │  await agent.run(...)  /  await build_dashboard(...)
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    AI Agent Layer                                │
-│         agent/agent.py  ·  agent/tools.py                       │
-│         GPT-4o function-calling loop (OpenAI SDK)               │
+│         agent/agent.py  ·  agent/tools.py                        │
+│         GPT-4o function-calling loop (OpenAI SDK)                │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │  await connector.get_exchange_rate(...)
+                            │  await connector.get_historical_rates(...)
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                  Data Connector Layer                            │
-│   connectors/base.py (ABC)  ·  connectors/exchangerate_host.py  │
+│   connectors/base.py (ABC)                                       │
+│   connectors/exchangerate_host.py  ·  connectors/mock_connector.py │
+│   connectors/cache.py  (in-process rate cache)                   │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │  HTTPS GET
+                            │  HTTPS GET  (batched, cached)
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │               Market Data Source                                 │
-│               api.exchangerate.host (free tier)                  │
+│         https://api.exchangerate.host  (EOD rates, free tier)    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Request Lifecycle (single chat turn)
+## 2. Feature 01 — Delivered (Baseline)
 
-1. User submits a message; JS appends it to the local `messages` array and POSTs the full array to `POST /api/chat`.
-2. FastAPI deserialises the body into `ChatRequest` (Pydantic), validates it.
-3. Router calls `await agent.run(messages, connector)`.
-4. Agent calls `openai.AsyncOpenAI.chat.completions.create` with tool definitions and the conversation history.
-5. If GPT-4o returns `finish_reason == "tool_calls"`: agent extracts arguments, dispatches to the connector.
-6. Connector calls `exchangerate.host` via `httpx.AsyncClient`, normalises response, returns a typed dict.
-7. Agent appends the tool result as a `tool` role message and calls GPT-4o again for synthesis.
-8. GPT-4o returns `finish_reason == "stop"` with a natural-language reply.
-9. Agent returns the reply string to the router.
-10. Router wraps it in `ChatResponse` and returns HTTP 200.
-11. JS appends the assistant message and re-renders the chat window.
+- Natural-language chat for FX spot rates (live and historical single-date lookups)
+- GPT-4o selects from 3 tools: `get_exchange_rate`, `get_exchange_rates`, `list_supported_currencies`
+- Non-USD cross-rates via USD triangulation (transparent to caller)
+- MockConnector with error injection for all automated tests
+- 90% coverage gate; tests never hit live API
 
 ---
 
-## 3. FastAPI Application Structure
+## 3. Feature 02 — FX Rate Trend Dashboard
 
-### 3.1 Entry Point — `backend/main.py`
+### 3.1 Goals
 
-```python
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from backend.router import router
-from backend.config import settings
-import logging
+1. Allow users to render multi-day historical rate trend charts directly in the browser.
+2. Support three dashboard types: **single-pair trend**, **multi-pair comparison**, **cross-rate heatmap**.
+3. Support multiple panels per dashboard, each independently configurable.
+4. Respect the 100 req/month free-tier quota via batching and an in-process cache.
+5. Keep the single-file frontend constraint (no build step, no external JS libraries).
 
-logging.basicConfig(level=settings.log_level)
+### 3.2 Supported Currencies
 
-app = FastAPI(title="AI Market Studio", version="0.1.0")
+USD, EUR, GBP, JPY, AUD, CAD, CHF, CNY, HKD, SGD, NZD (11 currencies).
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,  # ["*"] for PoC local dev
-    allow_methods=["POST", "OPTIONS"],
-    allow_headers=["Content-Type"],
-)
+### 3.3 Data Granularity
 
-app.include_router(router, prefix="/api")
-
-@app.get("/health")
-async def health() -> dict:
-    return {"status": "ok"}
-```
-
-### 3.2 Router — `backend/router.py`
-
-- Single route: `POST /api/chat`
-- Receives `ChatRequest`, calls agent, returns `ChatResponse`.
-- Catches `ConnectorError` → HTTP 502 (upstream data failure).
-- Catches `AgentError` → HTTP 500 (model/API failure).
-- All other unhandled exceptions → HTTP 500 via FastAPI default handler.
-- Logs request ID, latency, and outcome at INFO level.
-
-### 3.3 Pydantic Models — `backend/models.py`
-
-```python
-from pydantic import BaseModel, Field
-from typing import Literal
-
-class Message(BaseModel):
-    role: Literal["user", "assistant", "system"]
-    content: str
-
-class ChatRequest(BaseModel):
-    messages: list[Message] = Field(min_length=1)
-
-class ChatResponse(BaseModel):
-    reply: str
-```
-
-### 3.4 Config — `backend/config.py`
-
-Uses `pydantic-settings`. Reads from environment / `.env` file.
-
-```python
-from pydantic_settings import BaseSettings
-
-class Settings(BaseSettings):
-    openai_api_key: str
-    openai_model: str = "gpt-4o"
-    exchangerate_host_base_url: str = "https://api.exchangerate.host"
-    exchangerate_host_api_key: str  # REQUIRED — free tier now mandates access_key param
-    use_mock_connector: bool = False  # Set True in test environments to protect quota
-    log_level: str = "INFO"
-    cors_origins: list[str] = ["*"]
-
-    class Config:
-        env_file = ".env"
-
-settings = Settings()
-```
-
-> **UPDATED (2026-03-25):** exchangerate.host now requires `access_key` on all tiers including free. The free tier also locks the base currency to USD and limits to 100 requests/month. `EXCHANGERATE_HOST_API_KEY` is a required secret — treat it with the same care as `OPENAI_API_KEY`. Set `USE_MOCK_CONNECTOR=true` in all automated test environments to protect quota.
-
-### 3.5 Middleware Stack (PoC)
-
-| Middleware | Purpose |
-|---|---|
-| `CORSMiddleware` | Allow browser cross-origin requests from `localhost` |
-| Request ID injection | Attach `X-Request-ID` header (UUID4) for log correlation |
-| Structured logging | Log method, path, status, latency, request_id per request |
-
-A lightweight request-ID middleware injects a UUID into the request state and response headers:
-
-```python
-import uuid
-from starlette.middleware.base import BaseHTTPMiddleware
-
-class RequestIDMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        request_id = str(uuid.uuid4())
-        request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        return response
-```
-
-### 3.6 Error Handling Contract
-
-| Condition | HTTP Status | Response body |
-|---|---|---|
-| Invalid request body | 422 | FastAPI default validation error |
-| Connector upstream failure | 502 | `{"detail": "Market data unavailable"}` |
-| OpenAI API failure | 500 | `{"detail": "AI service error"}` |
-| Unexpected exception | 500 | `{"detail": "Internal server error"}` |
-
-Error details are logged server-side (with request_id). Client receives only safe, generic messages.
+End-of-day (EOD) only. Intraday data is not available on the free tier and is not in scope.
 
 ---
 
-## 4. AI Agent Layer Design
+## 4. New API Endpoints
 
-### 4.1 Function-Calling Loop — `backend/agent/agent.py`
+### 4.1  `POST /api/dashboard`
 
-The agent is a pure async function — no class state, no framework.
+Builds dashboard data for one or more panels. The frontend sends a dashboard config; the backend resolves all required historical rate series and returns structured time-series data ready for Canvas rendering.
 
-```
-run(messages, connector, openai_client)
-  │
-  ├── build_messages: prepend system prompt to conversation history
-  │
-  └── loop (max_iterations=5 guard):
-        ├── call openai_client.chat.completions.create(tools=TOOL_DEFINITIONS)
-        │
-        ├── if finish_reason == "stop"  → return response content
-        │
-        ├── if finish_reason == "tool_calls":
-        │     ├── for each tool_call:
-        │     │     dispatch_tool(tool_call, connector)  → result dict
-        │     │     append tool result message
-        │     └── continue loop
-        │
-        └── if max_iterations exceeded → raise AgentError
-```
-
-Key design choices:
-- `openai_client` and `connector` are injected (not created inside the function) — enables unit testing with mocks.
-- `max_iterations=5` prevents infinite tool-call loops.
-- Loop guard raises `AgentError` rather than returning a partial response.
-
-### 4.2 System Prompt
-
-```
-You are a financial data assistant specialising in foreign exchange (FX) markets.
-You have access to live and historical FX rate data via tools.
-
-Rules:
-- Always use the provided tools to fetch rate data. Never invent or estimate rates.
-- Quote rates to 4 decimal places.
-- If the user asks for a currency you cannot find, say so clearly.
-- Keep responses concise and factual. Do not speculate on market movements.
-- Today's date is {current_date}. Use this when the user asks for "today" or "current" rates.
-```
-
-The `{current_date}` placeholder is injected at request time from `datetime.utcnow().date().isoformat()`.
-
-### 4.3 Tool Definitions — `backend/agent/tools.py`
-
-Two tools are defined as JSON Schema objects passed to the OpenAI `tools` parameter.
-
-#### Tool 1: `get_fx_rate`
+#### Request
 
 ```json
 {
-  "type": "function",
-  "function": {
-    "name": "get_fx_rate",
-    "description": "Get the exchange rate between two currencies. Use for single pair queries.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "base": {
-          "type": "string",
-          "description": "ISO 4217 base currency code, e.g. EUR"
-        },
-        "target": {
-          "type": "string",
-          "description": "ISO 4217 target currency code, e.g. USD"
-        },
-        "date": {
-          "type": "string",
-          "description": "Optional ISO 8601 date (YYYY-MM-DD) for historical rate. Omit for latest."
-        }
+  "dashboard": {
+    "id": "dash-001",
+    "title": "My FX Dashboard",
+    "type": "multi_panel",
+    "panels": [
+      {
+        "id": "panel-1",
+        "type": "trend",
+        "base_currency": "USD",
+        "quote_currency": "EUR",
+        "start_date": "2026-02-24",
+        "end_date": "2026-03-25"
       },
-      "required": ["base", "target"]
-    }
+      {
+        "id": "panel-2",
+        "type": "comparison",
+        "base_currency": "USD",
+        "quote_currencies": ["EUR", "GBP", "JPY"],
+        "start_date": "2026-02-24",
+        "end_date": "2026-03-25"
+      },
+      {
+        "id": "panel-3",
+        "type": "heatmap",
+        "currencies": ["USD", "EUR", "GBP", "JPY"],
+        "date": "2026-03-25"
+      }
+    ]
   }
 }
 ```
 
-#### Tool 2: `get_fx_rates_list`
+#### Response — success (HTTP 200)
 
 ```json
 {
-  "type": "function",
-  "function": {
-    "name": "get_fx_rates_list",
-    "description": "Get a list of all supported currency codes.",
-    "parameters": {
-      "type": "object",
-      "properties": {},
-      "required": []
+  "dashboard_id": "dash-001",
+  "title": "My FX Dashboard",
+  "panels": [
+    {
+      "id": "panel-1",
+      "type": "trend",
+      "series": [
+        {
+          "label": "USD/EUR",
+          "data": [
+            {"date": "2026-02-24", "rate": 0.9210},
+            {"date": "2026-02-25", "rate": 0.9198}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "panel-2",
+      "type": "comparison",
+      "series": [
+        {"label": "USD/EUR", "data": [{"date": "2026-02-24", "rate": 0.9210}]},
+        {"label": "USD/GBP", "data": [{"date": "2026-02-24", "rate": 0.7890}]},
+        {"label": "USD/JPY", "data": [{"date": "2026-02-24", "rate": 149.55}]}
+      ]
+    },
+    {
+      "id": "panel-3",
+      "type": "heatmap",
+      "matrix": {
+        "currencies": ["USD", "EUR", "GBP", "JPY"],
+        "values": [
+          [1.0,    0.9210, 0.7890, 149.55],
+          [1.0857, 1.0,    0.8567, 162.38],
+          [1.2674, 1.1672, 1.0,    189.54],
+          [0.00668,0.00616,0.00527,1.0   ]
+        ]
+      }
     }
+  ],
+  "meta": {
+    "quota_calls_used": 3,
+    "cache_hits": 0,
+    "generated_at": "2026-03-26T10:00:00Z"
   }
 }
 ```
 
-#### Tool Dispatch
+#### Error Responses
 
-`dispatch_tool(tool_call, connector)` maps tool names to connector methods:
+| HTTP Status | Code | Meaning |
+|---|---|---|
+| 400 | `invalid_panel_type` | `type` not in `[trend, comparison, heatmap]` |
+| 400 | `invalid_currency` | Currency code not in supported set |
+| 400 | `invalid_date_range` | `start_date` > `end_date`, or range > 365 days |
+| 400 | `too_many_panels` | More than 6 panels in one request |
+| 422 | `validation_error` | Pydantic schema validation failure |
+| 503 | `connector_error` | Upstream exchangerate.host unavailable |
+| 504 | `connector_timeout` | Upstream request exceeded 10 s |
 
-```python
-async def dispatch_tool(tool_call, connector) -> str:
-    name = tool_call.function.name
-    args = json.loads(tool_call.function.arguments)
-    if name == "get_fx_rate":
-        result = await connector.get_exchange_rate(**args)
-    elif name == "get_fx_rates_list":
-        result = await connector.list_supported_currencies()
-    else:
-        raise AgentError(f"Unknown tool: {name}")
-    return json.dumps(result)
+### 4.2  `GET /api/rates/history`
+
+Optional lightweight endpoint for direct historical range retrieval (used by the agent tool and can be called from the frontend directly for simple use cases).
+
+#### Query Parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `base` | string | yes | Base currency (e.g. `USD`) |
+| `quote` | string | yes | Quote currency (e.g. `EUR`) |
+| `start_date` | string (ISO 8601) | yes | Inclusive start date |
+| `end_date` | string (ISO 8601) | yes | Inclusive end date |
+
+#### Response (HTTP 200)
+
+```json
+{
+  "base": "USD",
+  "quote": "EUR",
+  "start_date": "2026-02-24",
+  "end_date": "2026-03-25",
+  "rates": [
+    {"date": "2026-02-24", "rate": 0.9210},
+    {"date": "2026-02-25", "rate": 0.9198}
+  ]
+}
 ```
-
-### 4.4 Stateless Conversation History
-
-Conversation history is owned entirely by the browser. The backend receives the full `messages` array on every request and does not persist any state. This is a deliberate PoC choice:
-- Zero backend state = trivially horizontally scalable.
-- No session management, no DB.
-- Trade-off: history size grows with conversation length; for PoC this is acceptable.
 
 ---
 
-## 5. Data Connector Layer Design
+## 5. Data Models
 
-### 5.1 Abstract Base Class — `backend/connectors/base.py`
-
-```python
-from abc import ABC, abstractmethod
-from typing import Optional
-
-class MarketDataConnector(ABC):
-
-    @abstractmethod
-    async def get_exchange_rate(
-        self,
-        base: str,
-        target: str,
-        date: Optional[str] = None,
-    ) -> dict:
-        """Returns: {base, target, rate, date, source}"""
-        ...
-
-    @abstractmethod
-    async def list_supported_currencies(self) -> list[str]:
-        """Returns list of ISO 4217 currency codes."""
-        ...
-```
-
-The return schema for `get_exchange_rate` is fixed:
-```json
-{"base": "EUR", "target": "USD", "rate": 1.0823, "date": "2026-03-25", "source": "exchangerate.host"}
-```
-
-All concrete connectors MUST produce this exact schema. The agent layer depends only on this contract.
-
-### 5.2 Connector Registration / Selection
-
-For the PoC, a single connector is instantiated at startup in `main.py` and injected into the router via FastAPI dependency injection:
+### 5.1 Pydantic Request/Response Models (`backend/models.py`)
 
 ```python
-# main.py
-from backend.connectors.exchangerate_host import ExchangeRateHostConnector
+# Panel configs
+class TrendPanelConfig(BaseModel):
+    id: str
+    type: Literal["trend"]
+    base_currency: str
+    quote_currency: str
+    start_date: date
+    end_date: date
 
-connector = ExchangeRateHostConnector(base_url=settings.exchangerate_host_base_url)
+class ComparisonPanelConfig(BaseModel):
+    id: str
+    type: Literal["comparison"]
+    base_currency: str
+    quote_currencies: list[str]          # 2–5 currencies
+    start_date: date
+    end_date: date
 
-# router.py
-from fastapi import Depends
+class HeatmapPanelConfig(BaseModel):
+    id: str
+    type: Literal["heatmap"]
+    currencies: list[str]                # 2–6 currencies
+    date: date
 
-def get_connector() -> MarketDataConnector:
-    return connector  # module-level singleton
+PanelConfig = Annotated[
+    TrendPanelConfig | ComparisonPanelConfig | HeatmapPanelConfig,
+    Field(discriminator="type")
+]
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat(
-    request: ChatRequest,
-    connector: MarketDataConnector = Depends(get_connector),
-) -> ChatResponse:
+class DashboardConfig(BaseModel):
+    id: str
+    title: str
+    type: Literal["multi_panel"] = "multi_panel"
+    panels: list[PanelConfig]            # 1–6 panels
+
+class DashboardRequest(BaseModel):
+    dashboard: DashboardConfig
+
+# Response structures
+class RatePoint(BaseModel):
+    date: date
+    rate: float
+
+class Series(BaseModel):
+    label: str
+    data: list[RatePoint]
+
+class TrendPanelData(BaseModel):
+    id: str
+    type: Literal["trend"]
+    series: list[Series]                 # always 1 series
+
+class ComparisonPanelData(BaseModel):
+    id: str
+    type: Literal["comparison"]
+    series: list[Series]                 # N series, one per quote currency
+
+class HeatmapMatrix(BaseModel):
+    currencies: list[str]
+    values: list[list[float]]
+
+class HeatmapPanelData(BaseModel):
+    id: str
+    type: Literal["heatmap"]
+    matrix: HeatmapMatrix
+
+PanelData = TrendPanelData | ComparisonPanelData | HeatmapPanelData
+
+class DashboardMeta(BaseModel):
+    quota_calls_used: int
+    cache_hits: int
+    generated_at: datetime
+
+class DashboardResponse(BaseModel):
+    dashboard_id: str
+    title: str
+    panels: list[PanelData]
+    meta: DashboardMeta
+```
+
+### 5.2 Connector ABC Extension (`backend/connectors/base.py`)
+
+New abstract method added to `MarketDataConnector`:
+
+```python
+@abstractmethod
+async def get_historical_rates(
+    self,
+    base: str,
+    quote: str,
+    start_date: date,
+    end_date: date,
+) -> list[dict]:  # [{"date": "YYYY-MM-DD", "rate": float}, ...]
     ...
 ```
 
-For production, the connector could be selected by a factory based on a config value (e.g. `connector_type: str = "exchangerate_host"`).
-
-### 5.2a Cross-Rate Calculation Strategy (resolves GAP-02)
-
-> **UPDATED (2026-03-25):** exchangerate.host free tier locks `source` to USD. All cross-pairs must use the USD-base fallback strategy below. The `access_key` query parameter is required on every call.
-
-The `exchangerate.host /live` endpoint accepts a `source` parameter but the **free tier restricts source to USD only**. Cross-pair queries (e.g. EUR/JPY) require USD-base cross-rate computation but still only one HTTP call.
-
-**Free-tier strategy (mandatory):** Call `/live?access_key={key}&source=USD&currencies={base},{target}`, then compute:
-```
-cross_rate = quotes["USD" + target] / quotes["USD" + base]
-```
-For a direct USD pair (e.g. EUR/USD), the rate is `quotes["USDEUR"]` inverted or `quotes["USDUSD"]` — handle identity case explicitly.
-
-**Paid-tier primary strategy (future):** Call `/live?access_key={key}&source={base}&currencies={target}`. The endpoint returns the rate directly for the requested base.
-
-**Fallback (if `source` parameter unsupported for a given base):** Call `/live?source=USD`, extract both `USD/{base}` and `USD/{target}`, then compute:
-```
-cross_rate = USD_target / USD_base
-```
-This is a single HTTP call plus one Python division — no additional network round-trip.
-
-**Historical rates:** Use `/historical?date={date}&source={base}&currencies={target}` with identical logic.
-
-**Latency impact:** Single HTTP call (~200–800ms). No risk to the 10s p95 SLO.
-
-### 5.3 Connector Error Handling Contract
-
-All connectors MUST raise `ConnectorError` (a custom exception) on failure. They must NOT raise raw `httpx` exceptions or return `None`.
+### 5.3 In-Process Cache Schema (`backend/connectors/cache.py`)
 
 ```python
-class ConnectorError(Exception):
-    """Base class — raised when the data connector cannot fulfil a request."""
-    pass
-
-class RateFetchError(ConnectorError):
-    """HTTP/network failure fetching a rate (wraps httpx exceptions)."""
-    pass
-
-class UnsupportedPairError(ConnectorError):
-    """The requested currency pair is not available from this connector."""
-    pass
-
-class StaleDataError(ConnectorError):
-    """Upstream returned data older than acceptable freshness threshold."""
-    pass
+# Key: (base, quote, date_str)  →  Value: float (EOD rate)
+# TTL: 24 hours (EOD rates are stable once published)
+# Max size: 3 650 entries (~10 years × 365 days × 1 pair)
+# Implementation: dict + timestamp; no external dependency
+cache: dict[tuple[str, str, str], tuple[float, float]] = {}
+#                                                             rate  stored_at_epoch
 ```
 
-The router catches `ConnectorError` at the base class level → HTTP 502. Subclasses allow finer-grained logging and future per-subclass handling without router changes.
+---
 
-Error conditions and their subclass mapping:
-- `httpx.TimeoutException` / `httpx.ConnectError` / HTTP 4xx/5xx → `RateFetchError`
-- Currency pair not found / unsupported base currency → `UnsupportedPairError`
-- Missing or malformed fields in upstream JSON → `RateFetchError`
-- Data freshness violation → `StaleDataError`
+## 6. Agent Tool Additions
 
-**Connector return schema** (confirmed with data-engineer — additive fields are non-breaking):
+Two new GPT-4o tool definitions are added in `backend/agent/tools.py`.
+
+### 6.1 `get_historical_rate_series`
+
 ```json
 {
-  "base": "EUR",
-  "target": "USD",
-  "rate": 1.0823,
-  "date": "2026-03-25",
-  "source": "exchangerate.host",
-  "timestamp": "2026-03-25T10:30:00Z",
-  "is_mock": false
+  "type": "function",
+  "function": {
+    "name": "get_historical_rate_series",
+    "description": "Retrieve end-of-day exchange rates for a currency pair over a date range. Returns a time-ordered list of {date, rate} objects. Maximum range is 365 days.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "base_currency": {
+          "type": "string",
+          "description": "The base (from) currency ISO 4217 code, e.g. USD"
+        },
+        "quote_currency": {
+          "type": "string",
+          "description": "The quote (to) currency ISO 4217 code, e.g. EUR"
+        },
+        "start_date": {
+          "type": "string",
+          "description": "Start date in YYYY-MM-DD format (inclusive)"
+        },
+        "end_date": {
+          "type": "string",
+          "description": "End date in YYYY-MM-DD format (inclusive)"
+        }
+      },
+      "required": ["base_currency", "quote_currency", "start_date", "end_date"]
+    }
+  }
 }
 ```
-The agent layer reads only `{base, target, rate, date, source}`. `timestamp` and `is_mock` are additive — present for observability and test assertions, ignored by the agent.
+
+### 6.2 `build_dashboard`
+
+```json
+{
+  "type": "function",
+  "function": {
+    "name": "build_dashboard",
+    "description": "Build a multi-panel FX rate dashboard. Returns structured panel data that the frontend will render as charts. Supported panel types: trend (single pair over time), comparison (multiple pairs over time), heatmap (cross-rate matrix for a single date).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Dashboard title"
+        },
+        "panels": {
+          "type": "array",
+          "description": "List of panel configurations (1–6 panels)",
+          "items": {
+            "type": "object"
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": ["title", "panels"]
+    }
+  }
+}
+```
 
 ---
 
-## 6. SLIs and SLOs (PoC)
+## 7. Frontend Component Architecture
 
-These targets are appropriate for a local development PoC. They document intent, not production commitments.
+### 7.1 Single-File Constraint
 
-| SLI | SLO Target | Measurement Method |
-|---|---|---|
-| API availability | 99% during dev sessions | Health check endpoint `/health` |
-| End-to-end chat latency (p50) | < 5 seconds | Server-side request timing log |
-| End-to-end chat latency (p95) | < 10 seconds | Server-side request timing log |
-| Connector success rate | > 95% | Count of `ConnectorError` vs total tool calls |
-| OpenAI tool-call loop iterations | ≤ 3 per request (typical) | Agent loop counter log |
+All dashboard UI lives in `frontend/index.html`. No external JS libraries, no build step. Charts are rendered using the browser's native **Canvas 2D API**.
 
-**Latency budget breakdown (typical request):**
+### 7.2 UI Sections
 
 ```
-FastAPI routing + validation:    ~5ms
-OpenAI API call 1 (tool decision): ~500–1500ms
-Connector HTTP call:               ~200–800ms
-OpenAI API call 2 (synthesis):     ~500–1500ms
-Response serialisation:            ~2ms
-─────────────────────────────────────────────
-Total (p50 estimate):              ~1.2–3.8s
+frontend/index.html
+├── <style>         — CSS for chat panel, dashboard panel, canvas sizing
+├── <div#chat>      — existing chat interface (Feature 01, unchanged)
+├── <div#dashboard> — new dashboard builder section
+│   ├── Dashboard form (title, add-panel controls)
+│   ├── Panel list (dynamic: add/remove panels)
+│   └── <div#panels-container> — rendered panel canvases
+└── <script>
+    ├── chatModule      — existing chat logic (unchanged)
+    ├── dashboardModule — new dashboard logic
+    │   ├── buildDashboardConfig()  — collects form state → DashboardRequest JSON
+    │   ├── submitDashboard()       — POST /api/dashboard, handles response
+    │   ├── renderPanel(panelData)  — dispatcher: trend/comparison/heatmap
+    │   ├── renderTrend(ctx, data)  — Canvas line chart
+    │   ├── renderComparison(ctx, data) — Canvas multi-line chart
+    │   └── renderHeatmap(ctx, data)    — Canvas color matrix
+    └── init()          — wire up event listeners
 ```
+
+### 7.3 Dashboard Types and Panel Rendering
+
+#### Trend Panel (single-pair line chart)
+- X-axis: dates, Y-axis: exchange rate
+- Canvas `lineTo` / `stroke` for the rate series
+- Axis labels drawn with `fillText`
+
+#### Comparison Panel (multi-pair line chart)
+- Same axes as trend; each pair rendered in a distinct colour
+- Legend drawn top-right using `fillRect` + `fillText`
+- Colours from a fixed palette (6 colours; max 5 pairs per panel)
+
+#### Heatmap Panel (N×N colour matrix)
+- Each cell: `fillRect` with colour interpolated from green (low rate) → red (high rate) per column
+- Cell labels: `fillText` with the rate value centred in the cell
+- Row/column headers: currency codes
+
+### 7.4 Panel Configuration UI
+
+Each panel added by the user exposes:
+- Panel type selector (trend / comparison / heatmap)
+- Currency selectors (base + quote, or multi-select for comparison/heatmap)
+- Date range pickers (start_date, end_date) — hidden for heatmap (single date)
+- Remove button
+
+All controls are plain `<select>`, `<input type="date">`, `<button>` — no library.
 
 ---
 
-## 7. Observability Design
+## 8. Quota Management and Caching Strategy
 
-### 7.1 Logging Strategy
+### 8.1 The Constraint
 
-Python standard `logging` module. Structured log lines at INFO level for all requests.
+exchangerate.host free tier: ~100 API requests/month. **CONFIRMED:** `/timeseries` endpoint is **NOT available on the free tier** — it requires the Basic plan ($14.99/month). The free tier provides only `/historical` (single date per call) and `/live`. Therefore every historical date requires one separate API call. There is no batching available on the free tier.
 
-**Log fields per request:**
+### 8.2 Batching Strategy
 
-```
-request_id  method  path  status_code  latency_ms  error_type(if any)
-```
+When `POST /api/dashboard` is received:
 
-**Log fields per agent loop iteration:**
+1. **Decompose panels** into a set of unique `(base, quote, date)` tuples across all requested dates.
+2. **Check cache** — for each `(base, quote, date)`, look up in `cache.py`. Cached dates cost 0 calls.
+3. **Fetch uncached dates** — one `/historical` call per uncached `(base, quote, date)` tuple.
+4. **Populate cache** with all returned rates (TTL 24 h).
+5. **Assemble response** from cache.
 
-```
-request_id  iteration  finish_reason  tool_name(if any)  tool_latency_ms(if any)
-```
+> **CONFIRMED: No batching available on free tier.** `/timeseries` requires the Basic plan ($14.99/month). Free tier uses `/historical` only — 1 call per date per pair. The in-memory cache is the **sole quota mitigation**: warm cache loads cost 0 calls. `USE_MOCK_CONNECTOR=true` is mandatory for all development and CI.
 
-**Log levels:**
-- `DEBUG`: full message payloads (gated behind `LOG_LEVEL=DEBUG`; never log in production)
-- `INFO`: request/response metadata, tool dispatch events
-- `WARNING`: retryable connector failures, unexpected tool names
-- `ERROR`: unhandled exceptions, OpenAI API errors, connector hard failures
+> **Upgrade path:** Basic plan ($14.99/month) provides `/timeseries` (1 call per pair for any date range, 10k req/month). At that tier, a 30-day 3-pair dashboard = 3 calls and `MAX_HISTORICAL_DAYS` can safely be raised to 365.
 
-### 7.2 Request Tracing
+#### Guardrails (quota protection — free tier defaults)
 
-`X-Request-ID` (UUID4) is generated by `RequestIDMiddleware` and:
-- Attached to every log line via a logging filter that reads `request.state.request_id`.
-- Returned in the HTTP response header so clients can correlate.
-- Passed to the agent and connector as a parameter for downstream log correlation.
-
-### 7.3 Error Reporting
-
-For the PoC, errors are logged to stdout/stderr with full tracebacks at `ERROR` level. No external error aggregator (e.g. Sentry) is wired — this is a noted gap for production readiness.
-
----
-
-## 8. Deployment — Local Dev Setup
-
-### 8.1 Prerequisites
-
-- Python 3.11+
-- `pip` or `uv`
-- An OpenAI API key
-
-### 8.2 Setup Steps
-
-```bash
-# 1. Clone / enter project
-cd ai-market-studio
-
-# 2. Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Configure environment
-cp .env.example .env
-# Edit .env and set OPENAI_API_KEY=sk-...
-
-# 5. Run backend
-uvicorn backend.main:app --reload --port 8000
-
-# 6. Open frontend
-# Open frontend/index.html in a browser directly (file://) or serve via:
-python -m http.server 3000 --directory frontend
-# Then visit http://localhost:3000
-```
-
-### 8.3 Environment Variables
-
-| Variable | Required | Default | Description |
+| Guardrail | Free tier default | Basic plan default | Env var override |
 |---|---|---|---|
-| `OPENAI_API_KEY` | YES | — | OpenAI secret key |
-| `OPENAI_MODEL` | no | `gpt-4o` | Model name |
-| `EXCHANGERATE_HOST_API_KEY` | YES | — | exchangerate.host API key (free tier requires this; 100 req/month, USD base only) |
-| `EXCHANGERATE_HOST_BASE_URL` | no | `https://api.exchangerate.host` | Connector base URL |
-| `USE_MOCK_CONNECTOR` | no | `false` | Set `true` in test environments to bypass live API and protect quota |
-| `LOG_LEVEL` | no | `INFO` | Python log level |
-| `CORS_ORIGINS` | no | `["*"]` | Allowed CORS origins |
+| Max date range per panel | **7 days** | 365 days | `MAX_HISTORICAL_DAYS` |
+| Max pairs per dashboard | 5 | 5 | `MAX_DASHBOARD_PAIRS` |
+| Max panels per dashboard | 6 | 6 | — (hard limit) |
 
-### 8.4 `.env.example`
+#### Quota Consumption (free tier — `/historical` per-date calls)
 
-```
-OPENAI_API_KEY=sk-your-key-here
-OPENAI_MODEL=gpt-4o
-EXCHANGERATE_HOST_API_KEY=your-exchangerate-host-key-here
-USE_MOCK_CONNECTOR=false
-LOG_LEVEL=INFO
-```
+| Dashboard | Days | Pairs | Cache cold | API calls |
+|---|---|---|---|---|
+| 7-day single trend | 7 | 1 | yes | 7 |
+| 7-day 3-pair comparison | 7 | 3 | yes | 21 |
+| 7-day 3-pair + heatmap (5 currencies = 10 pairs, 1 date) | 2 panels | 3 + 10 | cold | 31 |
+| Any dashboard, repeated load | any | any | warm | 0 |
+| 30-day 3-pair (if MAX_HISTORICAL_DAYS overridden to 30) | 30 | 3 | cold | 90 |
 
-### 8.5 Running Tests
+### 8.3 Cache Implementation
 
-```bash
-pytest tests/ -v
-```
+- **Location**: `backend/connectors/cache.py` — module-level dict (in-process, no Redis dependency for PoC)
+- **Key**: `(base: str, quote: str, date: str)` → `(rate: float, stored_epoch: float)`
+- **TTL**: 24 hours (EOD rates do not change once published)
+- **Eviction**: lazy — checked on read; no background sweep needed at PoC scale
+- **Thread safety**: FastAPI runs in a single async event loop; `asyncio.Lock` guards cache writes
 
----
+### 8.4 Development Recommendation
 
-## 9. Scalability Considerations (Beyond PoC)
+Set `USE_MOCK_CONNECTOR=true` in `.env` during development and in all CI/CD pipelines. MockConnector returns deterministic synthetic rates, uses 0 quota, and supports error injection. This is **mandatory** for CI — live connector calls in automated tests will exhaust the monthly quota within days.
 
-| Concern | PoC State | Production Path |
-|---|---|---|
-| Stateless history | Browser holds all history; no backend state | Add server-side session store (Redis) with TTL for long conversations or multi-device support |
-| Single connector | Hard-coded `ExchangeRateHostConnector` | Factory pattern with config-driven selection; add Bloomberg/Refinitiv adapters |
-| No auth | Open API, no authentication | Add API key or JWT middleware; rate limit per key |
-| No caching | Every request hits upstream | Cache `get_exchange_rate` responses in Redis with short TTL (e.g. 30s for live rates) |
-| Single process | `uvicorn` single worker | `gunicorn` + multiple `uvicorn` workers; or containerise with Docker + Kubernetes |
-| No rate limiting | Unlimited requests | Add `slowapi` middleware; respect OpenAI and exchangerate.host rate limits |
-| Context window growth | Conversation grows unbounded | Implement message windowing or summarisation when `len(messages) > N` |
-| No streaming | Full response before render | Use OpenAI streaming + Server-Sent Events for perceived latency improvement |
-| Cost control | No token tracking | Log `usage` from OpenAI response; alert on anomalous token consumption |
+### 8.5 Production Scaling Notes
+
+The in-process dict cache is sufficient for PoC single-process deployments. For production scale, replace with:
+
+- **Redis** shared cache — survives restarts, shared across multiple worker processes
+- **Quota counter** — atomic Redis counter per calendar month; reject requests when counter approaches 100
+- **Circuit breaker** — open circuit after 3 consecutive 5xx from exchangerate.host; return cached data or 503 fast-fail
+- **Retry with exponential backoff** — not implemented in PoC connector; add for production to handle transient upstream errors
 
 ---
 
-## 10. Architectural Risks
+## 9. SLIs and SLOs
 
-### CRITICAL
+### 9.1 `POST /api/dashboard`
 
-| Risk | Description | Mitigation |
+| SLI | SLO | Measurement |
 |---|---|---|
-| **OpenAI API key exposure** | If `OPENAI_API_KEY` is committed to git or logged at DEBUG level, it will leak. | Enforce `.env` in `.gitignore`; never log env vars; audit log output. |
-| **exchangerate.host API key exposure** | `EXCHANGERATE_HOST_API_KEY` is now required and is a secret. Same leak risk as OpenAI key. | Enforce in `.gitignore`; add to `.env.example` as placeholder only; never log. |
-| **Prompt injection via user input** | A malicious user could attempt to override the system prompt through the `messages` array. | System prompt is always prepended server-side and never taken from client input. Validate `role` field (only `user`/`assistant` allowed from client). |
+| Availability | ≥ 99% of requests return HTTP 2xx or expected 4xx | FastAPI middleware counter |
+| Latency (cache warm) | p95 < 500 ms | Middleware timer |
+| Latency (cache cold, 1 pair, 30 days) | p95 < 3 s | Middleware timer |
+| Latency (cache cold, 6 panels, max pairs) | p95 < 10 s | Middleware timer |
+| Error rate (5xx) | < 1% of requests | Middleware counter |
 
-### HIGH
+### 9.2 `GET /api/rates/history`
 
-| Risk | Description | Mitigation |
+| SLI | SLO | Measurement |
 |---|---|---|
-| **exchangerate.host reliability** | Free tier has no SLA; downtime breaks the entire demo. | Return graceful error messages via `ConnectorError`; document alternative connectors. |
-| **Unbounded conversation history** | Very long conversations will hit OpenAI context limits and increase cost. | Add a PoC-level warning when `messages` exceeds 20 items; implement windowing for production. |
-| **No input validation on currency codes** | GPT-4o could pass malformed strings to the connector. | Connector validates currency codes against a known list or upstream error response. |
-| **Infinite tool-call loop** | GPT-4o could theoretically keep requesting tool calls. | `max_iterations=5` guard with `AgentError` raise. |
+| Availability | ≥ 99% | Middleware counter |
+| Latency (cache warm) | p95 < 200 ms | Middleware timer |
+| Latency (cache cold) | p95 < 3 s | Middleware timer |
 
-### MEDIUM
+### 9.3 `POST /api/chat` (unchanged)
 
-| Risk | Description | Mitigation |
-|---|---|---|
-| **CORS wildcard in production** | `allow_origins=["*"]` is acceptable for local PoC only. | Restrict to known origins before any deployment beyond localhost. |
-| **No HTTPS for local dev** | Browser → backend traffic is plain HTTP locally. | Acceptable for PoC; use TLS termination (nginx/caddy) for any shared deployment. |
+| SLI | SLO |
+|---|---|
+| Availability | ≥ 99% |
+| Latency | p95 < 5 s (GPT-4o round-trip dominates) |
+
+### 9.4 Observability
+
+- Structured JSON logs on every request: method, path, status, latency_ms, cache_hits, quota_calls
+- `meta` block in `DashboardResponse` exposes `quota_calls_used` and `cache_hits` to the client for transparency
+- No external monitoring stack in PoC — logs to stdout, captured by Uvicorn
 
 ---
 
-## 11. File Responsibility Summary
+## 10. File Ownership
 
-| File | Owner | Responsibility |
+### 10.1 Modified Files
+
+| File | Owner | Change Summary |
 |---|---|---|
-| `backend/main.py` | Backend specialist | App factory, middleware, router mount, connector instantiation |
-| `backend/router.py` | Backend specialist | `/api/chat` route, error mapping, request logging |
-| `backend/models.py` | Backend specialist | `ChatRequest`, `ChatResponse`, `Message` Pydantic models |
-| `backend/config.py` | Backend specialist | `Settings` via pydantic-settings |
-| `backend/agent/agent.py` | AI Agent specialist | GPT-4o function-calling loop |
-| `backend/agent/tools.py` | AI Agent specialist | Tool JSON schemas, dispatch function, `AgentError` |
-| `backend/connectors/base.py` | Data Connector specialist | `MarketDataConnector` ABC, `ConnectorError` |
-| `backend/connectors/exchangerate_host.py` | Data Connector specialist | `ExchangeRateHostConnector` implementation |
-| `frontend/index.html` | Frontend specialist | Single-file chat UI |
-| `tests/unit/test_connector.py` | QA specialist | Connector tests with `respx` mocks |
-| `tests/unit/test_tools.py` | QA specialist | Tool schema and dispatch tests |
-| `tests/agent/test_agent.py` | QA specialist | Agent loop tests with mocked OpenAI |
-| `tests/e2e/test_chat_api.py` | QA specialist | E2E tests via `httpx` TestClient |
-| `requirements.txt` | QA specialist | All runtime and test dependencies |
-| `.env.example` | Backend specialist | Template for environment configuration |
+| `backend/router.py` | Backend specialist | Add `POST /api/dashboard` and `GET /api/rates/history` routes |
+| `backend/models.py` | Backend specialist | Add all dashboard Pydantic models (Section 5.1) |
+| `backend/agent/tools.py` | AI Agent specialist | Add `get_historical_rate_series` and `build_dashboard` tool definitions and dispatch |
+| `backend/agent/agent.py` | AI Agent specialist | Register new tools; handle `build_dashboard` tool call → delegate to dashboard service |
+| `backend/connectors/base.py` | Data Engineer | Add `get_historical_rates` abstract method |
+| `backend/connectors/exchangerate_host.py` | Data Engineer | Implement `get_historical_rates` via `/timeseries` endpoint |
+| `backend/connectors/mock_connector.py` | Data Engineer | Implement `get_historical_rates` with synthetic data + error injection |
+| `frontend/index.html` | Frontend specialist | Add dashboard UI section and `dashboardModule` JS |
+
+### 10.2 New Files
+
+| File | Owner | Purpose |
+|---|---|---|
+| `backend/connectors/cache.py` | Data Engineer | In-process rate cache (dict + TTL) |
+| `backend/dashboard.py` | Backend specialist | `build_dashboard_response()` service function — panel decomposition, cache lookup, batched fetch, response assembly |
+| `tests/unit/test_cache.py` | QA specialist | Cache TTL, hit/miss, eviction, concurrent write tests |
+| `tests/unit/test_dashboard_service.py` | QA specialist | `build_dashboard_response()` unit tests with MockConnector |
+| `tests/e2e/test_dashboard_api.py` | QA specialist | E2E tests for `POST /api/dashboard` via TestClient |
+
+### 10.3 Unchanged Files
+
+`backend/main.py`, `backend/config.py`, `tests/unit/test_connector.py`, `tests/unit/test_tools.py`, `tests/agent/test_agent.py`, `tests/e2e/test_chat_api.py`, `requirements.txt`, `.env.example`
+
+---
+
+## 11. Cross-Cutting Concerns
+
+### 11.1 For QA Expert
+- MockConnector **must** implement `get_historical_rates` with error injection support (simulate 503, timeout, partial data) before any dashboard tests can be written.
+- New coverage gate applies: 90% line coverage must be maintained across all new files.
+- Heatmap panels require N×(N-1)/2 unique pair lookups for an N-currency matrix (symmetric — each pair fetched once, diagonal self-pairs = 1.0 require no API call). Test boundary: 6 currencies = **15 pairs**.
+
+### 11.2 For Data Engineer
+- **CONFIRMED (2026-03-26):** `/timeseries` is NOT available on the free tier. Implementation uses `/historical` only — 1 call per date per pair. No batching is possible on the free tier.
+- **Series-level triangulation pattern (REQUIRED):** For non-USD cross-rate historical panels (e.g. EUR/GBP), fetch `USD/base` series + `USD/quote` series (2 calls total regardless of date range if `/timeseries` were available; on free tier: 2 calls per date). Compute `base/quote = (USD/quote) / (USD/base)` locally per date, store derived cross-rate in cache under `(base, quote, date)`.
+- On free tier with `/historical` fallback, a 7-day EUR/GBP panel costs 14 calls (2 per day). `MAX_HISTORICAL_DAYS=7` is the safe free-tier default.
+- Cache key uses `(base, quote, date)` — always store the derived cross-rate, never the intermediate USD legs.
+- Heatmap for N currencies = N×(N-1)/2 unique pairs (symmetric). A 5-currency heatmap = 10 pairs = 10 calls cold, 0 warm.
+
+### 11.3 For Business Analyst
+- Maximum 6 panels per dashboard is a quota-protection constraint, not a product decision — if the product requires more panels, quota management must be revisited.
+- EOD-only granularity is a hard free-tier constraint. Intraday would require a paid plan.
+
+---
+
+## 12. Sequence Diagram — `POST /api/dashboard` (cache cold)
+
+```
+Browser          FastAPI           dashboard.py        cache.py        ExchangeRateHostConnector
+  │                │                    │                  │                    │
+  │─POST /api/─────▶│                    │                  │                    │
+  │  dashboard      │                    │                  │                    │
+  │                 │─build_dashboard────▶│                  │                    │
+  │                 │    _response()      │                  │                    │
+  │                 │                    │─lookup(pairs)────▶│                    │
+  │                 │                    │◀─cache miss───────│                    │
+  │                 │                    │─get_historical────────────────────────▶│
+  │                 │                    │  _rates() × N     │                    │
+  │                 │                    │◀─[{date,rate}]────────────────────────│
+  │                 │                    │─store(pairs)─────▶│                    │
+  │                 │                    │─assemble panels   │                    │
+  │                 │◀─DashboardResponse─│                   │                    │
+  │◀─HTTP 200───────│                    │                   │                    │
+```
 
 ---
 

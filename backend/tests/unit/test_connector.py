@@ -261,3 +261,106 @@ async def test_exchangerate_host_list_supported_currencies_api_error(respx_mock)
     connector = ExchangeRateHostConnector(api_key="test_key")
     with pytest.raises(RateFetchError, match="Could not fetch currency list"):
         await connector.list_supported_currencies()
+
+
+# ---------------------------------------------------------------------------
+# MockConnector — get_historical_rates tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_mock_historical_rates_returns_correct_date_range():
+    """Returns one entry per day inclusive of start and end."""
+    connector = MockConnector()
+    result = await connector.get_historical_rates("USD", ["EUR", "GBP"], "2025-01-01", "2025-01-05")
+    assert len(result) == 5
+    assert "2025-01-01" in result
+    assert "2025-01-05" in result
+
+
+@pytest.mark.asyncio
+async def test_mock_historical_rates_contains_all_targets():
+    """Each date entry has a rate for every requested target."""
+    connector = MockConnector()
+    result = await connector.get_historical_rates("USD", ["EUR", "GBP", "JPY"], "2025-01-01", "2025-01-03")
+    for day_data in result.values():
+        assert "EUR" in day_data
+        assert "GBP" in day_data
+        assert "JPY" in day_data
+
+
+@pytest.mark.asyncio
+async def test_mock_historical_rates_values_are_floats():
+    """All rate values are positive floats."""
+    connector = MockConnector()
+    result = await connector.get_historical_rates("USD", ["EUR"], "2025-01-01", "2025-01-03")
+    for day_data in result.values():
+        assert isinstance(day_data["EUR"], float)
+        assert day_data["EUR"] > 0
+
+
+@pytest.mark.asyncio
+async def test_mock_historical_rates_deterministic():
+    """Same call twice returns identical data."""
+    connector = MockConnector()
+    result1 = await connector.get_historical_rates("USD", ["EUR"], "2025-01-01", "2025-01-03")
+    result2 = await connector.get_historical_rates("USD", ["EUR"], "2025-01-01", "2025-01-03")
+    assert result1 == result2
+
+
+@pytest.mark.asyncio
+async def test_mock_historical_rates_unsupported_currency():
+    """Unsupported target raises UnsupportedPairError."""
+    connector = MockConnector()
+    with pytest.raises(UnsupportedPairError):
+        await connector.get_historical_rates("USD", ["XYZ"], "2025-01-01", "2025-01-03")
+
+
+@pytest.mark.asyncio
+async def test_mock_historical_rates_single_day():
+    """start_date == end_date returns exactly one entry."""
+    connector = MockConnector()
+    result = await connector.get_historical_rates("USD", ["EUR"], "2025-06-15", "2025-06-15")
+    assert len(result) == 1
+    assert "2025-06-15" in result
+
+
+# ---------------------------------------------------------------------------
+# ExchangeRateHostConnector — get_historical_rates tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_exchangerate_host_historical_rates_happy_path(respx_mock):
+    """Returns correct dict structure for a 2-day range."""
+    respx_mock.get("https://api.exchangerate.host/historical").mock(
+        return_value=httpx.Response(200, json={
+            "success": True,
+            "rates": {"EUR": 0.92, "GBP": 0.79},
+        })
+    )
+    connector = ExchangeRateHostConnector(api_key="test_key")
+    result = await connector.get_historical_rates("USD", ["EUR", "GBP"], "2025-01-01", "2025-01-02")
+    assert "2025-01-01" in result
+    assert "2025-01-02" in result
+    assert result["2025-01-01"]["EUR"] == 0.92
+
+
+@pytest.mark.asyncio
+async def test_exchangerate_host_historical_rates_http_error(respx_mock):
+    """HTTP error raises RateFetchError."""
+    respx_mock.get("https://api.exchangerate.host/historical").mock(
+        return_value=httpx.Response(500)
+    )
+    connector = ExchangeRateHostConnector(api_key="test_key")
+    with pytest.raises(RateFetchError):
+        await connector.get_historical_rates("USD", ["EUR"], "2025-01-01", "2025-01-01")
+
+
+@pytest.mark.asyncio
+async def test_exchangerate_host_historical_rates_api_error(respx_mock):
+    """API success=False raises RateFetchError."""
+    respx_mock.get("https://api.exchangerate.host/historical").mock(
+        return_value=httpx.Response(200, json={"success": False, "error": {"info": "bad key"}})
+    )
+    connector = ExchangeRateHostConnector(api_key="test_key")
+    with pytest.raises(RateFetchError):
+        await connector.get_historical_rates("USD", ["EUR"], "2025-01-01", "2025-01-01")

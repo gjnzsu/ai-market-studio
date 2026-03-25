@@ -66,6 +66,40 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "get_historical_rates",
+            "description": (
+                "Retrieve historical daily FX rates for a base currency against one or "
+                "more target currencies over a date range. Use when the user asks about "
+                "rate trends, historical performance, or wants to compare rates over time."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "base": {
+                        "type": "string",
+                        "description": "ISO 4217 base currency, e.g. USD",
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of target currency codes",
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "Start date YYYY-MM-DD",
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "End date YYYY-MM-DD",
+                    },
+                },
+                "required": ["base", "targets", "start_date", "end_date"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "list_supported_currencies",
             "description": "List all currency codes supported by the current data connector.",
             "parameters": {
@@ -108,6 +142,13 @@ async def dispatch_tool(
             base=tool_args["base"],
             targets=tool_args["targets"],
             date=tool_args.get("date"),
+        )
+    elif tool_name == "get_historical_rates":
+        return await connector.get_historical_rates(
+            base=tool_args["base"],
+            targets=tool_args["targets"],
+            start_date=tool_args["start_date"],
+            end_date=tool_args["end_date"],
         )
     elif tool_name == "list_supported_currencies":
         currencies = await connector.list_supported_currencies()

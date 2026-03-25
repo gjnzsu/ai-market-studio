@@ -115,6 +115,48 @@ class ExchangeRateHostConnector(MarketDataConnector):
                 results.append({"base": base, "target": target, "rate": round(rate, 6), "date": rate_date, "source": SOURCE_NAME})
         return results
 
+    async def get_historical_rates(
+        self,
+        base: str,
+        targets: list[str],
+        start_date: str,
+        end_date: str,
+    ) -> dict[str, dict[str, float]]:
+        """
+        Fetch daily closing rates via sequential /historical calls.
+
+        IMPORTANT: /timeseries is not available on the free tier.
+        Makes one API call per day in [start_date, end_date].
+        Caller must enforce max 7 days to stay within 100 req/month.
+        """
+        from datetime import date as _date, timedelta
+        base = base.upper()
+        symbols = ",".join(t.upper() for t in targets)
+        start = _date.fromisoformat(start_date)
+        end = _date.fromisoformat(end_date)
+        result: dict[str, dict[str, float]] = {}
+        current = start
+        while current <= end:
+            params = {
+                "access_key": self._api_key,
+                "base": base,
+                "symbols": symbols,
+                "date": current.isoformat(),
+            }
+            try:
+                resp = await self._client.get(f"{BASE_URL}/historical", params=params)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                raise RateFetchError(f"HTTP {e.response.status_code} from exchangerate.host historical") from e
+            except httpx.RequestError as e:
+                raise RateFetchError(f"Network error: {e}") from e
+            body = resp.json()
+            if not body.get("success") or "rates" not in body:
+                raise RateFetchError(f"historical API error for {current}: {body.get('error')}")
+            result[current.isoformat()] = body["rates"]
+            current += timedelta(days=1)
+        return result
+
     async def list_supported_currencies(self) -> list[str]:
         try:
             resp = await self._client.get(

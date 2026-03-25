@@ -1,36 +1,70 @@
 # AI Market Studio — User Guide & Developer Guide
 
-> Version: 1.0 (PoC)
-> Date: 2026-03-25
-> Status: Final
+> **Version:** 2.0
+> **Date:** 2026-03-26
+> **Status:** Final — covers Feature 01 (Chat Interface) and Feature 02 (FX Rate Trend Dashboard)
 
 ---
 
-## Part 1 — User Guide
+## Table of Contents
 
-### 1. What is AI Market Studio?
+**End-User Sections**
+1. [What is AI Market Studio?](#1-what-is-ai-market-studio)
+2. [Getting Started](#2-getting-started)
+3. [Using the Chat Interface (Feature 01)](#3-using-the-chat-interface-feature-01)
+4. [Using the FX Dashboard (Feature 02)](#4-using-the-fx-dashboard-feature-02)
+5. [Supported Currencies](#5-supported-currencies)
+6. [Troubleshooting](#6-troubleshooting)
 
-AI Market Studio is an AI-powered foreign exchange (FX) market data chatbot that lets traders, analysts, and financial professionals query live and historical exchange rates through plain-language conversation — no SQL, no dashboards, no manual lookups. You type a question such as "What is EUR/USD right now?" or "What was GBP/JPY on 1 March 2026?" and the system retrieves real data from a live market source, reasons over it with a GPT-4o AI agent, and replies in clear English. The PoC is scoped to FX spot rates from a single data source (exchangerate.host) and is intended as a clean, handoff-ready reference implementation rather than a production system.
+**Developer Sections**
+7. [Project Structure](#7-project-structure)
+8. [Adding a New Connector](#8-adding-a-new-connector)
+9. [Adding a New Agent Tool](#9-adding-a-new-agent-tool)
+10. [Adding a New Dashboard Type](#10-adding-a-new-dashboard-type)
+11. [Running Tests](#11-running-tests)
+12. [API Reference](#12-api-reference)
 
 ---
 
-### 2. How to Start the App
+# End-User Sections
 
-#### Prerequisites
+---
 
-- Python 3.11 or later installed and on your `PATH`
-- A modern web browser (Chrome, Firefox, Edge, Safari)
-- An OpenAI API key with access to `gpt-4o`
-- An exchangerate.host API key (free tier available at https://exchangerate.host)
+## 1. What is AI Market Studio?
 
-#### Step 1 — Clone the repository
+AI Market Studio is an AI-powered foreign exchange (FX) market data platform. It provides two interfaces:
+
+- **Chat Interface (Feature 01):** Ask natural-language questions — "What is EUR/USD right now?" or "What was GBP/JPY on 1 March 2026?" — and receive plain-English answers backed by live and historical data.
+- **FX Rate Trend Dashboard (Feature 02):** Build visual dashboards composed of multiple panels showing historical rate trends, multi-pair comparisons, and currency heatmaps, rendered in-browser.
+
+The system uses GPT-4o (OpenAI) to interpret user intent, and fetches rate data from exchangerate.host. It is a clean, handoff-ready proof-of-concept targeting FX traders, finance analysts, and treasury teams.
+
+> **Important — API quota:** The exchangerate.host free tier allows approximately **100 requests per month**. A single 30-day, 3-pair dashboard consumes ~90 calls. Use `USE_MOCK_CONNECTOR=true` for development and testing to avoid exhausting your quota.
+
+---
+
+## 2. Getting Started
+
+### Prerequisites
+
+| Requirement | Version / Notes |
+|-------------|----------------|
+| Python | 3.11 or higher |
+| pip | Latest |
+| OpenAI API key | GPT-4o access required |
+| exchangerate.host API key | Free tier requires registration at exchangerate.host |
+| Modern browser | Chrome, Firefox, Edge, or Safari |
+
+### Installation
+
+**Step 1 — Clone the repository**
 
 ```bash
 git clone <repository-url>
 cd ai-market-studio
 ```
 
-#### Step 2 — Create and activate a virtual environment
+**Step 2 — Create and activate a virtual environment**
 
 ```bash
 python -m venv .venv
@@ -42,615 +76,713 @@ source .venv/bin/activate
 .venv\Scripts\Activate.ps1
 ```
 
-#### Step 3 — Install dependencies
+**Step 3 — Install dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-#### Step 4 — Configure environment variables
+**Step 4 — Configure environment variables**
 
-Copy the example environment file and fill in your credentials:
+Copy the example file and fill in your keys:
 
 ```bash
 cp .env.example .env
 ```
 
-Then open `.env` in a text editor and set the following values:
+Edit `.env`:
 
 ```dotenv
-# Required — your OpenAI API key
+# Required
 OPENAI_API_KEY=sk-...
+EXCHANGERATE_API_KEY=your_exchangerate_host_key
 
-# Required — your exchangerate.host API key
-EXCHANGERATE_API_KEY=your_key_here
+# Optional — GPT-4o is the default
+OPENAI_MODEL=gpt-4o
 
-# Optional — set to true to use the mock connector instead of live data
-# USE_MOCK_CONNECTOR=false
+# Set to true during development to avoid consuming live API quota
+USE_MOCK_CONNECTOR=false
+
+# Allowed origins for CORS (comma-separated)
+CORS_ORIGINS=http://localhost:8000
 ```
 
-> **Note:** Never commit your `.env` file to version control. It is already listed in `.gitignore`.
+> **Note:** No new environment variables are required for Feature 02. All Feature 02 functionality uses the same keys listed above.
 
-#### Step 5 — Start the backend server
+**Step 5 — Start the server**
 
 ```bash
-uvicorn backend.main:app --reload
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-You should see output similar to:
-
-```
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-```
-
-#### Step 6 — Open the frontend
-
-Open `frontend/index.html` directly in your browser. No build step or web server is required — it is a single self-contained HTML file.
-
-On macOS:
-```bash
-open frontend/index.html
-```
-
-On Windows:
-```bash
-start frontend/index.html
-```
-
-The chat window will load and connect to the backend at `http://127.0.0.1:8000`.
+The application is now available at **http://localhost:8000**.
+Interactive API docs (Swagger UI) are at **http://localhost:8000/docs**.
 
 ---
 
-### 3. How to Use the Chatbot
+## 3. Using the Chat Interface (Feature 01)
 
-Type your question in the input box at the bottom of the chat window and press **Enter** or click **Send**. The AI agent will retrieve the relevant exchange rate data and reply in plain English.
+The chat interface lets you query live and historical FX rates in plain English.
 
-#### Example queries and expected responses
+### Accessing the Chat
 
-| Your message | Expected response (approximate) |
-|---|---|
-| `What is EUR/USD right now?` | "The current EUR/USD rate is 1.0823 as of 2026-03-25." |
-| `What was GBP/USD on 1 March 2026?` | "The GBP/USD rate on 2026-03-01 was 1.2650." |
-| `Convert 1000 USD to JPY` | "1,000 USD is approximately 149,230 JPY at the current rate of 149.23." |
-| `What is EUR/JPY today?` | "The current EUR/JPY rate is approximately 161.42 as of 2026-03-25. (Note: this rate is calculated via USD triangulation.)" |
-| `List the rates for USD against EUR, GBP, and JPY` | "Here are today's USD rates: EUR 0.9240, GBP 0.7905, JPY 149.23." |
-| `What was AUD/CAD on 15 January 2026?` | "The AUD/CAD rate on 2026-01-15 was 0.8912. (Note: calculated via USD triangulation.)" |
+Open **http://localhost:8000** in your browser. The chat panel appears on the page by default.
 
-#### Tips for best results
+### Asking Questions
 
-- Include the currency pair explicitly using ISO 4217 codes (EUR, USD, GBP, JPY, etc.).
-- For historical queries, use unambiguous date formats such as `1 March 2026` or `2026-03-01`.
-- The conversation is stateful within a session — you can ask follow-up questions such as "What about last week?" after a prior query.
+Type a question in the input box and press **Enter** or click **Send**.
 
----
+**Example prompts:**
 
-### 4. Supported Currency Pairs and Limitations
+| What you want | What to type |
+|---------------|-------------|
+| Current spot rate | `What is the EUR/USD rate?` |
+| Historical rate | `What was USD/JPY on 2025-12-01?` |
+| Cross-rate | `What is GBP/CHF today?` |
+| Multiple rates | `Show me EUR/USD, GBP/USD and AUD/USD rates` |
+| Supported currencies | `Which currencies do you support?` |
 
-#### Supported currencies
+### How It Works
 
-The exchangerate.host free tier supports the following currency codes (not exhaustive):
+1. Your message is sent to the backend via `POST /api/chat`.
+2. GPT-4o interprets intent and selects one of three tools: `get_exchange_rate`, `get_exchange_rates`, or `list_supported_currencies`.
+3. The selected tool calls the active data connector (live or mock).
+4. The result is formatted and returned as a conversational reply.
 
-AED, AFN, ALL, AMD, ANG, AOA, ARS, AUD, AWG, AZN, BAM, BBD, BDT, BGN, BHD, BIF, BMD, BND, BOB, BRL, BSD, BTN, BWP, BYR, BZD, CAD, CDF, CHF, CLP, CNY, COP, CRC, CUP, CVE, CZK, DJF, DKK, DOP, DZD, EGP, ERN, ETB, **EUR**, FJD, FKP, **GBP**, GEL, GHS, GIP, GMD, GNF, GTQ, GYD, HKD, HNL, HRK, HTG, HUF, IDR, ILS, INR, IQD, IRR, ISK, JMD, **JPY**, JOD, KES, KGS, KHR, KMF, KPW, KRW, KWD, KYD, KZT, LAK, LBP, LKR, LRD, LSL, LYD, MAD, MDL, MGA, MKD, MMK, MNT, MOP, MRO, MUR, MVR, MWK, MXN, MYR, MZN, NAD, NGN, NIO, NOK, NPR, NZD, OMR, PAB, PEN, PGK, PHP, PKR, PLN, PYG, QAR, RON, RSD, RUB, RWF, SAR, SBD, SCR, SDG, SEK, SGD, SHP, SLL, SOS, SRD, STD, SVC, SYP, SZL, THB, TJS, TMT, TND, TOP, TRY, TTD, TWD, TZS, UAH, UGX, **USD**, UYU, UZS, VEF, VND, VUV, WST, XAF, XCD, XOF, XPF, YER, ZAR, ZMW, ZWL
+For cross-rates not directly quoted (e.g., GBP/CHF), the system performs USD triangulation automatically — you simply ask for the pair you need.
 
-> The above list reflects the exchangerate.host free tier. Availability may vary. If a pair is not supported, the chatbot will return a clear error message.
+### Chat Limitations
 
-#### How non-USD cross-rates work
-
-The exchangerate.host free tier uses USD as its base currency for all rate lookups. When you request a pair that does not involve USD (for example EUR/JPY or GBP/AUD), the connector automatically performs **USD triangulation**:
-
-1. Fetch EUR/USD rate.
-2. Fetch JPY/USD rate.
-3. Calculate EUR/JPY = (EUR/USD) ÷ (JPY/USD).
-
-This is transparent to you as a user — the chatbot returns the correct cross-rate — but it means two API calls are made per non-USD query, which counts against the monthly quota (see below).
-
-#### Known limitations of the PoC
-
-| Limitation | Detail |
-|---|---|
-| **Free tier quota** | The exchangerate.host free tier allows approximately **100 requests per month**. Each non-USD cross-rate query consumes 2 requests. This quota will be exhausted quickly under sustained use. Use `USE_MOCK_CONNECTOR=true` for development and testing. |
-| **End-of-day rates only** | The free tier provides end-of-day (EOD) closing rates, not real-time intraday prices. Rates are typically updated once per day. |
-| **Historical data** | Historical rates may not be available on the free tier for all date ranges. If a historical query fails, the chatbot will return a clear error. |
-| **No streaming** | Responses are returned as a single message after processing completes. There is no token-by-token streaming in the PoC. |
-| **No authentication** | The PoC has no user authentication or session management. Anyone who can reach the backend can use the chatbot. |
-| **CORS open to all origins** | The backend accepts requests from any origin (`*`). This is acceptable for local development but must be locked down before any deployment. |
-| **No rate limiting** | The backend does not rate-limit incoming requests. A malicious or runaway client could exhaust the upstream API quota rapidly. |
-| **Single data source** | Only exchangerate.host is supported. Equities, commodities, and crypto are out of scope for this PoC. |
-| **English only** | The chatbot is prompted and tested in English. Other languages may produce unpredictable results. |
+- Optimised for question-and-answer queries, not bulk data export.
+- Historical data is **end-of-day (EOD) only** — intraday rates are not available on the free exchangerate.host tier.
+- For visual trend analysis across time or multiple pairs, use the FX Dashboard (Feature 02).
 
 ---
 
-### 5. Troubleshooting
+## 4. Using the FX Dashboard (Feature 02)
 
-#### The chat window shows no response / "Error contacting server"
+The FX Rate Trend Dashboard provides panel-based visual analysis of historical exchange rates.
 
-- Confirm the backend is running: open `http://127.0.0.1:8000/health` in your browser. You should see `{"status": "ok"}`.
-- Check the terminal where you ran `uvicorn` for error messages.
-- Ensure your `.env` file exists and contains valid values for `OPENAI_API_KEY` and `EXCHANGERATE_API_KEY`.
+### Accessing the Dashboard
 
-#### "Rate not found" or "Unsupported pair" error in the chat
+Click the **Dashboard** tab at the top of the page, or navigate to **http://localhost:8000/dashboard**.
 
-- Verify the currency codes you used are valid ISO 4217 codes (e.g. `EUR`, not `Euro` or `€`).
-- The pair may not be supported by the exchangerate.host free tier. Try a major pair such as EUR/USD to confirm the connector is working.
+### Selecting a Dashboard Type
 
-#### "API quota exceeded" or HTTP 429 error
+When you create a dashboard you choose one of three types:
 
-- Your exchangerate.host free tier has been exhausted (approximately 100 requests/month).
-- Switch to the mock connector for development: set `USE_MOCK_CONNECTOR=true` in your `.env` and restart the server.
-- Alternatively, upgrade to a paid exchangerate.host plan.
+| Dashboard Type | Best For |
+|---------------|----------|
+| **Single-Pair Trend** | Tracking one currency pair over time as a line chart |
+| **Multi-Pair Comparison** | Overlaying multiple pairs on one chart to compare relative movement |
+| **Heatmap** | Spotting rate-change patterns across a grid of base × quote currencies |
 
-#### "Invalid API key" / 401 error from the data source
+**To create a dashboard:**
 
-- Check that `EXCHANGERATE_API_KEY` in your `.env` is set correctly and has not expired.
-- Log in to your exchangerate.host account to verify the key is active.
+1. Click **+ New Dashboard** in the sidebar.
+2. Enter a name.
+3. Select a **Dashboard Type** from the dropdown.
+4. Click **Create**.
 
-#### "OpenAI API error" / 401 or 429 from OpenAI
+### Adding and Configuring Panels
 
-- Check that `OPENAI_API_KEY` in your `.env` is correct and has not been revoked.
-- If you receive a 429, your OpenAI account may be rate-limited or out of credits.
+Each dashboard holds multiple independent panels. A panel is one chart or data widget.
 
-#### The frontend does not connect to the backend
+**To add a panel:**
 
-- The frontend is hard-coded to connect to `http://127.0.0.1:8000`. If you started the backend on a different port (e.g. `--port 8080`), update the API URL in `frontend/index.html`.
-- Ensure no firewall or security software is blocking port 8000.
+1. Open a dashboard and click **+ Add Panel**.
+2. In the panel configuration drawer set:
+   - **Panel type** — Line Chart, Bar Chart, Stats Summary, or Heatmap Table.
+   - **Currency pair(s)** — one or more pairs (e.g., EUR/USD).
+   - **Date range** — start and end date, or a preset (7 days, 30 days, 90 days).
+   - **Granularity** — daily, weekly, or monthly data points.
+3. Click **Save Panel**.
 
-#### Historic rate query returns an error
+Panels are arranged in a CSS Grid layout. Drag panel headers to reorder; drag panel edges to resize.
 
-- Historical rate availability depends on your exchangerate.host plan. The free tier may not support all date ranges.
-- If historical queries consistently fail, this feature may need to be descoped (see GAP-05 in the product documentation).
+**To edit a panel:** click the pencil icon on the panel header.
+**To remove a panel:** click the trash icon and confirm.
+
+> **Quota warning:** Each panel data fetch consumes exchangerate.host API calls: one call per currency pair per date in the range. A 30-day, 3-pair dashboard = ~90 calls. The free tier allows ~100 calls/month. Set `USE_MOCK_CONNECTOR=true` during development.
+
+### Querying Historical Rates
+
+Historical data is fetched when you save a panel with a past date range:
+
+1. The frontend calls `POST /api/dashboard` with the panel configuration.
+2. The backend retrieves EOD rates from the connector (or cache).
+3. The panel chart renders with the returned data points.
+
+Click **Refresh** on a panel to force a fresh fetch. The date range is capped at **31 calendar days per request** by default (set `MAX_HISTORICAL_DAYS` in `.env` to change).
+
+> **Historical data is EOD only.** The exchangerate.host free tier provides end-of-day closing rates. Intraday (hourly/minute) rates are not available.
+
+### Understanding the Charts
+
+| Element | Meaning |
+|---------|--------|
+| X-axis | Date |
+| Y-axis | Rate (units of quote currency per 1 base currency unit) |
+| Tooltip | Exact rate and date on hover |
+| Colour legend | Identifies each pair (Multi-Pair Comparison) |
+| Cell colour | Magnitude of rate change — green = appreciation, red = depreciation (Heatmap) |
+| Stats panel | Shows min, max, mean, and standard deviation for the selected period |
 
 ---
 
-## Part 2 — Developer Guide
+## 5. Supported Currencies
 
-### 1. Architecture Overview
+The following currencies are supported for both chat queries and dashboard panels.
 
-AI Market Studio uses a strict four-layer architecture. Each layer depends only on the layer directly below it, communicates through a well-defined interface, and is independently testable.
+| Code | Currency |
+|------|----------|
+| USD | US Dollar |
+| EUR | Euro |
+| GBP | British Pound Sterling |
+| JPY | Japanese Yen |
+| AUD | Australian Dollar |
+| CAD | Canadian Dollar |
+| CHF | Swiss Franc |
+| CNY | Chinese Yuan Renminbi |
+| HKD | Hong Kong Dollar |
+| SGD | Singapore Dollar |
+| NZD | New Zealand Dollar |
+
+> For the live list, call `GET /api/v1/currencies`.
+
+**Cross-rates:** Pairs not directly quoted against USD (e.g., GBP/CHF) are computed by USD triangulation:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Chat UI (Browser)                        │
-│              frontend/index.html — HTML + Vanilla JS            │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │  POST /api/chat  { messages: [...] }
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Backend API (FastAPI)                        │
-│   main.py · router.py · models.py · config.py · middleware      │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │  await agent.run(messages)
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    AI Agent Layer                                │
-│         agent/agent.py  ·  agent/tools.py                       │
-│         GPT-4o function-calling loop (OpenAI SDK)               │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │  await connector.get_exchange_rate(...)
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  Data Connector Layer                            │
-│   connectors/base.py (ABC)  ·  connectors/exchangerate_host.py  │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │  HTTPS GET
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│               Market Data Source (exchangerate.host)            │
-└─────────────────────────────────────────────────────────────────┘
+GBP/CHF = (USD/CHF) / (USD/GBP)
 ```
 
-#### Key files
-
-| File | Layer | Responsibility |
-|---|---|---|
-| `frontend/index.html` | UI | Single-file chat UI (HTML + Vanilla JS) |
-| `backend/main.py` | API | App factory, middleware, router mount, connector instantiation |
-| `backend/router.py` | API | `/api/chat` route, error mapping, request logging |
-| `backend/models.py` | API | `ChatRequest`, `ChatResponse`, `Message` Pydantic models |
-| `backend/config.py` | API | `Settings` via pydantic-settings |
-| `backend/agent/agent.py` | Agent | GPT-4o function-calling loop |
-| `backend/agent/tools.py` | Agent | Tool JSON schemas, dispatch function |
-| `backend/connectors/base.py` | Connector | `MarketDataConnector` ABC + exception hierarchy |
-| `backend/connectors/exchangerate_host.py` | Connector | Live data implementation |
-| `backend/connectors/mock.py` | Connector | Deterministic mock for testing |
-| `tests/unit/test_connector.py` | Tests | Connector tests with `respx` HTTP mocks |
-| `tests/agent/test_agent.py` | Tests | Agent loop tests with mocked OpenAI client |
-| `tests/e2e/test_chat_api.py` | Tests | E2E tests via `httpx` TestClient |
-| `requirements.txt` | — | All runtime and test dependencies |
-| `.env.example` | — | Environment variable template |
+This is transparent — simply ask for the pair you need.
 
 ---
 
-### 2. How to Add a New Data Connector
+## 6. Troubleshooting
 
-All data connectors must implement the `MarketDataConnector` abstract base class defined in `backend/connectors/base.py`.
+### Server won't start
 
-#### Step 1 — Understand the interface
+- Confirm Python 3.11+: `python --version`
+- Confirm dependencies installed: `pip install -r requirements.txt`
+- Confirm `.env` exists and contains `OPENAI_API_KEY` and `EXCHANGERATE_API_KEY`.
+
+### "API key invalid" error
+
+- Check for leading/trailing spaces in `.env` values.
+- Confirm your OpenAI key has GPT-4o access.
+- Confirm your exchangerate.host key is active (log in to their dashboard).
+
+### Chat returns "I could not retrieve the rate"
+
+- Check server logs for HTTP 4xx/5xx from the connector.
+- If `USE_MOCK_CONNECTOR=false` you may have exhausted the free-tier quota (~100 req/month).
+- Set `USE_MOCK_CONNECTOR=true` to verify the rest of the stack with synthetic data.
+
+### Dashboard panel shows "No data"
+
+- Confirm the date range is not in the future.
+- Confirm the currency pair is in the supported list (Section 5).
+- Check browser console for network errors (F12 → Console).
+- Click **Refresh** on the panel.
+- Confirm you have not exceeded the 31-day-per-request cap (`MAX_HISTORICAL_DAYS`).
+
+### Historical data unavailable
+
+- The exchangerate.host free tier historical endpoint availability is unconfirmed. Verify your plan at exchangerate.host, or use `USE_MOCK_CONNECTOR=true` for development.
+- Historical data is EOD only — intraday rates will never be returned regardless of plan.
+
+### Cross-rate is wrong or null
+
+- Cross-rates require two sequential USD-based API calls. If either fails, the result is `null`.
+- Check server logs for `triangulation error`.
+- Verify both leg currencies are in the supported list.
+
+### Quota exhausted mid-session
+
+- The session-level quota enforcer (`QUOTA_LIMIT_PER_SESSION`) will return HTTP 429 once reached.
+- Check remaining quota: `GET /api/v1/quota`.
+- Set `USE_MOCK_CONNECTOR=true` and restart the server to continue working without consuming quota.
+
+---
+
+# Developer Sections
+
+---
+
+## 7. Project Structure
+
+```
+ai-market-studio/
+├── backend/
+│   ├── main.py                   # FastAPI app factory, startup, middleware
+│   ├── router.py                 # All HTTP route definitions
+│   ├── models.py                 # Pydantic request/response models
+│   ├── config.py                 # Settings (env vars, feature flags)
+│   ├── agent/
+│   │   ├── agent.py              # GPT-4o function-calling loop
+│   │   └── tools.py              # Tool definitions and dispatch
+│   ├── connectors/
+│   │   ├── base.py               # Abstract MarketDataConnector base class
+│   │   ├── exchangerate_host.py  # Live data connector
+│   │   ├── mock_connector.py     # Synthetic data connector (tests/dev)
+│   │   └── cache.py              # In-process rate cache
+│   └── dashboard/
+│       └── dashboard.py          # build_dashboard_response() logic
+├── frontend/
+│   └── index.html                # Single-page UI (chat + dashboard tabs)
+├── tests/
+│   ├── unit/                     # Connector and model unit tests
+│   ├── agent/                    # Agent layer tests (mocked OpenAI)
+│   └── e2e/                      # End-to-end tests (TestClient + MockConnector)
+├── docs/                         # All design and reference documents
+├── .env.example
+├── requirements.txt
+└── README.md
+```
+
+### Architecture (5 Layers)
+
+```
+Chat UI + Dashboard UI  (frontend/index.html)
+           │  POST /api/chat  │  POST /api/dashboard
+           ▼                  ▼
+     Backend API  (FastAPI — router.py)
+           │
+           ▼
+  AI Agent Layer  (agent/agent.py + tools.py)
+           │
+           ▼
+Data Connector Layer  (connectors/base.py ABC)
+           │
+           ▼
+ Market Data Source  (exchangerate.host / MockConnector)
+```
+
+---
+
+## 8. Adding a New Connector
+
+All connectors implement the abstract base class in `backend/connectors/base.py`.
+
+**Step 1 — Create the connector file**
 
 ```python
-# backend/connectors/base.py
-class MarketDataConnector(ABC):
-    @abstractmethod
-    async def get_exchange_rate(
-        self,
-        base: str,
-        target: str,
-        date: Optional[str] = None,  # ISO 8601: "YYYY-MM-DD"; None = latest
-    ) -> dict:
+# backend/connectors/myconnector.py
+from backend.connectors.base import MarketDataConnector
+from decimal import Decimal
+from datetime import date
+from typing import list
+
+class MyConnector(MarketDataConnector):
+
+    async def get_exchange_rate(self, base: str, quote: str) -> Decimal:
+        """Return current spot rate for base/quote."""
         ...
 
-    @abstractmethod
+    async def get_exchange_rates(
+        self, base: str, quotes: list[str]
+    ) -> dict[str, Decimal]:
+        """Return current spot rates for multiple quote currencies."""
+        ...
+
+    async def get_historical_rate(
+        self, base: str, quote: str, on_date: date
+    ) -> Decimal:
+        """Return EOD rate for base/quote on a specific date."""
+        ...
+
+    async def get_historical_rates(
+        self, base: str, quote: str, start: date, end: date
+    ) -> list[dict]:
+        """Return EOD rates for base/quote over a date range.
+        Each dict: {"date": "YYYY-MM-DD", "rate": Decimal}
+        """
+        ...
+
     async def list_supported_currencies(self) -> list[str]:
-        ...
-
-    @abstractmethod
-    async def health_check(self) -> bool:
+        """Return list of supported ISO 4217 currency codes."""
         ...
 ```
 
-The canonical return dict for `get_exchange_rate` must conform to:
+**Step 2 — Register the connector in `config.py`**
+
+Add a branch to the connector factory function that reads `USE_MOCK_CONNECTOR` and any new env vars your connector needs.
+
+**Step 3 — Add unit tests**
+
+Create `tests/unit/test_myconnector.py` using `respx` to mock HTTP calls. The MockConnector pattern in `mock_connector.py` is the reference implementation.
+
+**Step 4 — Set `USE_MOCK_CONNECTOR=true` in CI**
+
+Never allow CI to call a live API. Inject the MockConnector in all automated test runs.
+
+---
+
+## 9. Adding a New Agent Tool
+
+Agent tools are defined in `backend/agent/tools.py` and dispatched in the same file.
+
+**Step 1 — Define the tool schema**
+
+Add a new entry to the `TOOLS` list following the OpenAI function-calling schema:
 
 ```python
 {
-    "base":      str,          # e.g. "EUR"
-    "target":    str,          # e.g. "USD"
-    "rate":      float,        # e.g. 1.0823
-    "date":      str,          # ISO 8601 date of the rate
-    "source":    str,          # connector identifier, e.g. "exchangerate_host"
-    "timestamp": str,          # ISO 8601 datetime of data retrieval (UTC)
+    "type": "function",
+    "function": {
+        "name": "my_new_tool",
+        "description": "What this tool does, in one sentence.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "param_one": {
+                    "type": "string",
+                    "description": "Description of param_one."
+                }
+            },
+            "required": ["param_one"]
+        }
+    }
 }
 ```
 
-#### Step 2 — Create the connector file
+**Step 2 — Implement the dispatch handler**
 
-Create a new file at `backend/connectors/<your_source>.py`. Name the class descriptively.
-
-```python
-# backend/connectors/my_source.py
-from datetime import datetime, timezone
-from typing import Optional
-import httpx
-from .base import MarketDataConnector, RateFetchError, UnsupportedPairError
-
-class MySourceConnector(MarketDataConnector):
-    def __init__(self, api_key: str):
-        self._api_key = api_key
-        self._base_url = "https://api.mysource.example"
-
-    async def get_exchange_rate(
-        self, base: str, target: str, date: Optional[str] = None
-    ) -> dict:
-        async with httpx.AsyncClient() as client:
-            try:
-                resp = await client.get(
-                    f"{self._base_url}/rate",
-                    params={"base": base, "target": target, "date": date},
-                    headers={"Authorization": f"Bearer {self._api_key}"},
-                    timeout=10.0,
-                )
-                resp.raise_for_status()
-            except httpx.HTTPStatusError as exc:
-                raise RateFetchError(str(exc)) from exc
-            data = resp.json()
-        return {
-            "base": base,
-            "target": target,
-            "rate": float(data["rate"]),
-            "date": data["date"],
-            "source": "my_source",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-
-    async def list_supported_currencies(self) -> list[str]:
-        # Return a static list or fetch from the API
-        return ["EUR", "USD", "GBP"]  # example
-
-    async def health_check(self) -> bool:
-        try:
-            await self.get_exchange_rate("EUR", "USD")
-            return True
-        except Exception:
-            return False
-```
-
-#### Step 3 — Register the connector in the factory
-
-Open `backend/connectors/__init__.py` (or `backend/main.py`, depending on where the factory function lives) and add a branch for your new connector:
+In the `dispatch_tool` function, add a branch for `"my_new_tool"`:
 
 ```python
-from backend.connectors.my_source import MySourceConnector
-
-def get_connector(settings: Settings) -> MarketDataConnector:
-    if settings.use_mock_connector:
-        return MockConnector()
-    if settings.connector == "my_source":
-        return MySourceConnector(api_key=settings.my_source_api_key)
-    # default
-    return ExchangeRateHostConnector(api_key=settings.exchangerate_api_key)
+elif name == "my_new_tool":
+    result = await connector.some_method(args["param_one"])
+    return {"result": str(result)}
 ```
 
-#### Step 4 — Add the required environment variable
+**Step 3 — Add agent-layer tests**
 
-Add your new API key to `.env.example`:
-
-```dotenv
-MY_SOURCE_API_KEY=your_key_here
-```
-
-And expose it in `backend/config.py`:
-
-```python
-class Settings(BaseSettings):
-    my_source_api_key: str = ""
-```
-
-#### Step 5 — Write tests
-
-Add a test file at `tests/unit/test_my_source_connector.py`. Use `respx` to mock HTTP calls — do not make real network requests in unit tests.
-
-```python
-import respx
-import httpx
-import pytest
-from backend.connectors.my_source import MySourceConnector
-
-@pytest.mark.asyncio
-async def test_get_exchange_rate_success():
-    with respx.mock:
-        respx.get("https://api.mysource.example/rate").mock(
-            return_value=httpx.Response(200, json={"rate": "1.08", "date": "2026-03-25"})
-        )
-        connector = MySourceConnector(api_key="test")
-        result = await connector.get_exchange_rate("EUR", "USD")
-        assert result["rate"] == 1.08
-        assert result["base"] == "EUR"
-```
-
-The agent layer does not need to be modified — it depends only on the `MarketDataConnector` interface.
+In `tests/agent/`, add a fixture with a recorded OpenAI response that invokes `my_new_tool`, and assert that `dispatch_tool` returns the expected result using MockConnector.
 
 ---
 
-### 3. API Reference — POST /api/chat
+## 10. Adding a New Dashboard Type
 
-#### Endpoint
+Dashboard types are defined in `backend/dashboard/dashboard.py` and rendered in `frontend/index.html`.
 
+**Step 1 — Register the type in `models.py`**
+
+Add the new type string to the `DashboardType` enum:
+
+```python
+class DashboardType(str, Enum):
+    single_pair_trend = "single_pair_trend"
+    multi_pair_comparison = "multi_pair_comparison"
+    heatmap = "heatmap"
+    my_new_type = "my_new_type"  # add here
 ```
-POST http://127.0.0.1:8000/api/chat
-Content-Type: application/json
+
+**Step 2 — Implement the assembler in `dashboard.py`**
+
+Add a handler branch inside `build_dashboard_response()`:
+
+```python
+elif request.dashboard_type == DashboardType.my_new_type:
+    panels = await _build_my_new_type_panels(request, connector)
 ```
 
-#### Request body
+Implement `_build_my_new_type_panels()` to fetch data and return a list of `PanelData` objects.
+
+**Step 3 — Implement the renderer in `index.html`**
+
+The frontend receives panel data as JSON. Add a renderer function:
+
+```javascript
+function renderMyNewType(panel, canvasEl) {
+    const ctx = canvasEl.getContext('2d');
+    // draw using Canvas 2D API
+}
+```
+
+Register it in the panel dispatch map so the correct renderer is called based on `panel.type`.
+
+**Step 4 — Add tests**
+
+Add a unit test in `tests/unit/` that calls `build_dashboard_response()` with `dashboard_type="my_new_type"` using MockConnector and asserts the correct panel structure is returned.
+
+---
+
+## 11. Running Tests
+
+### Test Layout
+
+| Directory | What it tests | Connector used |
+|-----------|--------------|----------------|
+| `tests/unit/` | Connectors, models, cache, dashboard assembler | MockConnector + respx |
+| `tests/agent/` | GPT-4o tool dispatch, agent loop | Mocked OpenAI client (recorded fixtures) |
+| `tests/e2e/` | Full HTTP request → response via FastAPI TestClient | MockConnector injected |
+
+### Running All Tests
+
+```bash
+pytest --cov=backend --cov-report=term-missing
+```
+
+The 90% coverage gate is enforced. The run will fail if coverage drops below that threshold.
+
+### Running a Specific Layer
+
+```bash
+# Unit tests only
+pytest tests/unit/
+
+# Agent tests only
+pytest tests/agent/
+
+# E2E tests only
+pytest tests/e2e/
+```
+
+### Environment for Tests
+
+Always run tests with MockConnector to avoid consuming live API quota:
+
+```bash
+USE_MOCK_CONNECTOR=true pytest
+```
+
+Or set `USE_MOCK_CONNECTOR=true` in your `.env` before running pytest.
+
+> **CI requirement:** All CI pipelines must set `USE_MOCK_CONNECTOR=true`. Never allow CI to call a live external API.
+
+---
+
+## 12. API Reference
+
+All endpoints are prefixed with `/api/v1`. The Swagger UI at `/docs` provides an interactive reference.
+
+---
+
+### `POST /api/chat`
+
+Send a natural-language message and receive an AI-generated reply.
+
+**Request body**
 
 ```json
 {
-  "messages": [
-    { "role": "user",      "content": "What is EUR/USD right now?" },
-    { "role": "assistant", "content": "The current EUR/USD rate is 1.0823 as of 2026-03-25." },
-    { "role": "user",      "content": "What about GBP/USD?" }
+  "message": "What is EUR/USD right now?",
+  "history": [
+    {"role": "user", "content": "..."},
+    {"role": "assistant", "content": "..."}
   ]
 }
 ```
 
 | Field | Type | Required | Description |
-|---|---|---|---|
-| `messages` | array | Yes | Full conversation history. Each element is a message object. |
-| `messages[].role` | string | Yes | One of `"user"` or `"assistant"`. |
-| `messages[].content` | string | Yes | The text of the message. |
+|-------|------|----------|-------------|
+| `message` | string | Yes | The user's current message |
+| `history` | array | No | Prior conversation turns for context |
 
-The full message history must be sent on every request. The backend is stateless — it does not store conversation state between calls.
-
-#### Response body (200 OK)
+**Response — HTTP 200**
 
 ```json
 {
-  "reply": "The current GBP/USD rate is 1.2650 as of 2026-03-25."
+  "reply": "The current EUR/USD rate is 1.0842."
 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `reply` | string | The AI-generated natural-language response. |
+**Error codes**
 
-#### Error responses
-
-| HTTP Status | Condition | Response body example |
-|---|---|---|
-| `400 Bad Request` | Malformed request body (e.g. missing `messages` field, wrong types) | `{"detail": "messages field is required"}` |
-| `422 Unprocessable Entity` | Pydantic validation failure | `{"detail": [{"loc": [...], "msg": "...", "type": "..."}]}` |
-| `500 Internal Server Error` | Unhandled exception in agent or connector layer | `{"detail": "Internal server error"}` |
-| `502 Bad Gateway` | Upstream API (OpenAI or exchangerate.host) returned an error | `{"detail": "Upstream data source error: <message>"}` |
-| `503 Service Unavailable` | Connector health check failed on startup | `{"detail": "Data connector unavailable"}` |
-
-#### Example curl request
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"messages": [{"role": "user", "content": "What is EUR/USD?"}]}'
-```
-
-#### Health check endpoint
-
-```
-GET http://127.0.0.1:8000/health
-```
-
-Returns `{"status": "ok"}` when the backend is running.
+| Code | Meaning |
+|------|---------|
+| 400 | Malformed request body |
+| 422 | Validation error (Pydantic) |
+| 500 | Agent or connector error |
+| 502 | Upstream API (OpenAI or exchangerate.host) unreachable |
 
 ---
 
-### 4. Environment Variables Reference
+### `POST /api/dashboard`
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `OPENAI_API_KEY` | Yes | — | OpenAI API key. Must have access to `gpt-4o`. |
-| `EXCHANGERATE_API_KEY` | Yes (unless using mock) | — | API key for exchangerate.host. Required even on the free tier. |
-| `USE_MOCK_CONNECTOR` | No | `false` | Set to `true` to use `MockConnector` instead of the live connector. Use this for all automated tests and local development to avoid consuming API quota. |
-| `OPENAI_MODEL` | No | `gpt-4o` | The OpenAI model name to use for the agent. Change only if you have access to a different model. |
-| `LOG_LEVEL` | No | `INFO` | Logging level for the backend (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
-| `CORS_ORIGINS` | No | `*` | Comma-separated list of allowed CORS origins. Default allows all origins — restrict before deployment. |
-| `HOST` | No | `127.0.0.1` | Host address for uvicorn. |
-| `PORT` | No | `8000` | Port for uvicorn. |
+Build a dashboard response: fetch historical rate data and assemble panel payloads for frontend rendering.
 
-All variables are read from the `.env` file at startup via `pydantic-settings`. Environment variables set in the shell override `.env` values.
+**Request body**
 
----
-
-### 5. How to Run Tests
-
-#### Prerequisites
-
-Ensure you are in the project root with your virtual environment activated and dependencies installed.
-
-For all automated tests, set `USE_MOCK_CONNECTOR=true` to avoid consuming live API quota:
-
-```bash
-export USE_MOCK_CONNECTOR=true   # macOS/Linux
-# or
-set USE_MOCK_CONNECTOR=true      # Windows cmd
-```
-
-Or add it to your `.env` file temporarily.
-
-#### Run all tests
-
-```bash
-pytest
-```
-
-#### Run only unit tests
-
-```bash
-pytest tests/unit/
-```
-
-#### Run only agent tests
-
-```bash
-pytest tests/agent/
-```
-
-#### Run only E2E tests
-
-```bash
-pytest tests/e2e/
-```
-
-#### Run with verbose output
-
-```bash
-pytest -v
-```
-
-#### Run a specific test file
-
-```bash
-pytest tests/unit/test_connector.py -v
-```
-
-#### Test structure
-
-| Test file | What it tests | Mocking strategy |
-|---|---|---|
-| `tests/unit/test_connector.py` | `ExchangeRateHostConnector` HTTP interactions | `respx` mocks HTTP at the transport level |
-| `tests/unit/test_tools.py` | Tool JSON schema validity, dispatch function | No mocking needed (pure functions) |
-| `tests/agent/test_agent.py` | GPT-4o function-calling loop logic | Mocked `openai.AsyncOpenAI` client + `MockConnector` |
-| `tests/e2e/test_chat_api.py` | Full `/api/chat` request/response cycle | `httpx` TestClient + `MockConnector` |
-
-> **Important:** Never run tests against the live exchangerate.host API. Always use `USE_MOCK_CONNECTOR=true`. The free tier quota of ~100 requests/month will be exhausted by a single test run otherwise.
-
----
-
-### 6. How to Add a New Tool to the Agent Layer
-
-The agent layer uses OpenAI function calling. Tools are defined as JSON schemas in `backend/agent/tools.py` and dispatched to the connector layer.
-
-#### Step 1 — Define the tool schema
-
-Open `backend/agent/tools.py` and add a new entry to the `TOOLS` list:
-
-```python
-TOOLS = [
+```json
+{
+  "dashboard_type": "single_pair_trend",
+  "panels": [
     {
-        "type": "function",
-        "function": {
-            "name": "get_exchange_rate",
-            # ... existing tool ...
-        },
-    },
+      "panel_type": "line_chart",
+      "pairs": ["EUR/USD"],
+      "start_date": "2026-02-01",
+      "end_date": "2026-03-01",
+      "granularity": "daily"
+    }
+  ]
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `dashboard_type` | string enum | Yes | `single_pair_trend`, `multi_pair_comparison`, or `heatmap` |
+| `panels` | array | Yes | One or more panel configurations |
+| `panels[].panel_type` | string enum | Yes | `line_chart`, `bar_chart`, `stats_summary`, or `heatmap_table` |
+| `panels[].pairs` | array of strings | Yes | Currency pairs in `BASE/QUOTE` format |
+| `panels[].start_date` | string (YYYY-MM-DD) | Yes | Start of date range |
+| `panels[].end_date` | string (YYYY-MM-DD) | Yes | End of date range (max 31 days ahead of start by default) |
+| `panels[].granularity` | string enum | No | `daily` (default), `weekly`, or `monthly` |
+
+**Response — HTTP 200**
+
+```json
+{
+  "dashboard_type": "single_pair_trend",
+  "panels": [
     {
-        "type": "function",
-        "function": {
-            "name": "list_supported_currencies",
-            "description": "Returns a list of all currency codes supported by the current data connector.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": [],
-            },
-        },
-    },
-]
+      "panel_type": "line_chart",
+      "pair": "EUR/USD",
+      "data": [
+        {"date": "2026-02-01", "rate": 1.0821},
+        {"date": "2026-02-02", "rate": 1.0834}
+      ],
+      "stats": {
+        "min": 1.0798,
+        "max": 1.0901,
+        "mean": 1.0851,
+        "stddev": 0.0031
+      },
+      "grid": {"col": 1, "row": 1, "col_span": 2, "row_span": 1}
+    }
+  ]
+}
 ```
 
-The `name` field must exactly match the function name you will handle in the dispatch function.
+**Error codes**
 
-#### Step 2 — Implement the dispatch case
-
-In `backend/agent/tools.py`, find the `dispatch` function (or equivalent) and add a branch for your new tool:
-
-```python
-async def dispatch(tool_name: str, arguments: dict, connector: MarketDataConnector) -> dict:
-    if tool_name == "get_exchange_rate":
-        return await connector.get_exchange_rate(**arguments)
-    elif tool_name == "list_supported_currencies":
-        currencies = await connector.list_supported_currencies()
-        return {"currencies": currencies}
-    else:
-        raise ValueError(f"Unknown tool: {tool_name}")
-```
-
-#### Step 3 — Verify the connector supports the operation
-
-Confirm that the `MarketDataConnector` abstract base class (and all concrete implementations) have the method your tool calls. If it is a new method:
-
-1. Add the `@abstractmethod` to `backend/connectors/base.py`.
-2. Implement it in `backend/connectors/exchangerate_host.py`.
-3. Implement it in `backend/connectors/mock.py` with deterministic test data.
-
-#### Step 4 — Write tests
-
-Add a test to `tests/unit/test_tools.py` to verify the schema is valid and the dispatch function routes correctly:
-
-```python
-import pytest
-from backend.agent.tools import TOOLS, dispatch
-from backend.connectors.mock import MockConnector
-
-def test_list_supported_currencies_schema():
-    names = [t["function"]["name"] for t in TOOLS]
-    assert "list_supported_currencies" in names
-
-@pytest.mark.asyncio
-async def test_dispatch_list_supported_currencies():
-    connector = MockConnector()
-    result = await dispatch("list_supported_currencies", {}, connector)
-    assert "currencies" in result
-    assert isinstance(result["currencies"], list)
-```
-
-Add an agent-level test to `tests/agent/test_agent.py` to verify the agent calls the tool correctly when the user asks for supported currencies.
+| Code | Meaning |
+|------|---------|
+| 400 | Malformed request body |
+| 422 | Validation error (Pydantic) |
+| 429 | Session quota exhausted (`QUOTA_LIMIT_PER_SESSION` reached) |
+| 500 | Connector or assembler error |
+| 502 | Upstream API unreachable |
 
 ---
 
-### 7. Contradictions and Gaps Found
+### `GET /api/v1/rates/history`
 
-The following discrepancies were identified during documentation authoring:
+Fetch raw EOD historical rates for a single currency pair.
+
+**Query parameters**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `base` | string | Yes | Base currency code (e.g., `EUR`) |
+| `quote` | string | Yes | Quote currency code (e.g., `USD`) |
+| `start_date` | string (YYYY-MM-DD) | Yes | Start of range |
+| `end_date` | string (YYYY-MM-DD) | Yes | End of range |
+
+**Response — HTTP 200**
+
+```json
+{
+  "base": "EUR",
+  "quote": "USD",
+  "rates": [
+    {"date": "2026-02-01", "rate": 1.0821},
+    {"date": "2026-02-02", "rate": 1.0834}
+  ]
+}
+```
+
+---
+
+### `GET /api/v1/dashboards`
+
+List all dashboards for the current session.
+
+**Response — HTTP 200:** Array of dashboard summary objects (`id`, `name`, `dashboard_type`, `panel_count`).
+
+---
+
+### `POST /api/v1/dashboards`
+
+Create a new dashboard.
+
+**Request body:** `{"name": "My Dashboard", "dashboard_type": "single_pair_trend"}`
+
+**Response — HTTP 201:** Full dashboard object including `id`.
+
+---
+
+### `GET /api/v1/dashboards/{id}`
+
+Retrieve a dashboard by ID including all panel configurations.
+
+---
+
+### `PATCH /api/v1/dashboards/{id}`
+
+Update dashboard name or type.
+
+---
+
+### `DELETE /api/v1/dashboards/{id}`
+
+Delete a dashboard and all its panels.
+
+---
+
+### `POST /api/v1/dashboards/{id}/panels`
+
+Add a panel to an existing dashboard.
+
+---
+
+### `DELETE /api/v1/dashboards/{id}/panels/{panel_id}`
+
+Remove a panel from a dashboard.
+
+---
+
+### `GET /api/v1/dashboards/{id}/layout`
+
+Return the CSS Grid layout descriptor for all panels in a dashboard.
+
+---
+
+### `GET /api/v1/quota`
+
+Return current session quota usage.
+
+**Response — HTTP 200**
+
+```json
+{
+  "used": 42,
+  "limit": 100,
+  "remaining": 58
+}
+```
+
+---
+
+### `GET /api/v1/currencies`
+
+Return the list of supported ISO 4217 currency codes.
+
+**Response — HTTP 200:** `{"currencies": ["USD", "EUR", "GBP", ...]}`
+
+---
+
+## Contradictions and Gaps Found
 
 | ID | Source | Finding |
-|---|---|---|
-| CONTRA-01 | `team_context.md` vs `data_design.md` | `team_context.md` states the exchangerate.host free tier requires "no API key". `data_design.md` (confirmed by Wave 1 findings) states an API key (`EXCHANGERATE_API_KEY`) **is required**. The data design document is correct. All setup steps in this guide use the API key. |
-| GAP-05 | `product_documentation.md` | Historical rate availability on the exchangerate.host free tier is unconfirmed. If unavailable, US-02 (historical rate queries) must be descoped. This guide documents the feature as present but notes the caveat. |
-| GAP-04 | `product_documentation.md` | The GPT-4o system prompt is not defined in the architecture or team context documents. Tone and refusal behaviour are undocumented. The agent specialist must define and publish the system prompt. |
+|----|--------|---------|
+| CONTRA-01 | `team_context.md` vs `data_design.md` | An earlier version of `team_context.md` stated the free tier requires no API key. The correct position (confirmed in `data_design.md` and project memory) is that `EXCHANGERATE_API_KEY` **is required** even on the free tier. This guide follows the correct position. |
+| GAP-01 | `architecture_design.md` | The GPT-4o system prompt is referenced but not yet defined in `agent/agent.py`. Tone, refusal behaviour, and scope constraints are undocumented. The agent specialist must define and publish the system prompt. |
+| GAP-02 | `product_documentation.md` | Historical rate availability on the exchangerate.host free tier is unconfirmed. If the `/historical` endpoint requires a paid plan, Feature 02 historical panels will not function without upgrading. This guide documents the feature as designed but notes the caveat in Troubleshooting (Section 6). |
+| GAP-03 | `architecture_design.md` | MockConnector error injection API (`error_pairs` constructor arg) is listed as a high-priority open action item but is not yet implemented. Tests requiring error-path coverage cannot run until this is added. |
 
 ---
 

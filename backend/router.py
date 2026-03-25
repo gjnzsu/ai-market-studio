@@ -1,9 +1,16 @@
 import logging
 from fastapi import APIRouter, HTTPException, Request
 
-from backend.models import ChatRequest, ChatResponse
+from backend.models import (
+    ChatRequest, ChatResponse,
+    HistoricalRatesRequest, HistoricalRatesResponse, DailyRates,
+    DashboardConfig, DashboardDataResponse,
+)
 from backend.agent.agent import run_agent
 from backend.connectors.base import ConnectorError
+from backend.cache import RateCache
+
+rate_cache = RateCache()
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,4 +39,86 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
         reply=result["reply"],
         data=result["data"],
         tool_used=result["tool_used"],
+    )
+
+
+@router.post("/rates/historical", response_model=HistoricalRatesResponse)
+async def get_historical_rates(
+    request: Request, body: HistoricalRatesRequest
+) -> HistoricalRatesResponse:
+    """Return daily FX rates for a date range. Cached with TTL=300s."""
+    connector = request.app.state.connector
+    hit = rate_cache.get(body.base, body.targets, body.start_date, body.end_date)
+    if hit:
+        cached_resp = HistoricalRatesResponse(
+            base=hit.base,
+            start_date=hit.start_date,
+            end_date=hit.end_date,
+            series=hit.series,
+            cached=True,
+        )
+        return cached_resp
+    try:
+        raw = await connector.get_historical_rates(
+            body.base, body.targets, body.start_date, body.end_date
+        )
+    except ConnectorError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    series = [
+        DailyRates(date=d, rates=raw[d]) for d in sorted(raw.keys())
+    ]
+    resp = HistoricalRatesResponse(
+        base=body.base,
+        start_date=body.start_date,
+        end_date=body.end_date,
+        series=series,
+        cached=False,
+    )
+    rate_cache.set(body.base, body.targets, body.start_date, body.end_date, resp)
+    return resp
+
+
+@router.post("/dashboard", response_model=DashboardDataResponse)
+async def get_dashboard_data(
+    request: Request, config: DashboardConfig
+) -> DashboardDataResponse:
+    """Batch-fetch data for all dashboard panels. Reuses cache across panels."""
+    connector = request.app.state.connector
+    panels_out = []
+    for panel in config.panels:
+        hit = rate_cache.get(
+            panel.base, panel.targets, panel.start_date, panel.end_date
+        )
+        if hit:
+            panels_out.append({
+                "panel_id": panel.panel_id,
+                "panel_type": panel.panel_type,
+                "data": hit,
+            })
+            continue
+        try:
+            raw = await connector.get_historical_rates(
+                panel.base, panel.targets, panel.start_date, panel.end_date
+            )
+        except ConnectorError as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        series = [DailyRates(date=d, rates=raw[d]) for d in sorted(raw.keys())]
+        resp = HistoricalRatesResponse(
+            base=panel.base,
+            start_date=panel.start_date,
+            end_date=panel.end_date,
+            series=series,
+            cached=False,
+        )
+        rate_cache.set(
+            panel.base, panel.targets, panel.start_date, panel.end_date, resp
+        )
+        panels_out.append({
+            "panel_id": panel.panel_id,
+            "panel_type": panel.panel_type,
+            "data": resp,
+        })
+    return DashboardDataResponse(
+        dashboard_id=config.dashboard_id,
+        panels=panels_out,
     )

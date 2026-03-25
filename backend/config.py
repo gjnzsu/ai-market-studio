@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     use_mock_connector: bool = False
 
     cors_origins: str = "*"
+    max_historical_days: int = 7
 
     @property
     def cors_origins_list(self) -> list[str]:
