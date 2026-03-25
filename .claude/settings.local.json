@@ -3,7 +3,20 @@
     "allow": [
       "WebFetch(domain:exchangerate.host)",
       "WebFetch(domain:apilayer.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(python -m pytest backend/tests/ -v)",
+      "Bash(pip install:*)",
+      "Bash(curl -s http://127.0.0.1:8000/health)",
+      "Bash(curl:*)",
+      "Bash(python -c \":*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :8000)",
+      "Bash(taskkill /PID 21300 /F)",
+      "Bash(python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000)",
+      "Bash(cmd /c \"taskkill /PID 21300 /F\")",
+      "Bash(cmd /c \"taskkill /F /PID 21300\")",
+      "Bash(cmd /c taskkill /F /PID 21300 2>&1)",
+      "Bash(python:*)"
     ]
   }
 }
