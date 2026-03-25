@@ -88,10 +88,31 @@ class ExchangeRateHostConnector(MarketDataConnector):
         targets: list[str],
         date: Optional[str] = None,
     ) -> list[dict]:
+        # Fetch all needed currencies in a single API call to avoid rate limiting.
+        # For non-USD base we also need the base currency for triangulation.
+        currencies_needed = list(set(targets) | ({base} if base != FREE_TIER_BASE else set()))
+        quotes = await self._fetch_usd_rates(currencies_needed, date)
+        rate_date = date or self._today()
+
         results = []
         for target in targets:
-            result = await self.get_exchange_rate(base, target, date)
-            results.append(result)
+            if base == target:
+                results.append({"base": base, "target": target, "rate": 1.0, "date": rate_date, "source": SOURCE_NAME})
+                continue
+            if base == FREE_TIER_BASE:
+                key = f"{FREE_TIER_BASE}{target}"
+                if key not in quotes:
+                    raise UnsupportedPairError(f"{target} not available.")
+                results.append({"base": base, "target": target, "rate": round(quotes[key], 6), "date": rate_date, "source": SOURCE_NAME})
+            else:
+                usd_base_key = f"{FREE_TIER_BASE}{base}"
+                usd_target_key = f"{FREE_TIER_BASE}{target}"
+                if usd_base_key not in quotes:
+                    raise UnsupportedPairError(f"{base} not available via triangulation.")
+                if usd_target_key not in quotes:
+                    raise UnsupportedPairError(f"{target} not available via triangulation.")
+                rate = quotes[usd_target_key] / quotes[usd_base_key]
+                results.append({"base": base, "target": target, "rate": round(rate, 6), "date": rate_date, "source": SOURCE_NAME})
         return results
 
     async def list_supported_currencies(self) -> list[str]:

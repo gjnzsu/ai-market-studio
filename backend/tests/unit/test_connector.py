@@ -150,3 +150,114 @@ async def test_exchangerate_host_cross_rate_triangulation(respx_mock):
 async def test_exchangerate_host_missing_api_key():
     with pytest.raises(RateFetchError):
         ExchangeRateHostConnector(api_key="")
+
+
+# ---------------------------------------------------------------------------
+# ExchangeRateHostConnector — get_exchange_rates (batched)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_exchangerate_host_get_exchange_rates_usd_base(respx_mock):
+    """Single API call returns all three pairs when base is USD."""
+    respx_mock.get("https://api.exchangerate.host/live").mock(
+        return_value=httpx.Response(200, json={
+            "success": True,
+            "quotes": {"USDEUR": 0.92, "USDGBP": 0.786, "USDJPY": 149.5},
+        })
+    )
+    connector = ExchangeRateHostConnector(api_key="test_key")
+    results = await connector.get_exchange_rates("USD", ["EUR", "GBP", "JPY"])
+    assert len(results) == 3
+    assert results[0] == {"base": "USD", "target": "EUR", "rate": 0.92, "date": results[0]["date"], "source": "exchangerate.host"}
+    assert results[1] == {"base": "USD", "target": "GBP", "rate": 0.786, "date": results[1]["date"], "source": "exchangerate.host"}
+    assert results[2] == {"base": "USD", "target": "JPY", "rate": 149.5, "date": results[2]["date"], "source": "exchangerate.host"}
+
+
+@pytest.mark.asyncio
+async def test_exchangerate_host_get_exchange_rates_cross_base(respx_mock):
+    """Non-USD base triggers triangulation for all targets in one call."""
+    respx_mock.get("https://api.exchangerate.host/live").mock(
+        return_value=httpx.Response(200, json={
+            "success": True,
+            "quotes": {"USDEUR": 0.92, "USDGBP": 0.786, "USDJPY": 149.5},
+        })
+    )
+    connector = ExchangeRateHostConnector(api_key="test_key")
+    results = await connector.get_exchange_rates("EUR", ["GBP", "JPY"])
+    assert len(results) == 2
+    assert results[0]["base"] == "EUR"
+    assert results[0]["target"] == "GBP"
+    assert results[0]["rate"] == pytest.approx(round(0.786 / 0.92, 6))
+    assert results[1]["base"] == "EUR"
+    assert results[1]["target"] == "JPY"
+    assert results[1]["rate"] == pytest.approx(round(149.5 / 0.92, 6))
+
+
+@pytest.mark.asyncio
+async def test_exchangerate_host_get_exchange_rates_same_currency(respx_mock):
+    """Same base and target returns rate 1.0 without needing the quote key."""
+    respx_mock.get("https://api.exchangerate.host/live").mock(
+        return_value=httpx.Response(200, json={
+            "success": True,
+            "quotes": {"USDEUR": 0.92},
+        })
+    )
+    connector = ExchangeRateHostConnector(api_key="test_key")
+    results = await connector.get_exchange_rates("USD", ["EUR", "USD"])
+    usd_usd = next(r for r in results if r["target"] == "USD")
+    assert usd_usd["rate"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_exchangerate_host_get_exchange_rates_missing_target(respx_mock):
+    """Missing target currency in quotes raises UnsupportedPairError."""
+    respx_mock.get("https://api.exchangerate.host/live").mock(
+        return_value=httpx.Response(200, json={
+            "success": True,
+            "quotes": {"USDEUR": 0.92},
+        })
+    )
+    connector = ExchangeRateHostConnector(api_key="test_key")
+    with pytest.raises(UnsupportedPairError):
+        await connector.get_exchange_rates("USD", ["EUR", "XYZ"])
+
+
+@pytest.mark.asyncio
+async def test_exchangerate_host_get_exchange_rates_api_error(respx_mock):
+    """API error response propagates as RateFetchError."""
+    respx_mock.get("https://api.exchangerate.host/live").mock(
+        return_value=httpx.Response(200, json={
+            "success": False,
+            "error": {"info": "Rate limit exceeded"},
+        })
+    )
+    connector = ExchangeRateHostConnector(api_key="test_key")
+    with pytest.raises(RateFetchError, match="Rate limit exceeded"):
+        await connector.get_exchange_rates("USD", ["EUR", "GBP"])
+
+
+# ---------------------------------------------------------------------------
+# ExchangeRateHostConnector — list_supported_currencies
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_exchangerate_host_list_supported_currencies(respx_mock):
+    respx_mock.get("https://api.exchangerate.host/list").mock(
+        return_value=httpx.Response(200, json={
+            "success": True,
+            "currencies": {"USD": "US Dollar", "EUR": "Euro", "GBP": "British Pound"},
+        })
+    )
+    connector = ExchangeRateHostConnector(api_key="test_key")
+    currencies = await connector.list_supported_currencies()
+    assert set(currencies) == {"USD", "EUR", "GBP"}
+
+
+@pytest.mark.asyncio
+async def test_exchangerate_host_list_supported_currencies_api_error(respx_mock):
+    respx_mock.get("https://api.exchangerate.host/list").mock(
+        return_value=httpx.Response(200, json={"success": False})
+    )
+    connector = ExchangeRateHostConnector(api_key="test_key")
+    with pytest.raises(RateFetchError, match="Could not fetch currency list"):
+        await connector.list_supported_currencies()
