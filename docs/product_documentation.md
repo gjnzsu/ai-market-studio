@@ -1,9 +1,9 @@
 # AI Market Studio — Product Documentation
 
-> **Version:** 2.0
-> **Date:** 2026-03-26
+> **Version:** 2.1
+> **Date:** 2026-03-27
 > **Status:** Active
-> **Scope:** FX Rate Trend Dashboard (Feature 02)
+> **Scope:** FX Rate Trend Dashboard (Feature 02) — Delivered
 
 ---
 
@@ -481,26 +481,29 @@ The layout is determined server-side based on panel count and returned as the `g
 - MockConnector + 90% coverage gate
 - Single HTML frontend, no build step
 
-### Feature 02 — FX Rate Trend Dashboard (Current)
+### Feature 02 — FX Rate Trend Dashboard (Delivered 2026-03-27)
 
-**Phase 1 — Backend API (in scope)**
-- [ ] Historical rates endpoint (`GET /api/v1/rates/history`) with caching and quota tracking
-- [ ] Dashboard CRUD (`POST/GET/PATCH/DELETE /api/v1/dashboards`)
-- [ ] Panel management (`POST/DELETE /api/v1/dashboards/{id}/panels`)
-- [ ] Layout endpoint (`GET /api/v1/dashboards/{id}/layout`)
-- [ ] Quota endpoint (`GET /api/v1/quota`)
-- [ ] Session-level quota enforcement (`QUOTA_LIMIT_PER_SESSION`)
-- [ ] MockConnector support for historical data
+**Phase 1 — Backend API**
+- [x] Historical rates endpoint (`POST /api/rates/historical`) with in-memory LRU cache (TTL=300s, max 200 entries)
+- [x] Batch dashboard endpoint (`POST /api/dashboard`) — fetches all panels in one request, reuses cache across panels
+- [x] `get_historical_rates` implemented in `ExchangeRateHostConnector` (1 call/day via `/historical`, USD triangulation for non-USD base)
+- [x] `get_historical_rates` implemented in `MockConnector` (deterministic synthetic data, no quota)
+- [x] `USE_MOCK_CONNECTOR` env var to switch connectors without code changes
 
-**Phase 2 — Frontend (in scope)**
-- [ ] Dashboard creation form (name + type selector)
-- [ ] Panel add/remove controls
-- [ ] CSS Grid layout renderer (driven by `grid` field)
-- [ ] Canvas-based line chart renderer
-- [ ] Canvas-based bar chart renderer
-- [ ] CSS heatmap table renderer (no JS charting lib)
-- [ ] Stats summary panel renderer
-- [ ] Quota indicator in UI
+**Phase 2 — Frontend**
+- [x] Tab navigation: Chat / Dashboard views in single HTML page
+- [x] Dashboard toolbar: preset selector, start/end date pickers, Load and Reset buttons
+- [x] 5 built-in presets: Major Currency Trends, Asia-Pacific, EUR Cross Rates, Volatility Focus, Custom
+- [x] Line trend chart (Chart.js 4.4) — multi-currency overlay per panel
+- [x] Bar comparison chart (Chart.js 4.4) — latest rate snapshot across currencies
+- [x] Stat summary panel — latest rate, 7-day change %, hi/lo per currency
+- [x] Panel grid layout (CSS Grid, 2-column, full-width stat panels)
+- [x] Loading/error states per panel
+
+**Phase 2 — Bug Fixes & DevEx (2026-03-27)**
+- [x] Fixed Windows system proxy (Clash/7897) bypassing TLS — added `trust_env=False` to httpx clients in connector and OpenAI agent
+- [x] Switched `.env` default to `USE_MOCK_CONNECTOR=true` to avoid exhausting exchangerate.host free tier (100 req/month) during development
+- [x] Added `test_dashboard.py` Playwright E2E test with 5 screenshot checkpoints
 
 **Phase 3 — Hardening (post-PoC, out of scope)**
 - [ ] localStorage persistence for dashboards
