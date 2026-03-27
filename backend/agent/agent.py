@@ -45,7 +45,11 @@ async def run_agent(
         dict with keys: reply (str), data (any), tool_used (str or None)
     """
     if client is None:
-        client = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value())
+        import httpx
+        client = AsyncOpenAI(
+            api_key=settings.openai_api_key.get_secret_value(),
+            http_client=httpx.AsyncClient(trust_env=False),
+        )
 
     messages: list[ChatCompletionMessageParam] = [
         {"role": "system", "content": SYSTEM_PROMPT},

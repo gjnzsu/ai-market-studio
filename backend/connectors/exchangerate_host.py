@@ -26,7 +26,7 @@ class ExchangeRateHostConnector(MarketDataConnector):
         if not api_key:
             raise RateFetchError("EXCHANGERATE_API_KEY is not set.")
         self._api_key = api_key
-        self._client = httpx.AsyncClient(timeout=10.0)
+        self._client = httpx.AsyncClient(timeout=10.0, trust_env=False)
 
     async def _fetch_usd_rates(self, currencies: list[str], date: Optional[str]) -> dict:
         """Fetch rates with USD as base from exchangerate.host."""
@@ -126,34 +126,39 @@ class ExchangeRateHostConnector(MarketDataConnector):
         Fetch daily closing rates via sequential /historical calls.
 
         IMPORTANT: /timeseries is not available on the free tier.
+        Reuses _fetch_usd_rates (source=USD, currencies=...) with a date
+        param, then applies USD triangulation for non-USD base currencies.
         Makes one API call per day in [start_date, end_date].
-        Caller must enforce max 7 days to stay within 100 req/month.
         """
         from datetime import date as _date, timedelta
         base = base.upper()
-        symbols = ",".join(t.upper() for t in targets)
+        targets_upper = [t.upper() for t in targets]
+        # For triangulation we need USD rates for both base and all targets
+        all_currencies = list({base} | set(targets_upper) - {FREE_TIER_BASE})
         start = _date.fromisoformat(start_date)
         end = _date.fromisoformat(end_date)
         result: dict[str, dict[str, float]] = {}
         current = start
         while current <= end:
-            params = {
-                "access_key": self._api_key,
-                "base": base,
-                "symbols": symbols,
-                "date": current.isoformat(),
-            }
-            try:
-                resp = await self._client.get(f"{BASE_URL}/historical", params=params)
-                resp.raise_for_status()
-            except httpx.HTTPStatusError as e:
-                raise RateFetchError(f"HTTP {e.response.status_code} from exchangerate.host historical") from e
-            except httpx.RequestError as e:
-                raise RateFetchError(f"Network error: {e}") from e
-            body = resp.json()
-            if not body.get("success") or "rates" not in body:
-                raise RateFetchError(f"historical API error for {current}: {body.get('error')}")
-            result[current.isoformat()] = body["rates"]
+            quotes = await self._fetch_usd_rates(all_currencies, current.isoformat())
+            day_rates: dict[str, float] = {}
+            for target in targets_upper:
+                if base == target:
+                    day_rates[target] = 1.0
+                elif base == FREE_TIER_BASE:
+                    key = f"{FREE_TIER_BASE}{target}"
+                    if key not in quotes:
+                        raise UnsupportedPairError(f"{target} not available.")
+                    day_rates[target] = round(quotes[key], 6)
+                else:
+                    usd_base_key = f"{FREE_TIER_BASE}{base}"
+                    usd_target_key = f"{FREE_TIER_BASE}{target}"
+                    if usd_base_key not in quotes:
+                        raise UnsupportedPairError(f"{base} not available via triangulation.")
+                    if usd_target_key not in quotes:
+                        raise UnsupportedPairError(f"{target} not available via triangulation.")
+                    day_rates[target] = round(quotes[usd_target_key] / quotes[usd_base_key], 6)
+            result[current.isoformat()] = day_rates
             current += timedelta(days=1)
         return result
 
