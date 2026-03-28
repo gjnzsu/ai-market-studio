@@ -1,6 +1,6 @@
 # AI Market Studio
 
-A conversational FX market data platform. Ask natural-language questions about exchange rates and explore historical trends through an interactive dashboard — all in a single-page app with no build step.
+A conversational FX market data platform. Ask natural-language questions about exchange rates and get instant inline charts — all in a clean single-pane chat interface with no build step.
 
 > **Vision:** AI-native market intelligence platform that enables natural language–driven data retrieval, automated dashboard generation, and context-aware insights.
 
@@ -15,18 +15,18 @@ A conversational FX market data platform. Ask natural-language questions about e
 - GPT-4o function calling with four tools: spot rate, multi-pair rates, supported currencies list, dashboard generation
 - Conversation history maintained client-side
 
-### Feature 02 — FX Rate Trend Dashboard
-- 5 built-in presets: Major Currency Trends, Asia-Pacific, EUR Cross Rates, Volatility Focus, Custom
-- Three panel types: line trend chart, bar comparison chart, stat summary
-- Date range picker (default: last 7 days)
-- In-memory LRU cache (TTL=300s) — shared across panels in a single request
-- Toggle between live API and mock data via env var
+### Feature 02 — FX Rate Historical Data
+- `POST /api/rates/historical` — daily FX rates with in-memory LRU cache (TTL=300s)
+- `POST /api/dashboard` — batch panel data fetch (up to 9 panels)
+- Supports line trend, bar comparison, and stat summary panel types
+- Toggle between live API and mock data via `USE_MOCK_CONNECTOR` env var
 
 ### Feature 04 — Conversational Dashboard Generation
 - Ask in natural language: *"Show me EUR/USD and GBP/USD trend for the last 5 days"*
 - LLM detects chart/visualize/show intent and calls the `generate_dashboard` tool
 - Inline Chart.js chart renders directly inside the chat bubble — no tab switching
 - Supports line trend (time series) and bar comparison chart types
+- Suggested example chips in the UI for quick access
 
 ![Conversational Dashboard](shot_06_inline_chart.png)
 
@@ -35,12 +35,12 @@ A conversational FX market data platform. Ask natural-language questions about e
 ## Architecture
 
 ```
-Browser (Vanilla JS + Chart.js)
+Browser — single-pane chat UI (Vanilla JS + Chart.js)
         │
         ▼
 FastAPI Backend  (backend/)
-   ├── /api/chat              ← GPT-4o agent loop
-   ├── /api/rates/historical  ← daily FX rates, cached
+   ├── /api/chat              ← GPT-4o agent loop (4 tools)
+   ├── /api/rates/historical  ← daily FX rates, LRU cached
    └── /api/dashboard         ← batch panel fetch
         │
         ▼
@@ -48,6 +48,8 @@ Connector Layer
    ├── ExchangeRateHostConnector  ← live data (exchangerate.host)
    └── MockConnector              ← deterministic synthetic data
 ```
+
+**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `generate_dashboard`
 
 ---
 
