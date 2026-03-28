@@ -4,7 +4,7 @@ A conversational FX market data platform. Ask natural-language questions about e
 
 > **Vision:** AI-native market intelligence platform that enables natural language–driven data retrieval, automated dashboard generation, and context-aware insights.
 
-![Chat](shot_05_chat_response.png)
+![Chat UI](shot_07_chat_ui.png)
 
 ---
 
@@ -28,7 +28,7 @@ A conversational FX market data platform. Ask natural-language questions about e
 - Supports line trend (time series) and bar comparison chart types
 - Suggested example chips in the UI for quick access
 
-![Conversational Dashboard](shot_06_inline_chart.png)
+![Conversational Dashboard](shot_08_inline_chart.png)
 
 ---
 
