@@ -205,5 +205,5 @@ ai-market-studio/
 - [x] Feature 01 — Chat assistant with GPT-4o function calling
 - [x] Feature 02 — FX Rate Trend Dashboard
 - [ ] Feature 03 — localStorage persistence, authentication, CORS lockdown
-- [ ] Feature 04 — Conversational dashboard control via GPT-4o
+- [x] Feature 04 — Conversational dashboard control via GPT-4o
 - [ ] Feature 05 — Paid-tier API integration (intraday data, higher quota)
