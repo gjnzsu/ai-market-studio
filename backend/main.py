@@ -30,7 +30,8 @@ def create_connector():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.connector = create_connector()
+    if not getattr(app.state, 'connector', None):
+        app.state.connector = create_connector()
     logger.info("AI Market Studio started.")
     yield
     logger.info("AI Market Studio shutting down.")
