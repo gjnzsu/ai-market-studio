@@ -35,24 +35,9 @@
     }
     header h1 { font-size: 1rem; font-weight: 600; color: #a5b4fc; }
     header .tagline { font-size: 0.72rem; color: #64748b; }
-    nav { display: flex; align-items: stretch; gap: 0.25rem; }
-    .nav-tab {
-      background: none;
-      border: none;
-      color: #64748b;
-      font-size: 0.85rem;
-      font-weight: 500;
-      padding: 0 1rem;
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      transition: color 0.15s, border-color 0.15s;
-    }
-    .nav-tab:hover { color: #a5b4fc; }
-    .nav-tab.active { color: #a5b4fc; border-bottom-color: #4f46e5; }
     /* ---- Views ---- */
     #app { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-    .view { flex: 1; overflow: hidden; display: none; flex-direction: column; }
-    .view.active { display: flex; }
+    #chat-view { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
     /* ---- Chat View ---- */
     #chat-window {
       flex: 1;
@@ -165,145 +150,6 @@
       transition: border-color 0.15s, color 0.15s;
     }
     .ex-chip:hover { border-color: #4f46e5; color: #a5b4fc; }
-    /* ---- Dashboard View ---- */
-    #dashboard-view {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .dashboard-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-    .dashboard-toolbar label { font-size: 0.82rem; color: #94a3b8; }
-    .dash-select {
-      background: #1e2235;
-      border: 1px solid #2d3148;
-      border-radius: 6px;
-      color: #e2e8f0;
-      padding: 0.4rem 0.7rem;
-      font-size: 0.85rem;
-      outline: none;
-      cursor: pointer;
-    }
-    .dash-select:focus { border-color: #4f46e5; }
-    .dash-btn {
-      background: #4f46e5;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: 0.4rem 1rem;
-      font-size: 0.85rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .dash-btn:hover { background: #4338ca; }
-    .dash-btn:disabled { background: #2d3148; color: #64748b; cursor: not-allowed; }
-    .dash-btn.secondary {
-      background: #1e2235;
-      border: 1px solid #2d3148;
-      color: #94a3b8;
-    }
-    .dash-btn.secondary:hover { border-color: #4f46e5; color: #a5b4fc; background: #1e2235; }
-    .dash-status {
-      font-size: 0.8rem;
-      color: #64748b;
-      margin-left: auto;
-    }
-    .dash-status.error { color: #f87171; }
-    .dash-status.ok { color: #34d399; }
-    /* date inputs */
-    .date-group { display: flex; align-items: center; gap: 0.4rem; }
-    .dash-date {
-      background: #1e2235;
-      border: 1px solid #2d3148;
-      border-radius: 6px;
-      color: #e2e8f0;
-      padding: 0.4rem 0.6rem;
-      font-size: 0.82rem;
-      outline: none;
-    }
-    .dash-date:focus { border-color: #4f46e5; }
-    /* panel grid */
-    .panel-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
-      gap: 1rem;
-    }
-    .panel-card {
-      background: #1e2235;
-      border: 1px solid #2d3148;
-      border-radius: 10px;
-      padding: 1rem 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      min-height: 280px;
-    }
-    .panel-card.full-width { grid-column: 1 / -1; }
-    .panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .panel-title { font-size: 0.88rem; font-weight: 600; color: #a5b4fc; }
-    .panel-badge {
-      font-size: 0.7rem;
-      background: #2d3148;
-      color: #64748b;
-      border-radius: 4px;
-      padding: 0.15rem 0.45rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .panel-body { flex: 1; position: relative; min-height: 200px; }
-    .panel-body canvas { width: 100% !important; }
-    /* stat summary panel */
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-      gap: 0.75rem;
-      padding-top: 0.25rem;
-    }
-    .stat-card {
-      background: #0f1117;
-      border: 1px solid #2d3148;
-      border-radius: 8px;
-      padding: 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.3rem;
-    }
-    .stat-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
-    .stat-value { font-size: 1.3rem; font-weight: 700; color: #e2e8f0; }
-    .stat-sub { font-size: 0.75rem; color: #94a3b8; }
-    .stat-change { font-size: 0.78rem; font-weight: 600; }
-    .stat-change.up { color: #34d399; }
-    .stat-change.down { color: #f87171; }
-    /* loading skeleton */
-    .panel-loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 200px;
-      color: #64748b;
-      font-size: 0.85rem;
-      font-style: italic;
-    }
-    .panel-error {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 200px;
-      color: #f87171;
-      font-size: 0.85rem;
-    }
   </style>
 </head>
 <body>
@@ -312,20 +158,18 @@
       <h1>AI Market Studio</h1>
       <span class="tagline">FX Intelligence Platform</span>
     </div>
-    <nav>
-      <button class="nav-tab active" data-view="chat">Chat</button>
-      <button class="nav-tab" data-view="dashboard">Dashboard</button>
-    </nav>
   </header>
 
   <div id="app">
     <!-- ===== CHAT VIEW ===== -->
-    <section class="view active" id="chat-view">
+    <section id="chat-view">
       <div class="examples">
         <span class="ex-chip" onclick="sendExample(this)">USD to EUR rate</span>
         <span class="ex-chip" onclick="sendExample(this)">Compare GBP vs JPY vs CHF</span>
         <span class="ex-chip" onclick="sendExample(this)">EUR/USD last 30 days</span>
         <span class="ex-chip" onclick="sendExample(this)">Best performing vs USD this week</span>
+        <span class="ex-chip" onclick="sendExample(this)">Show EUR/USD trend last 5 days</span>
+        <span class="ex-chip" onclick="sendExample(this)">Compare GBP JPY CHF vs USD bar chart</span>
       </div>
       <div id="chat-window"></div>
       <div id="input-area">
@@ -334,101 +178,9 @@
       </div>
     </section>
 
-    <!-- ===== DASHBOARD VIEW ===== -->
-    <section class="view" id="dashboard-view">
-      <div class="dashboard-toolbar">
-        <label>Preset:</label>
-        <select class="dash-select" id="dash-preset">
-          <option value="major_trends">Major Currency Trends</option>
-          <option value="asia_pacific">Asia-Pacific vs USD</option>
-          <option value="eur_cross">EUR Cross Rates</option>
-          <option value="volatility">30-Day Volatility Snapshot</option>
-          <option value="custom">Custom…</option>
-        </select>
-        <div class="date-group">
-          <label>From:</label>
-          <input type="date" class="dash-date" id="dash-start" />
-          <label>To:</label>
-          <input type="date" class="dash-date" id="dash-end" />
-        </div>
-        <button class="dash-btn" id="dash-load-btn" onclick="loadDashboard()">Load Dashboard</button>
-        <button class="dash-btn secondary" onclick="resetDashboard()">Reset</button>
-        <span class="dash-status" id="dash-status"></span>
-      </div>
-      <div class="panel-grid" id="panel-grid"></div>
-    </section>
   </div>
 
 <script>
-  // ── Nav tab switching ──────────────────────────────────────────────────
-  document.querySelectorAll('.nav-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(btn.dataset.view + '-view').classList.add('active');
-    });
-  });
-
-  // ── Date helpers ─────────────────────────────────────────────────────────
-  function isoDate(d) { return d.toISOString().slice(0, 10); }
-  function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d; }
-
-  // Set default date range (last 30 days)
-  (function initDates() {
-    document.getElementById('dash-end').value   = isoDate(new Date());
-    document.getElementById('dash-start').value = isoDate(daysAgo(6));
-  })();
-
-  // ── Dashboard presets ────────────────────────────────────────────────────
-  const PRESETS = {
-    major_trends: (s, e) => ({
-      dashboard_id: 'major_trends',
-      dashboard_type: 'mixed',
-      panels: [
-        { panel_id: 'p1', panel_type: 'line_trend',      base: 'USD', targets: ['EUR', 'GBP', 'JPY'], start_date: s, end_date: e },
-        { panel_id: 'p2', panel_type: 'line_trend',      base: 'USD', targets: ['CHF', 'CAD', 'AUD'], start_date: s, end_date: e },
-        { panel_id: 'p3', panel_type: 'bar_comparison',  base: 'USD', targets: ['EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD'], start_date: s, end_date: e },
-        { panel_id: 'p4', panel_type: 'stat_summary',    base: 'USD', targets: ['EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD'], start_date: s, end_date: e },
-      ]
-    }),
-    asia_pacific: (s, e) => ({
-      dashboard_id: 'asia_pacific',
-      dashboard_type: 'trend',
-      panels: [
-        { panel_id: 'p1', panel_type: 'line_trend',     base: 'USD', targets: ['JPY', 'CNY', 'HKD'], start_date: s, end_date: e },
-        { panel_id: 'p2', panel_type: 'line_trend',     base: 'USD', targets: ['SGD', 'KRW', 'THB'], start_date: s, end_date: e },
-        { panel_id: 'p3', panel_type: 'bar_comparison', base: 'USD', targets: ['JPY', 'CNY', 'HKD', 'SGD', 'KRW'], start_date: s, end_date: e },
-        { panel_id: 'p4', panel_type: 'stat_summary',   base: 'USD', targets: ['JPY', 'CNY', 'HKD', 'SGD', 'KRW'], start_date: s, end_date: e },
-      ]
-    }),
-    eur_cross: (s, e) => ({
-      dashboard_id: 'eur_cross',
-      dashboard_type: 'comparison',
-      panels: [
-        { panel_id: 'p1', panel_type: 'line_trend',     base: 'EUR', targets: ['USD', 'GBP', 'CHF'], start_date: s, end_date: e },
-        { panel_id: 'p2', panel_type: 'line_trend',     base: 'EUR', targets: ['JPY', 'CAD', 'AUD'], start_date: s, end_date: e },
-        { panel_id: 'p3', panel_type: 'stat_summary',   base: 'EUR', targets: ['USD', 'GBP', 'CHF', 'JPY', 'CAD'], start_date: s, end_date: e },
-      ]
-    }),
-    volatility: (s, e) => ({
-      dashboard_id: 'volatility',
-      dashboard_type: 'mixed',
-      panels: [
-        { panel_id: 'p1', panel_type: 'line_trend',     base: 'USD', targets: ['EUR', 'GBP'], start_date: s, end_date: e },
-        { panel_id: 'p2', panel_type: 'bar_comparison', base: 'USD', targets: ['EUR', 'GBP', 'JPY', 'CHF'], start_date: s, end_date: e },
-        { panel_id: 'p3', panel_type: 'stat_summary',   base: 'USD', targets: ['EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD'], start_date: s, end_date: e },
-      ]
-    }),
-    custom: (s, e) => ({
-      dashboard_id: 'custom',
-      dashboard_type: 'mixed',
-      panels: [
-        { panel_id: 'p1', panel_type: 'line_trend',    base: 'USD', targets: ['EUR', 'GBP', 'JPY'], start_date: s, end_date: e },
-        { panel_id: 'p2', panel_type: 'stat_summary',  base: 'USD', targets: ['EUR', 'GBP', 'JPY', 'CHF'], start_date: s, end_date: e },
-      ]
-    }),
-  };
   // ── Chart color palette ─────────────────────────────────────────────────
   const COLORS = [
     '#a5b4fc', '#34d399', '#fb923c', '#f472b6', '#38bdf8', '#facc15',
@@ -436,19 +188,8 @@
   ];
   const COLORS_ALPHA = COLORS.map(c => c + '22');
 
-  // ── Chart registry (for destroy on re-render) ─────────────────────────────
-  const chartRegistry = {};
-
-  function destroyChart(panelId) {
-    if (chartRegistry[panelId]) {
-      chartRegistry[panelId].destroy();
-      delete chartRegistry[panelId];
-    }
-  }
-
-  // ── Render helpers ───────────────────────────────────────────────────────
+  // ── Inline chart renderers (used by renderInlineDashboard) ──────────────
   function renderLineTrend(panelId, data, base) {
-    destroyChart(panelId);
     const canvas = document.getElementById('canvas-' + panelId);
     if (!canvas) return;
     const series = data.series;
@@ -464,7 +205,7 @@
       tension: 0.3,
       fill: targets.length === 1,
     }));
-    chartRegistry[panelId] = new Chart(canvas, {
+    new Chart(canvas, {
       type: 'line',
       data: { labels, datasets },
       options: {
@@ -476,50 +217,29 @@
           tooltip: { mode: 'index', intersect: false },
         },
         scales: {
-          x: {
-            ticks: { color: '#64748b', maxTicksLimit: 8, font: { size: 10 } },
-            grid: { color: '#2d3148' },
-          },
-          y: {
-            ticks: { color: '#64748b', font: { size: 10 } },
-            grid: { color: '#2d3148' },
-          },
+          x: { ticks: { color: '#64748b', maxTicksLimit: 8, font: { size: 10 } }, grid: { color: '#2d3148' } },
+          y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#2d3148' } },
         },
       },
     });
   }
 
   function renderBarComparison(panelId, data, base) {
-    destroyChart(panelId);
     const canvas = document.getElementById('canvas-' + panelId);
     if (!canvas) return;
     const series = data.series;
     const targets = Object.keys(series[0]?.rates || {});
-    // Use last value for comparison
     const lastDay = series[series.length - 1];
     const firstDay = series[0];
-    const labels = targets;
     const lastVals = targets.map(t => lastDay?.rates[t] ?? 0);
     const firstVals = targets.map(t => firstDay?.rates[t] ?? 0);
-    chartRegistry[panelId] = new Chart(canvas, {
+    new Chart(canvas, {
       type: 'bar',
       data: {
-        labels,
+        labels: targets,
         datasets: [
-          {
-            label: 'Start (' + (firstDay?.date || '') + ')',
-            data: firstVals,
-            backgroundColor: '#2d3148',
-            borderColor: '#4f46e5',
-            borderWidth: 1,
-          },
-          {
-            label: 'End (' + (lastDay?.date || '') + ')',
-            data: lastVals,
-            backgroundColor: COLORS.map(c => c + 'bb'),
-            borderColor: COLORS,
-            borderWidth: 1,
-          },
+          { label: 'Start (' + (firstDay?.date || '') + ')', data: firstVals, backgroundColor: '#2d3148', borderColor: '#4f46e5', borderWidth: 1 },
+          { label: 'End (' + (lastDay?.date || '') + ')', data: lastVals, backgroundColor: COLORS.map(c => c + 'bb'), borderColor: COLORS, borderWidth: 1 },
         ],
       },
       options: {
@@ -537,171 +257,7 @@
       },
     });
   }
-  function renderStatSummary(panelId, data, base) {
-    const body = document.getElementById('statbody-' + panelId);
-    if (!body) return;
-    const series = data.series;
-    const targets = Object.keys(series[0]?.rates || {});
-    const first = series[0];
-    const last  = series[series.length - 1];
-    body.innerHTML = '';
-    targets.forEach((t, i) => {
-      const startVal = first?.rates[t];
-      const endVal   = last?.rates[t];
-      const vals     = series.map(d => d.rates[t]).filter(v => v != null);
-      const minVal   = Math.min(...vals);
-      const maxVal   = Math.max(...vals);
-      const pct      = startVal ? ((endVal - startVal) / startVal) * 100 : 0;
-      const up       = pct >= 0;
-      const card = document.createElement('div');
-      card.className = 'stat-card';
-      card.innerHTML = `
-        <div class="stat-label">${base}/${t}</div>
-        <div class="stat-value" style="color:${COLORS[i % COLORS.length]}">${endVal != null ? endVal.toFixed(4) : 'N/A'}</div>
-        <div class="stat-change ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${Math.abs(pct).toFixed(2)}%</div>
-        <div class="stat-sub">Hi: ${maxVal.toFixed(4)} / Lo: ${minVal.toFixed(4)}</div>
-        <div class="stat-sub">${series.length} days</div>
-      `;
-      body.appendChild(card);
-    });
-  }
 
-  // ── Panel DOM builder ────────────────────────────────────────────────────
-  function panelTitle(panel) {
-    const type = { line_trend: 'Trend', bar_comparison: 'Comparison', stat_summary: 'Summary' }[panel.panel_type] || panel.panel_type;
-    return `${panel.base} vs ${panel.targets.join(', ')} — ${type}`;
-  }
-
-  function panelBadge(t) {
-    return { line_trend: 'Line', bar_comparison: 'Bar', stat_summary: 'Stats' }[t] || t;
-  }
-
-  function buildPanelCard(panel) {
-    const card = document.createElement('div');
-    card.className = 'panel-card' + (panel.panel_type === 'stat_summary' ? ' full-width' : '');
-    card.id = 'panel-' + panel.panel_id;
-    if (panel.panel_type === 'stat_summary') {
-      card.innerHTML = `
-        <div class="panel-header">
-          <span class="panel-title">${panelTitle(panel)}</span>
-          <span class="panel-badge">${panelBadge(panel.panel_type)}</span>
-        </div>
-        <div class="panel-body">
-          <div class="panel-loading" id="loading-${panel.panel_id}">Loading…</div>
-          <div class="stat-grid" id="statbody-${panel.panel_id}" style="display:none"></div>
-        </div>`;
-    } else {
-      card.innerHTML = `
-        <div class="panel-header">
-          <span class="panel-title">${panelTitle(panel)}</span>
-          <span class="panel-badge">${panelBadge(panel.panel_type)}</span>
-        </div>
-        <div class="panel-body">
-          <div class="panel-loading" id="loading-${panel.panel_id}">Loading…</div>
-          <canvas id="canvas-${panel.panel_id}" style="display:none"></canvas>
-        </div>`;
-    }
-    return card;
-  }
-
-  function showPanelData(panel, data) {
-    const loading = document.getElementById('loading-' + panel.panel_id);
-    if (loading) loading.style.display = 'none';
-    if (panel.panel_type === 'line_trend') {
-      const canvas = document.getElementById('canvas-' + panel.panel_id);
-      if (canvas) canvas.style.display = 'block';
-      renderLineTrend(panel.panel_id, data, panel.base);
-    } else if (panel.panel_type === 'bar_comparison') {
-      const canvas = document.getElementById('canvas-' + panel.panel_id);
-      if (canvas) canvas.style.display = 'block';
-      renderBarComparison(panel.panel_id, data, panel.base);
-    } else if (panel.panel_type === 'stat_summary') {
-      const statbody = document.getElementById('statbody-' + panel.panel_id);
-      if (statbody) statbody.style.display = 'grid';
-      renderStatSummary(panel.panel_id, data, panel.base);
-    }
-  }
-
-  function showPanelError(panel, msg) {
-    const loading = document.getElementById('loading-' + panel.panel_id);
-    if (loading) { loading.className = 'panel-error'; loading.textContent = 'Error: ' + msg; }
-  }
-  // ── Load dashboard ───────────────────────────────────────────────────────
-  async function loadDashboard() {
-    const preset  = document.getElementById('dash-preset').value;
-    const start   = document.getElementById('dash-start').value;
-    const end     = document.getElementById('dash-end').value;
-    const status  = document.getElementById('dash-status');
-    const btn     = document.getElementById('dash-load-btn');
-    const grid    = document.getElementById('panel-grid');
-
-    if (!start || !end) { setStatus('Select a date range first.', 'error'); return; }
-    if (start >= end)   { setStatus('Start must be before end.', 'error'); return; }
-
-    const config = PRESETS[preset](start, end);
-
-    // Destroy old charts & clear grid
-    Object.keys(chartRegistry).forEach(id => { chartRegistry[id].destroy(); delete chartRegistry[id]; });
-    grid.innerHTML = '';
-    btn.disabled = true;
-    setStatus('Fetching data…', '');
-
-    // Build skeleton cards
-    config.panels.forEach(panel => grid.appendChild(buildPanelCard(panel)));
-
-    try {
-      const res = await fetch('/api/dashboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        setStatus('API error: ' + (err.detail || res.statusText), 'error');
-        config.panels.forEach(p => showPanelError(p, err.detail || res.statusText));
-        return;
-      }
-      const result = await res.json();
-      const panelMap = {};
-      result.panels.forEach(p => { panelMap[p.panel_id] = p; });
-      config.panels.forEach(panel => {
-        const p = panelMap[panel.panel_id];
-        if (p && p.data) {
-          showPanelData(panel, p.data);
-        } else {
-          showPanelError(panel, 'No data returned');
-        }
-      });
-      const cached = result.panels.filter(p => p.data && p.data.cached).length;
-      setStatus(`Loaded ${result.panels.length} panel(s)${cached ? ' (' + cached + ' cached)' : ''}.`, 'ok');
-    } catch (e) {
-      setStatus('Network error: ' + e.message, 'error');
-      config.panels.forEach(p => showPanelError(p, e.message));
-    } finally {
-      btn.disabled = false;
-    }
-  }
-
-  function resetDashboard() {
-    Object.keys(chartRegistry).forEach(id => { chartRegistry[id].destroy(); delete chartRegistry[id]; });
-    document.getElementById('panel-grid').innerHTML = '';
-    document.getElementById('dash-status').textContent = '';
-    document.getElementById('dash-status').className = 'dash-status';
-    document.getElementById('dash-end').value   = isoDate(new Date());
-    document.getElementById('dash-start').value = isoDate(daysAgo(6));
-  }
-
-  function setStatus(msg, type) {
-    const el = document.getElementById('dash-status');
-    el.textContent = msg;
-    el.className = 'dash-status' + (type ? ' ' + type : '');
-  }
-
-  // Auto-load on preset change
-  document.getElementById('dash-preset').addEventListener('change', () => {
-    document.getElementById('panel-grid').innerHTML = '';
-    setStatus('', '');
-  });
   // ── Chat ─────────────────────────────────────────────────────────────────
   const chatWindow = document.getElementById('chat-window');
   const userInput  = document.getElementById('user-input');
