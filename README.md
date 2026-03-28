@@ -23,7 +23,7 @@ A conversational FX market data platform. Ask natural-language questions about e
 - Toggle between live API and mock data via env var
 
 ### Feature 04 — Conversational Dashboard Generation
-- Ask in natural language: *"Show me EUR/USD and GBP/USD trend for the last 7 days"*
+- Ask in natural language: *"Show me EUR/USD and GBP/USD trend for the last 5 days"*
 - LLM detects chart/visualize/show intent and calls the `generate_dashboard` tool
 - Inline Chart.js chart renders directly inside the chat bubble — no tab switching
 - Supports line trend (time series) and bar comparison chart types
