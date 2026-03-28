@@ -334,7 +334,7 @@ async def test_exchangerate_host_historical_rates_happy_path(respx_mock):
     respx_mock.get("https://api.exchangerate.host/historical").mock(
         return_value=httpx.Response(200, json={
             "success": True,
-            "rates": {"EUR": 0.92, "GBP": 0.79},
+            "quotes": {"USDEUR": 0.92, "USDGBP": 0.79},
         })
     )
     connector = ExchangeRateHostConnector(api_key="test_key")

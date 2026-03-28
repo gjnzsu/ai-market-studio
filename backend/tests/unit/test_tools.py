@@ -5,12 +5,13 @@ from backend.connectors.mock_connector import MockConnector
 
 def test_tool_definitions_are_valid():
     assert isinstance(TOOL_DEFINITIONS, list)
-    assert len(TOOL_DEFINITIONS) == 4
+    assert len(TOOL_DEFINITIONS) == 5
     names = [t["function"]["name"] for t in TOOL_DEFINITIONS]
     assert "get_exchange_rate" in names
     assert "get_exchange_rates" in names
     assert "get_historical_rates" in names
     assert "list_supported_currencies" in names
+    assert "generate_dashboard" in names
 
 
 def test_tool_definitions_have_required_fields():

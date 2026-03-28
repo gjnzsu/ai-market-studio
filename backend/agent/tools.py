@@ -109,6 +109,46 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_dashboard",
+            "description": (
+                "Generate a visual FX rate trend or comparison dashboard panel. "
+                "Use when the user asks to 'show', 'chart', 'plot', 'visualize', "
+                "or 'display' exchange rate trends or comparisons over a date range. "
+                "Returns historical rate series suitable for chart rendering."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "base": {
+                        "type": "string",
+                        "description": "Base currency code (e.g. 'USD')",
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Target currency codes (e.g. ['EUR', 'GBP'])",
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "Start date in YYYY-MM-DD format",
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "End date in YYYY-MM-DD format",
+                    },
+                    "panel_type": {
+                        "type": "string",
+                        "enum": ["line_trend", "bar_comparison"],
+                        "description": "Chart type: line_trend for time series, bar_comparison for snapshot comparison",
+                    },
+                },
+                "required": ["base", "targets", "start_date", "end_date", "panel_type"],
+            },
+        },
+    },
 ]
 
 
@@ -153,5 +193,25 @@ async def dispatch_tool(
     elif tool_name == "list_supported_currencies":
         currencies = await connector.list_supported_currencies()
         return {"currencies": currencies}
+    elif tool_name == "generate_dashboard":
+        raw = await connector.get_historical_rates(
+            base=tool_args["base"],
+            targets=tool_args["targets"],
+            start_date=tool_args["start_date"],
+            end_date=tool_args["end_date"],
+        )
+        sorted_dates = sorted(raw.keys())
+        return {
+            "type": "dashboard",
+            "panel_type": tool_args["panel_type"],
+            "base": tool_args["base"].upper(),
+            "targets": [t.upper() for t in tool_args["targets"]],
+            "start_date": sorted_dates[0] if sorted_dates else tool_args["start_date"],
+            "end_date": sorted_dates[-1] if sorted_dates else tool_args["end_date"],
+            "series": [
+                {"date": date, "rates": raw[date]}
+                for date in sorted_dates
+            ],
+        }
     else:
         raise AgentError(f"Unknown tool: {tool_name}")

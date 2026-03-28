@@ -21,7 +21,8 @@ Guidelines:
 - For unsupported queries (stocks, crypto, news), politely say they are out of scope.
 - If a data error occurs, explain the issue clearly without exposing internal details.
 - Be concise and professional. Do not add unnecessary caveats.
-- Supported query types: spot rates, multi-pair comparisons, historical rates (if available), supported currency list.
+- Supported query types: spot rates, multi-pair comparisons, historical rates, supported currency list, visual dashboard charts.
+- When the user asks to show, chart, visualize, plot, or display rate trends or comparisons over a date range, use the generate_dashboard tool.
 """.strip()
 
 MAX_TOOL_ROUNDS = 5
