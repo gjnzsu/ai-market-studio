@@ -12,7 +12,7 @@ A conversational FX market data platform. Ask natural-language questions about e
 
 ### Feature 01 — FX Chat Assistant
 - Natural-language queries: *"What is EUR/USD today?"*, *"Compare USD vs JPY and CHF"*
-- GPT-4o function calling with three tools: spot rate, multi-pair rates, supported currencies list
+- GPT-4o function calling with four tools: spot rate, multi-pair rates, supported currencies list, dashboard generation
 - Conversation history maintained client-side
 
 ### Feature 02 — FX Rate Trend Dashboard
@@ -21,6 +21,14 @@ A conversational FX market data platform. Ask natural-language questions about e
 - Date range picker (default: last 7 days)
 - In-memory LRU cache (TTL=300s) — shared across panels in a single request
 - Toggle between live API and mock data via env var
+
+### Feature 04 — Conversational Dashboard Generation
+- Ask in natural language: *"Show me EUR/USD and GBP/USD trend for the last 7 days"*
+- LLM detects chart/visualize/show intent and calls the `generate_dashboard` tool
+- Inline Chart.js chart renders directly inside the chat bubble — no tab switching
+- Supports line trend (time series) and bar comparison chart types
+
+![Conversational Dashboard](shot_06_inline_chart.png)
 
 ---
 
