@@ -1,0 +1,13 @@
+.env
+.env.*
+*.pyc
+__pycache__/
+.coverage
+*.png
+backend/tests/
+.claude/
+docs/
+test_dashboard.py
+.git/
+.gitignore
+README.md

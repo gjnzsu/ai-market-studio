@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-market-studio-config
+data:
+  USE_MOCK_CONNECTOR: "true"
+  OPENAI_MODEL: "gpt-4o"
+  CORS_ORIGINS: "*"
+  MAX_HISTORICAL_DAYS: "7"
