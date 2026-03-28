@@ -2,6 +2,8 @@
 
 A conversational FX market data platform. Ask natural-language questions about exchange rates and explore historical trends through an interactive dashboard — all in a single-page app with no build step.
 
+> **Vision:** AI-native market intelligence platform that enables natural language–driven data retrieval, automated dashboard generation, and context-aware insights.
+
 ![Chat](shot_05_chat_response.png)
 
 ---
@@ -41,6 +43,21 @@ Connector Layer
 
 ---
 
+## Live Deployment
+
+The app is deployed on Google Kubernetes Engine (GKE):
+
+**http://35.224.3.54/**
+
+| Detail | Value |
+|---|---|
+| Cluster | `helloworld-cluster` (us-central1) |
+| GCP Project | `gen-lang-client-0896070179` |
+| Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio:latest` |
+| Connector | `USE_MOCK_CONNECTOR=true` |
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -75,6 +92,55 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
 Open [http://localhost:8000](http://localhost:8000) in your browser.
+
+---
+
+## Deploy to GKE
+
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) with GCR auth configured
+- [gcloud CLI](https://cloud.google.com/sdk/docs/install) authenticated
+- `kubectl` configured for your cluster
+
+### 1. Build and push the image
+
+```bash
+gcloud auth configure-docker
+docker build -t gcr.io/<PROJECT_ID>/ai-market-studio:latest .
+docker push gcr.io/<PROJECT_ID>/ai-market-studio:latest
+```
+
+### 2. Get cluster credentials
+
+```bash
+gcloud container clusters get-credentials <CLUSTER_NAME> --region <REGION> --project <PROJECT_ID>
+```
+
+### 3. Create the Kubernetes secret
+
+```bash
+kubectl create secret generic ai-market-studio-secrets \
+  --from-literal=OPENAI_API_KEY=<your-openai-key> \
+  --from-literal=EXCHANGERATE_API_KEY=<your-key-or-dummy>
+```
+
+> Do not commit real API keys to `k8s/secret.yaml`. Always create secrets imperatively.
+
+### 4. Apply manifests
+
+```bash
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+```
+
+### 5. Get the external IP
+
+```bash
+kubectl get service ai-market-studio --watch
+```
+
+Once `EXTERNAL-IP` is assigned, the app is available at `http://<EXTERNAL-IP>/`.
 
 ---
 
