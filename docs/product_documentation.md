@@ -475,43 +475,40 @@ The layout is determined server-side based on panel count and returned as the `g
 
 ## 8. Roadmap
 
-### Feature 01 — Delivered (PoC)
+| Priority | Theme | Features |
+|----------|-------|----------|
+| **P0 — Done** | Foundation | Chat assistant, spot & historical FX rates, conversational dashboard, market news, GKE deployment |
+| **P1 — Awareness** | Market Intelligence | F7: Market Insight Summary — AI-generated "why is EUR/USD moving?" commentary from news + rate data; F3: Market News (delivered) |
+| **P2 — Productivity** | Output Generation | F9: PPT / Excel / PDF report generation; F8: Email sending of insights and reports |
+| **P3 — Intelligence** | Research | F5: Web search integration for live market context; F4: Research report generation via RAG pipeline over internal documents |
+| **P4 — Data Breadth** | Data & Collaboration | F1: Multi-source market data connectors; F6: Sales/trader commentary capture and retrieval; F12: Scheduled report function |
+| **P5 — Advanced** | Platform | F10: Custom agent creation; F11: OCR / document ingestion (scanned reports, PDFs) |
+
+### Delivered Detail
+
+#### Feature 01 — FX Chat Assistant (PoC)
 - Natural-language FX spot rate queries via chat
 - GPT-4o function calling with 3 tools
 - MockConnector + 90% coverage gate
 - Single HTML frontend, no build step
 
-### Feature 02 — FX Rate Trend Dashboard (Delivered 2026-03-27)
+#### Feature 02 — FX Rate Historical Data (2026-03-27)
+- `POST /api/rates/historical` — daily FX rates with in-memory LRU cache (TTL=300s, max 200 entries)
+- `POST /api/dashboard` — batch panel fetch, reuses cache across panels
+- Line trend, bar comparison, and stat summary panel types
+- `USE_MOCK_CONNECTOR` env var; `trust_env=False` httpx fix for Windows proxy
 
-**Phase 1 — Backend API**
-- [x] Historical rates endpoint (`POST /api/rates/historical`) with in-memory LRU cache (TTL=300s, max 200 entries)
-- [x] Batch dashboard endpoint (`POST /api/dashboard`) — fetches all panels in one request, reuses cache across panels
-- [x] `get_historical_rates` implemented in `ExchangeRateHostConnector` (1 call/day via `/historical`, USD triangulation for non-USD base)
-- [x] `get_historical_rates` implemented in `MockConnector` (deterministic synthetic data, no quota)
-- [x] `USE_MOCK_CONNECTOR` env var to switch connectors without code changes
+#### Feature 03 — Market News (2026-03-29)
+- `get_fx_news` GPT-4o tool; inline news cards in chat bubble
+- Free RSS feeds: BBC Business, Investing.com FX, FXStreet — no paid API key
+- `USE_MOCK_NEWS_CONNECTOR` decoupled from rate connector flag
+- MockNewsConnector for all tests (8+ deterministic items)
 
-**Phase 2 — Frontend**
-- [x] Tab navigation: Chat / Dashboard views in single HTML page
-- [x] Dashboard toolbar: preset selector, start/end date pickers, Load and Reset buttons
-- [x] 5 built-in presets: Major Currency Trends, Asia-Pacific, EUR Cross Rates, Volatility Focus, Custom
-- [x] Line trend chart (Chart.js 4.4) — multi-currency overlay per panel
-- [x] Bar comparison chart (Chart.js 4.4) — latest rate snapshot across currencies
-- [x] Stat summary panel — latest rate, 7-day change %, hi/lo per currency
-- [x] Panel grid layout (CSS Grid, 2-column, full-width stat panels)
-- [x] Loading/error states per panel
-
-**Phase 2 — Bug Fixes & DevEx (2026-03-27)**
-- [x] Fixed Windows system proxy (Clash/7897) bypassing TLS — added `trust_env=False` to httpx clients in connector and OpenAI agent
-- [x] Switched `.env` default to `USE_MOCK_CONNECTOR=true` to avoid exhausting exchangerate.host free tier (100 req/month) during development
-- [x] Added `test_dashboard.py` Playwright E2E test with 5 screenshot checkpoints
-
-**Phase 3 — Hardening (post-PoC, out of scope)**
-- [ ] localStorage persistence for dashboards
-- [ ] CORS lockdown
-- [ ] Authentication (API key or session token)
-- [ ] GPT-4o conversational dashboard control ("add a USD/JPY panel to my current dashboard")
-- [ ] Paid-tier exchangerate.host integration (higher quota, intraday data)
-- [ ] Export dashboard as PNG or CSV
+#### Feature 04 — Conversational Dashboard (2026-03-28)
+- LLM detects chart/visualize/show intent and calls `generate_dashboard` tool
+- Inline Chart.js chart renders inside the chat bubble — no tab switching
+- Supports line trend (time series) and bar comparison chart types
+- UI simplified to single-pane chat; dashboard tab removed
 
 ---
 
