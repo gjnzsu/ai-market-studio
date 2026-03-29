@@ -29,10 +29,9 @@ def create_connector():
 
 
 def create_news_connector():
-    use_mock = settings.use_mock_news_connector or settings.use_mock_connector
-    if use_mock:
+    if settings.use_mock_news_connector:
         from backend.connectors.news_connector import MockNewsConnector
-        logger.info("Using MockNewsConnector (USE_MOCK_NEWS_CONNECTOR=true or USE_MOCK_CONNECTOR=true)")
+        logger.info("Using MockNewsConnector (USE_MOCK_NEWS_CONNECTOR=true)")
         return MockNewsConnector()
     else:
         from backend.connectors.news_connector import RSSNewsConnector
