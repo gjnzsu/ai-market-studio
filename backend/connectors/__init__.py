@@ -1,6 +1,7 @@
 from .base import MarketDataConnector, ConnectorError, RateFetchError, UnsupportedPairError
 from .mock_connector import MockConnector
 from .exchangerate_host import ExchangeRateHostConnector
+from .news_connector import NewsConnectorBase, MockNewsConnector, RSSNewsConnector
 
 __all__ = [
     "MarketDataConnector",
@@ -9,4 +10,7 @@ __all__ = [
     "UnsupportedPairError",
     "MockConnector",
     "ExchangeRateHostConnector",
+    "NewsConnectorBase",
+    "MockNewsConnector",
+    "RSSNewsConnector",
 ]

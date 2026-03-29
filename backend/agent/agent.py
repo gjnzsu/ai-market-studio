@@ -7,6 +7,7 @@ from openai.types.chat import ChatCompletionMessageParam
 
 from backend.config import settings
 from backend.connectors.base import MarketDataConnector, ConnectorError
+from backend.connectors.news_connector import NewsConnectorBase
 from backend.agent.tools import TOOL_DEFINITIONS, dispatch_tool, AgentError
 
 logger = logging.getLogger(__name__)
@@ -18,11 +19,13 @@ You help traders and analysts query foreign exchange rates through natural langu
 Guidelines:
 - Always use the available tools to fetch live data before answering rate questions.
 - Present rates clearly: "The EUR/USD rate is 1.0823 as of 2026-03-25."
-- For unsupported queries (stocks, crypto, news), politely say they are out of scope.
+- For unsupported queries (stocks, crypto), politely say they are out of scope.
 - If a data error occurs, explain the issue clearly without exposing internal details.
 - Be concise and professional. Do not add unnecessary caveats.
-- Supported query types: spot rates, multi-pair comparisons, historical rates, supported currency list, visual dashboard charts.
+- Supported query types: spot rates, multi-pair comparisons, historical rates, supported currency list, visual dashboard charts, news and market events.
 - When the user asks to show, chart, visualize, plot, or display rate trends or comparisons over a date range, use the generate_dashboard tool.
+- When the user asks about news, current events, why a currency is moving, or what is happening in the market, use the get_fx_news tool.
+- You may optionally pass a query parameter to get_fx_news to filter news by currency pair (e.g. 'EUR/USD') or topic (e.g. 'Fed', 'inflation', 'BOJ').
 """.strip()
 
 MAX_TOOL_ROUNDS = 5
@@ -33,6 +36,7 @@ async def run_agent(
     history: Optional[list[dict]] = None,
     connector: Optional[MarketDataConnector] = None,
     client: Optional[AsyncOpenAI] = None,
+    news_connector: Optional[NewsConnectorBase] = None,
 ) -> dict:
     """Run the GPT-4o function-calling agent loop.
 
@@ -81,7 +85,7 @@ async def run_agent(
                 logger.info("Tool call: %s args=%s", tool_name, tool_args)
 
                 try:
-                    result = await dispatch_tool(tool_name, tool_args, connector)
+                    result = await dispatch_tool(tool_name, tool_args, connector, news_connector)
                     last_tool_used = tool_name
                     last_tool_data = result
                     tool_result_content = json.dumps(result)

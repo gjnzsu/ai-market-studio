@@ -1,17 +1,19 @@
 import pytest
 from backend.agent.tools import TOOL_DEFINITIONS, dispatch_tool, AgentError
 from backend.connectors.mock_connector import MockConnector
+from backend.connectors.news_connector import MockNewsConnector
 
 
 def test_tool_definitions_are_valid():
     assert isinstance(TOOL_DEFINITIONS, list)
-    assert len(TOOL_DEFINITIONS) == 5
+    assert len(TOOL_DEFINITIONS) == 6
     names = [t["function"]["name"] for t in TOOL_DEFINITIONS]
     assert "get_exchange_rate" in names
     assert "get_exchange_rates" in names
     assert "get_historical_rates" in names
     assert "list_supported_currencies" in names
     assert "generate_dashboard" in names
+    assert "get_fx_news" in names
 
 
 def test_tool_definitions_have_required_fields():
@@ -45,6 +47,52 @@ async def test_dispatch_list_supported_currencies():
     result = await dispatch_tool("list_supported_currencies", {}, connector)
     assert "currencies" in result
     assert isinstance(result["currencies"], list)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_get_fx_news_no_connector():
+    """get_fx_news with no news_connector returns empty items and error key."""
+    connector = MockConnector()
+    result = await dispatch_tool("get_fx_news", {}, connector, news_connector=None)
+    assert result["type"] == "news"
+    assert result["items"] == []
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_dispatch_get_fx_news_with_mock_connector():
+    connector = MockConnector()
+    news = MockNewsConnector()
+    result = await dispatch_tool("get_fx_news", {}, connector, news_connector=news)
+    assert result["type"] == "news"
+    assert isinstance(result["items"], list)
+    assert len(result["items"]) <= 5
+    assert result["query"] is None
+
+
+@pytest.mark.asyncio
+async def test_dispatch_get_fx_news_with_query():
+    connector = MockConnector()
+    news = MockNewsConnector()
+    result = await dispatch_tool(
+        "get_fx_news", {"query": "Fed", "max_items": 3}, connector, news_connector=news
+    )
+    assert result["type"] == "news"
+    assert result["query"] == "Fed"
+    assert len(result["items"]) <= 3
+    for item in result["items"]:
+        text = item["title"].lower() + item["summary"].lower()
+        assert "fed" in text
+
+
+@pytest.mark.asyncio
+async def test_dispatch_get_fx_news_max_items_capped_at_10():
+    connector = MockConnector()
+    news = MockNewsConnector()
+    result = await dispatch_tool(
+        "get_fx_news", {"max_items": 999}, connector, news_connector=news
+    )
+    assert len(result["items"]) <= 10
 
 
 @pytest.mark.asyncio

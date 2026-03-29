@@ -96,6 +96,39 @@
       max-height: 200px;
       overflow-y: auto;
     }
+    .news-list {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .news-card {
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+    }
+    .news-card a {
+      color: #a5b4fc;
+      font-weight: 600;
+      text-decoration: none;
+      display: block;
+      margin-bottom: 4px;
+      line-height: 1.35;
+    }
+    .news-card a:hover { text-decoration: underline; }
+    .news-card .news-summary {
+      color: #94a3b8;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      margin-bottom: 5px;
+      white-space: normal;
+    }
+    .news-card .news-meta {
+      color: #475569;
+      font-size: 0.7rem;
+    }
     #input-area {
       padding: 1rem 1.5rem;
       background: #1a1d27;
@@ -170,6 +203,8 @@
         <span class="ex-chip" onclick="sendExample(this)">Best performing vs USD this week</span>
         <span class="ex-chip" onclick="sendExample(this)">Show EUR/USD trend last 5 days</span>
         <span class="ex-chip" onclick="sendExample(this)">Compare GBP JPY CHF vs USD bar chart</span>
+        <span class="ex-chip" onclick="sendExample(this)">Latest FX market news</span>
+        <span class="ex-chip" onclick="sendExample(this)">News about the Fed and USD</span>
       </div>
       <div id="chat-window"></div>
       <div id="input-area">
@@ -297,13 +332,41 @@
     }
   }
 
+  function renderInlineNews(bubble, payload) {
+    const items = payload.items || [];
+    if (items.length === 0) return;
+    const list = document.createElement('div');
+    list.className = 'news-list';
+    items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'news-card';
+      const link = document.createElement('a');
+      link.href = item.url || '#';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = item.title || '(no title)';
+      const summary = document.createElement('div');
+      summary.className = 'news-summary';
+      summary.textContent = item.summary || '';
+      const meta = document.createElement('div');
+      meta.className = 'news-meta';
+      const pub = item.published ? new Date(item.published).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
+      meta.textContent = [item.source, pub].filter(Boolean).join(' · ');
+      card.appendChild(link);
+      if (item.summary) card.appendChild(summary);
+      card.appendChild(meta);
+      list.appendChild(card);
+    });
+    bubble.appendChild(list);
+  }
+
   function sendExample(el) { userInput.value = el.textContent; sendMessage(); }
 
   function addBubble(role, text, data) {
     const div = document.createElement('div');
     div.className = 'bubble ' + role;
     div.textContent = text;
-    if (data && data.type !== 'dashboard') {
+    if (data && data.type !== 'dashboard' && data.type !== 'news') {
       const block = document.createElement('div');
       block.className = 'data-block';
       block.textContent = JSON.stringify(data, null, 2);
@@ -341,6 +404,8 @@
         const assistantBubble = addBubble('assistant', data.reply, data.data);
         if (data.data && data.data.type === 'dashboard') {
           renderInlineDashboard(assistantBubble, data.data);
+        } else if (data.data && data.data.type === 'news') {
+          renderInlineNews(assistantBubble, data.data);
         }
       }
     } catch (e) {

@@ -1,5 +1,6 @@
-from typing import Any
+from typing import Any, Optional
 from backend.connectors.base import MarketDataConnector, ConnectorError
+from backend.connectors.news_connector import NewsConnectorBase
 
 # ---------------------------------------------------------------------------
 # Tool JSON schemas (sent to GPT-4o as function definitions)
@@ -149,6 +150,31 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_fx_news",
+            "description": (
+                "Fetch recent FX and financial market news headlines. "
+                "Use when the user asks about news, what's happening in the market, "
+                "why a currency is moving, or current events affecting FX rates."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Optional keyword to filter news (e.g. 'EUR/USD', 'Fed', 'inflation', 'BOJ'). Omit to get general FX news.",
+                    },
+                    "max_items": {
+                        "type": "integer",
+                        "description": "Maximum number of news items to return. Between 1 and 10. Default is 5.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
 ]
 
 
@@ -164,6 +190,7 @@ async def dispatch_tool(
     tool_name: str,
     tool_args: dict[str, Any],
     connector: MarketDataConnector,
+    news_connector: Optional[NewsConnectorBase] = None,
 ) -> Any:
     """Execute a tool call and return the result.
 
@@ -213,5 +240,12 @@ async def dispatch_tool(
                 for date in sorted_dates
             ],
         }
+    elif tool_name == "get_fx_news":
+        query = tool_args.get("query")
+        max_items = min(int(tool_args.get("max_items", 5)), 10)
+        if news_connector is None:
+            return {"type": "news", "query": query, "items": [], "error": "News connector not available"}
+        items = news_connector.get_fx_news(query=query, max_items=max_items)
+        return {"type": "news", "query": query, "items": items}
     else:
         raise AgentError(f"Unknown tool: {tool_name}")

@@ -20,6 +20,7 @@ router = APIRouter()
 async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     """Accept a user message and return an AI-generated reply with FX data."""
     connector = request.app.state.connector
+    news_connector = getattr(request.app.state, 'news_connector', None)
     history = [m.model_dump() for m in body.history]
 
     try:
@@ -27,6 +28,7 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
             message=body.message,
             history=history,
             connector=connector,
+            news_connector=news_connector,
         )
     except ConnectorError as e:
         logger.error("Connector error in /chat: %s", e)

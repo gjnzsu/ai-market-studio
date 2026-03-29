@@ -28,10 +28,23 @@ def create_connector():
         )
 
 
+def create_news_connector():
+    if settings.use_mock_connector:
+        from backend.connectors.news_connector import MockNewsConnector
+        logger.info("Using MockNewsConnector (USE_MOCK_CONNECTOR=true)")
+        return MockNewsConnector()
+    else:
+        from backend.connectors.news_connector import RSSNewsConnector
+        logger.info("Using RSSNewsConnector")
+        return RSSNewsConnector()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not getattr(app.state, 'connector', None):
         app.state.connector = create_connector()
+    if not getattr(app.state, 'news_connector', None):
+        app.state.news_connector = create_news_connector()
     logger.info("AI Market Studio started.")
     yield
     logger.info("AI Market Studio shutting down.")
