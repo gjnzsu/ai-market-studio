@@ -225,21 +225,11 @@ ai-market-studio/
 
 ## Roadmap
 
-### Delivered
-
-| Feature | Description | Status |
-|---------|-------------|--------|
-| Feature 01 | FX Chat Assistant — natural-language spot rates via GPT-4o function calling | ✅ Delivered |
-| Feature 02 | FX Rate Historical Data — trend dashboard, LRU-cached historical endpoint | ✅ Delivered |
-| Feature 03 | Market News — inline news cards from free RSS feeds, `get_fx_news` tool | ✅ Delivered |
-| Feature 04 | Conversational Dashboard — LLM-driven inline Chart.js generation | ✅ Delivered |
-
-### Upcoming
-
-| Priority | Feature | Description |
-|----------|---------|-------------|
-| P1 | AI Market Insights | Context-aware analysis: "Why is EUR/USD moving today?" AI-generated commentary synthesised from news and rate data. Converts the app from a data terminal into an analyst assistant. |
-| P2 | Output & Export | Export charts as PNG/PDF, data as Excel/CSV, and generate PowerPoint summary reports. Turns the chatbot into a shareable workflow tool for sales and trading teams. |
-| P3 | Research & Reports | Web search integration for live market context; research report generation via RAG pipeline over internal documents. |
-| P4 | Trader Commentary | Capture, store, and retrieve internal trader annotations and commentary. Requires a data persistence layer before implementation. |
-| P5 | Platform Capabilities | Custom agent creation, document/OCR ingestion (scanned reports, PDFs). Platform plays appropriate after core use-case is validated. |
+| Priority | Theme | Features |
+|----------|-------|----------|
+| **P0 — Done** | Foundation | Chat assistant, spot & historical FX rates, conversational dashboard, market news, GKE deployment |
+| **P1 — Awareness** | Market Intelligence | F7: Market Insight Summary — AI-generated "why is EUR/USD moving?" commentary from news + rate data; F3: Market News (delivered) |
+| **P2 — Productivity** | Output Generation | F9: PPT / Excel / PDF report generation; F8: Email sending of insights and reports |
+| **P3 — Intelligence** | Research | F5: Web search integration for live market context; F4: Research report generation via RAG pipeline over internal documents |
+| **P4 — Data Breadth** | Data & Collaboration | F1: Multi-source market data connectors; F6: Sales/trader commentary capture and retrieval; F12: Scheduled report function |
+| **P5 — Advanced** | Platform | F10: Custom agent creation; F11: OCR / document ingestion (scanned reports, PDFs) |
