@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     exchangerate_api_key: SecretStr
     use_mock_connector: bool = False
+    use_mock_news_connector: bool = True  # independent flag; defaults True for safety
 
     cors_origins: str = "*"
     max_historical_days: int = 7
