@@ -12,7 +12,7 @@ A conversational FX market data platform. Ask natural-language questions about e
 
 ### Feature 01 — FX Chat Assistant
 - Natural-language queries: *"What is EUR/USD today?"*, *"Compare USD vs JPY and CHF"*
-- GPT-4o function calling with four tools: spot rate, multi-pair rates, supported currencies list, dashboard generation
+- GPT-4o function calling with five tools: spot rate, multi-pair rates, supported currencies list, dashboard generation, market news
 - Conversation history maintained client-side
 
 ### Feature 02 — FX Rate Historical Data
@@ -20,6 +20,13 @@ A conversational FX market data platform. Ask natural-language questions about e
 - `POST /api/dashboard` — batch panel data fetch (up to 9 panels)
 - Supports line trend, bar comparison, and stat summary panel types
 - Toggle between live API and mock data via `USE_MOCK_CONNECTOR` env var
+
+### Feature 03 — Market News
+- Ask in natural language: *"What's the latest FX news?"*, *"Any news on EUR/USD?"*
+- GPT-4o calls the `get_fx_news` tool; results render as inline news cards in the chat bubble
+- Free RSS feeds (BBC Business, Investing.com FX, FXStreet) — no paid API key required
+- Query filtering and item cap; fully decoupled from rate connector via `USE_MOCK_NEWS_CONNECTOR`
+- Mock news connector used in all tests (8+ hardcoded items, deterministic)
 
 ### Feature 04 — Conversational Dashboard Generation
 - Ask in natural language: *"Show me EUR/USD and GBP/USD trend for the last 5 days"*
@@ -39,17 +46,19 @@ Browser — single-pane chat UI (Vanilla JS + Chart.js)
         │
         ▼
 FastAPI Backend  (backend/)
-   ├── /api/chat              ← GPT-4o agent loop (4 tools)
+   ├── /api/chat              ← GPT-4o agent loop (5 tools)
    ├── /api/rates/historical  ← daily FX rates, LRU cached
    └── /api/dashboard         ← batch panel fetch
         │
         ▼
 Connector Layer
-   ├── ExchangeRateHostConnector  ← live data (exchangerate.host)
-   └── MockConnector              ← deterministic synthetic data
+   ├── ExchangeRateHostConnector  ← live FX data (exchangerate.host)
+   ├── MockConnector              ← deterministic synthetic FX data
+   ├── RSSNewsConnector           ← free RSS feeds (BBC, Investing.com, FXStreet)
+   └── MockNewsConnector          ← deterministic synthetic news (tests + dev)
 ```
 
-**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `generate_dashboard`
+**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `generate_dashboard`, `get_fx_news`
 
 ---
 
@@ -161,7 +170,8 @@ Once `EXTERNAL-IP` is assigned, the app is available at `http://<EXTERNAL-IP>/`.
 | `OPENAI_API_KEY` | — | Required. OpenAI API key |
 | `OPENAI_MODEL` | `gpt-4o` | Model used by the agent |
 | `EXCHANGERATE_API_KEY` | — | Required. exchangerate.host API key |
-| `USE_MOCK_CONNECTOR` | `false` | Use synthetic data instead of live API |
+| `USE_MOCK_CONNECTOR` | `false` | Use synthetic FX data instead of live exchangerate.host API |
+| `USE_MOCK_NEWS_CONNECTOR` | `false` | Use synthetic news data instead of live RSS feeds |
 | `MAX_HISTORICAL_DAYS` | `7` | Max date range per dashboard request |
 | `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
 
@@ -195,9 +205,12 @@ ai-market-studio/
 │   │   ├── agent.py         # GPT-4o function-calling loop
 │   │   └── tools.py         # Tool definitions and dispatch
 │   ├── connectors/
-│   │   ├── base.py          # Abstract connector interface
+│   │   ├── base.py              # Abstract FX connector interface
+│   │   ├── news_base.py         # Abstract news connector interface
 │   │   ├── exchangerate_host.py
-│   │   └── mock_connector.py
+│   │   ├── mock_connector.py
+│   │   ├── rss_news_connector.py
+│   │   └── mock_news_connector.py
 │   └── tests/
 │       ├── unit/
 │       └── e2e/
@@ -212,8 +225,21 @@ ai-market-studio/
 
 ## Roadmap
 
-- [x] Feature 01 — Chat assistant with GPT-4o function calling
-- [x] Feature 02 — FX Rate Trend Dashboard
-- [ ] Feature 03 — localStorage persistence, authentication, CORS lockdown
-- [x] Feature 04 — Conversational dashboard control via GPT-4o
-- [ ] Feature 05 — Paid-tier API integration (intraday data, higher quota)
+### Delivered
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| Feature 01 | FX Chat Assistant — natural-language spot rates via GPT-4o function calling | ✅ Delivered |
+| Feature 02 | FX Rate Historical Data — trend dashboard, LRU-cached historical endpoint | ✅ Delivered |
+| Feature 03 | Market News — inline news cards from free RSS feeds, `get_fx_news` tool | ✅ Delivered |
+| Feature 04 | Conversational Dashboard — LLM-driven inline Chart.js generation | ✅ Delivered |
+
+### Upcoming
+
+| Priority | Feature | Description |
+|----------|---------|-------------|
+| P1 | AI Market Insights | Context-aware analysis: "Why is EUR/USD moving today?" AI-generated commentary synthesised from news and rate data. Converts the app from a data terminal into an analyst assistant. |
+| P2 | Output & Export | Export charts as PNG/PDF, data as Excel/CSV, and generate PowerPoint summary reports. Turns the chatbot into a shareable workflow tool for sales and trading teams. |
+| P3 | Research & Reports | Web search integration for live market context; research report generation via RAG pipeline over internal documents. |
+| P4 | Trader Commentary | Capture, store, and retrieve internal trader annotations and commentary. Requires a data persistence layer before implementation. |
+| P5 | Platform Capabilities | Custom agent creation, document/OCR ingestion (scanned reports, PDFs). Platform plays appropriate after core use-case is validated. |

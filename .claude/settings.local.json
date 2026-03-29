@@ -18,7 +18,53 @@
       "Bash(cmd /c taskkill /F /PID 21300 2>&1)",
       "Bash(python:*)",
       "Bash('c:/SourceCode/ai-market-studio/docs/product_documentation.md':*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(xargs grep:*)",
+      "Bash(dir \"C:\\\\SourceCode\\\\ai-market-studio\" /s /b)",
+      "Bash(xargs -I{} taskkill /PID {} /F)",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c \"taskkill /PID 18384 /F\" 2>&1)",
+      "Bash(powershell -Command \"Stop-Process -Id 18384 -Force\" 2>&1)",
+      "Bash(powershell -Command \"Stop-Process -Id 23860 -Force\" 2>&1)",
+      "Bash(uvicorn backend.main:app --host 0.0.0.0 --port 8000)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8000 | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }\" 2>&1)",
+      "Bash(powershell -Command \"Stop-Process -Id 22252 -Force\")",
+      "Bash(gcloud auth:*)",
+      "Bash(docker build:*)",
+      "Bash(docker info:*)",
+      "Bash(docker push:*)",
+      "Bash(gcloud container:*)",
+      "Bash(kubectl create:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl get:*)",
+      "Bash(kubectl rollout:*)",
+      "Bash(pip show:*)",
+      "Bash(powershell -Command \"Get-Content 'C:\\\\SourceCode\\\\ai-market-studio\\\\frontend\\\\index.html' | Select-Object -First 350 | ForEach-Object { $i++; '{0,4}: {1}' -f $i, $_ }\")",
+      "Bash(powershell -Command \"$lines = Get-Content 'C:\\\\SourceCode\\\\ai-market-studio\\\\frontend\\\\index.html'; for\\($i=0;$i -lt [Math]::Min\\(350,$lines.Length\\);$i++\\){'{0,4}: {1}' -f \\($i+1\\),$lines[$i]}\")",
+      "Bash(powershell -NoProfile -Command \"$f='C:\\\\SourceCode\\\\ai-market-studio\\\\frontend\\\\index.html'; $lines=Get-Content $f; for\\($i=0;$i -lt 300 -and $i -lt $lines.Length;$i++\\){Write-Output \\('{0:D4} {1}' -f \\($i+1\\),$lines[$i]\\)}\")",
+      "Bash(powershell -NoProfile -Command \"$f='C:\\\\SourceCode\\\\ai-market-studio\\\\frontend\\\\index.html'; $lines=[System.IO.File]::ReadAllLines\\($f\\); $lines.Length\")",
+      "Bash(powershell -NoProfile -Command \"[System.IO.File]::ReadAllLines\\('C:\\\\SourceCode\\\\ai-market-studio\\\\frontend\\\\index.html'\\).Length\")",
+      "Bash(python3:*)",
+      "Bash(where python:*)",
+      "Bash(py:*)",
+      "Bash(curl -s -X POST http://35.224.3.54/api/chat -H 'Content-Type: application/json' -d '{\"\"\"\"message\"\"\"\": \"\"\"\"Show me EUR/USD trend last 5 days\"\"\"\", \"\"\"\"history\"\"\"\": []}')",
+      "Bash(kubectl patch:*)",
+      "Bash(kubectl exec:*)",
+      "Skill(update-config)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Look at the bash command in $ARGUMENTS. If it was a git commit command (contains 'git commit'), check whether README.md needs updating to reflect what was just committed — new features, architecture changes, new env vars, updated file structure, or roadmap status. If it does, update README.md now. If it was not a git commit, do nothing.",
+            "statusMessage": "Checking if README.md needs updating..."
+          }
+        ]
+      }
     ]
   }
 }
