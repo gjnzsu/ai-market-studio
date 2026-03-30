@@ -37,6 +37,15 @@ A conversational FX market data platform. Ask natural-language questions about e
 
 ![Conversational Dashboard](shot_08_inline_chart.png)
 
+### Feature 07 — Market Insight Summary
+- Ask in natural language: *"Give me a market insight on EUR/USD and GBP/USD"*
+- GPT-4o calls `generate_market_insight` tool: fetches live spot rates + RSS news in one turn
+- Batched API calls — all pairs with a shared target currency fetched in a single request
+- Renders inline rate chips and news cards inside the chat bubble
+- Live data from exchangerate.host (real rates, not mock)
+
+![Market Insight Summary](shot_f7_live.png)
+
 ---
 
 ## Architecture
@@ -58,7 +67,7 @@ Connector Layer
    └── MockNewsConnector          ← deterministic synthetic news (tests + dev)
 ```
 
-**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `generate_dashboard`, `get_fx_news`
+**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`
 
 ---
 
@@ -73,7 +82,7 @@ The app is deployed on Google Kubernetes Engine (GKE):
 | Cluster | `helloworld-cluster` (us-central1) |
 | GCP Project | `gen-lang-client-0896070179` |
 | Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio:latest` |
-| Connector | `USE_MOCK_CONNECTOR=true` |
+| Connector | `USE_MOCK_CONNECTOR=false` (live exchangerate.host data) |
 
 ---
 
@@ -227,8 +236,8 @@ ai-market-studio/
 
 | Priority | Theme | Features |
 |----------|-------|----------|
-| **P0 — Done** | Foundation | Chat assistant, spot & historical FX rates, conversational dashboard, market news, GKE deployment |
-| **P1 — Awareness** | Market Intelligence | F7: Market Insight Summary — AI-generated "why is EUR/USD moving?" commentary from news + rate data; F3: Market News (delivered) |
+| **P0 — Done** | Foundation | Chat assistant, spot & historical FX rates, conversational dashboard, market news, GKE deployment, F7: Market Insight Summary |
+| **P1 — Awareness** | Market Intelligence | F7: Market Insight Summary (delivered); F3: Market News (delivered) |
 | **P2 — Productivity** | Output Generation | F9: PPT / Excel / PDF report generation; F8: Email sending of insights and reports |
 | **P3 — Intelligence** | Research | F5: Web search integration for live market context; F4: Research report generation via RAG pipeline over internal documents |
 | **P4 — Data Breadth** | Data & Collaboration | F1: Multi-source market data connectors; F6: Sales/trader commentary capture and retrieval; F12: Scheduled report function |
