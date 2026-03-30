@@ -72,14 +72,19 @@ class ExchangeRateHostConnector(MarketDataConnector):
             return {"base": base, "target": target, "rate": quotes[key], "date": rate_date, "source": SOURCE_NAME}
 
         # Triangulate: base→USD and USD→target
-        quotes = await self._fetch_usd_rates([base, target], date)
+        # If target IS USD, we only need the base→USD rate and invert it.
+        currencies = [base] if target == FREE_TIER_BASE else [base, target]
+        quotes = await self._fetch_usd_rates(currencies, date)
         usd_base_key = f"{FREE_TIER_BASE}{base}"
-        usd_target_key = f"{FREE_TIER_BASE}{target}"
         if usd_base_key not in quotes:
             raise UnsupportedPairError(f"{base} not available via triangulation.")
-        if usd_target_key not in quotes:
-            raise UnsupportedPairError(f"{target} not available via triangulation.")
-        rate = quotes[usd_target_key] / quotes[usd_base_key]
+        if target == FREE_TIER_BASE:
+            rate = 1.0 / quotes[usd_base_key]
+        else:
+            usd_target_key = f"{FREE_TIER_BASE}{target}"
+            if usd_target_key not in quotes:
+                raise UnsupportedPairError(f"{target} not available via triangulation.")
+            rate = quotes[usd_target_key] / quotes[usd_base_key]
         return {"base": base, "target": target, "rate": round(rate, 6), "date": rate_date, "source": SOURCE_NAME}
 
     async def get_exchange_rates(
@@ -106,12 +111,15 @@ class ExchangeRateHostConnector(MarketDataConnector):
                 results.append({"base": base, "target": target, "rate": round(quotes[key], 6), "date": rate_date, "source": SOURCE_NAME})
             else:
                 usd_base_key = f"{FREE_TIER_BASE}{base}"
-                usd_target_key = f"{FREE_TIER_BASE}{target}"
                 if usd_base_key not in quotes:
                     raise UnsupportedPairError(f"{base} not available via triangulation.")
-                if usd_target_key not in quotes:
-                    raise UnsupportedPairError(f"{target} not available via triangulation.")
-                rate = quotes[usd_target_key] / quotes[usd_base_key]
+                if target == FREE_TIER_BASE:
+                    rate = 1.0 / quotes[usd_base_key]
+                else:
+                    usd_target_key = f"{FREE_TIER_BASE}{target}"
+                    if usd_target_key not in quotes:
+                        raise UnsupportedPairError(f"{target} not available via triangulation.")
+                    rate = quotes[usd_target_key] / quotes[usd_base_key]
                 results.append({"base": base, "target": target, "rate": round(rate, 6), "date": rate_date, "source": SOURCE_NAME})
         return results
 
@@ -152,12 +160,15 @@ class ExchangeRateHostConnector(MarketDataConnector):
                     day_rates[target] = round(quotes[key], 6)
                 else:
                     usd_base_key = f"{FREE_TIER_BASE}{base}"
-                    usd_target_key = f"{FREE_TIER_BASE}{target}"
                     if usd_base_key not in quotes:
                         raise UnsupportedPairError(f"{base} not available via triangulation.")
-                    if usd_target_key not in quotes:
-                        raise UnsupportedPairError(f"{target} not available via triangulation.")
-                    day_rates[target] = round(quotes[usd_target_key] / quotes[usd_base_key], 6)
+                    if target == FREE_TIER_BASE:
+                        day_rates[target] = round(1.0 / quotes[usd_base_key], 6)
+                    else:
+                        usd_target_key = f"{FREE_TIER_BASE}{target}"
+                        if usd_target_key not in quotes:
+                            raise UnsupportedPairError(f"{target} not available via triangulation.")
+                        day_rates[target] = round(quotes[usd_target_key] / quotes[usd_base_key], 6)
             result[current.isoformat()] = day_rates
             current += timedelta(days=1)
         return result

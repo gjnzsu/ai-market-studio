@@ -282,17 +282,50 @@ async def dispatch_tool(
         pairs = tool_args.get("pairs", [])
         news_query = tool_args.get("news_query")
         max_news = min(int(tool_args.get("max_news", 5)), 10)
-        # Fetch spot rate for each pair
-        rates = []
+        # Batch fetch: group targets by base to minimise API calls.
+        # Special case: pairs sharing the same target are fetched in one call
+        # by using that target as base and inverting (avoids per-pair HTTP hits).
+        from collections import defaultdict
+        base_to_targets: dict = defaultdict(list)
+        target_to_bases: dict = defaultdict(list)
+        valid_pairs: list = []
         for pair in pairs:
             parts = pair.upper().replace("-", "/").split("/")
             if len(parts) == 2:
                 base, target = parts
+                valid_pairs.append((base, target))
+                target_to_bases[target].append(base)
+
+        rates = []
+        fetched: dict = {}  # (base, target) -> rate_data
+
+        # For each unique target that has multiple bases, fetch all bases at once
+        # using that target as the connector base (one API call instead of N).
+        for common_target, bases in target_to_bases.items():
+            if len(bases) >= 1:
                 try:
-                    rate_data = await connector.get_exchange_rate(base=base, target=target)
-                    rates.append(rate_data)
+                    batch = await connector.get_exchange_rates(base=common_target, targets=bases)
+                    for item in batch:
+                        # item is common_target→base; we want base→common_target = 1/rate
+                        b, t = item["base"], item["target"]
+                        # b == common_target, t == original base
+                        inverted = {
+                            "base": t,
+                            "target": b,
+                            "rate": round(1.0 / item["rate"], 6) if item.get("rate") else None,
+                            "date": item.get("date"),
+                            "source": item.get("source"),
+                        }
+                        fetched[(t, b)] = inverted
                 except ConnectorError as e:
-                    rates.append({"base": base, "target": target, "error": str(e)})
+                    for base in bases:
+                        fetched[(base, common_target)] = {"base": base, "target": common_target, "error": str(e)}
+
+        for base, target in valid_pairs:
+            if (base, target) in fetched:
+                rates.append(fetched[(base, target)])
+            else:
+                rates.append({"base": base, "target": target, "error": "Rate not fetched"})
         # Fetch news
         news_items = []
         if news_connector is not None:

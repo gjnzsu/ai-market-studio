@@ -32,6 +32,25 @@ Guidelines:
 MAX_TOOL_ROUNDS = 5
 
 
+def _summarise_tool_result(result: dict) -> dict:
+    """Return a compact GPT-4o-friendly summary for structured UI payloads."""
+    rtype = result.get("type")
+    if rtype == "insight":
+        rate_lines = []
+        for r in result.get("rates", []):
+            if "error" in r:
+                rate_lines.append(f"{r['base']}/{r['target']}: unavailable")
+            else:
+                rate_lines.append(f"{r['base']}/{r['target']}: {r['rate']} ({r.get('date', '')})")
+        news_titles = [n["title"] for n in result.get("news", [])]
+        return {"rates": rate_lines, "news_headlines": news_titles}
+    if rtype == "dashboard":
+        return {"panel_type": result.get("panel_type"), "pairs": result.get("targets"), "series_count": len(result.get("series", []))}
+    if rtype == "news":
+        return {"headlines": [n["title"] for n in result.get("items", [])]}
+    return result
+
+
 async def run_agent(
     message: str,
     history: Optional[list[dict]] = None,
@@ -89,7 +108,12 @@ async def run_agent(
                     result = await dispatch_tool(tool_name, tool_args, connector, news_connector)
                     last_tool_used = tool_name
                     last_tool_data = result
-                    tool_result_content = json.dumps(result)
+                    # For structured UI payloads, send GPT-4o a compact summary
+                    # instead of the full JSON so it doesn't echo the raw payload.
+                    if isinstance(result, dict) and result.get("type") in ("insight", "dashboard", "news"):
+                        tool_result_content = json.dumps(_summarise_tool_result(result))
+                    else:
+                        tool_result_content = json.dumps(result)
                 except ConnectorError as e:
                     logger.warning("Connector error: %s", e)
                     tool_result_content = json.dumps({"error": str(e)})
