@@ -175,6 +175,37 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_market_insight",
+            "description": (
+                "Gather current spot rates and recent news for a set of currency pairs "
+                "to produce a market insight summary. "
+                "Use when the user asks for a market overview, briefing, insight, "
+                "or what's happening with specific currencies."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pairs": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Currency pairs to include, e.g. ['EUR/USD', 'GBP/USD']. Each pair is BASE/TARGET.",
+                    },
+                    "news_query": {
+                        "type": "string",
+                        "description": "Optional keyword to filter news (e.g. 'EUR', 'Fed', 'inflation'). Omit for general FX news.",
+                    },
+                    "max_news": {
+                        "type": "integer",
+                        "description": "Maximum number of news items to include. Between 1 and 10. Default is 5.",
+                    },
+                },
+                "required": ["pairs"],
+            },
+        },
+    },
 ]
 
 
@@ -247,5 +278,30 @@ async def dispatch_tool(
             return {"type": "news", "query": query, "items": [], "error": "News connector not available"}
         items = news_connector.get_fx_news(query=query, max_items=max_items)
         return {"type": "news", "query": query, "items": items}
+    elif tool_name == "generate_market_insight":
+        pairs = tool_args.get("pairs", [])
+        news_query = tool_args.get("news_query")
+        max_news = min(int(tool_args.get("max_news", 5)), 10)
+        # Fetch spot rate for each pair
+        rates = []
+        for pair in pairs:
+            parts = pair.upper().replace("-", "/").split("/")
+            if len(parts) == 2:
+                base, target = parts
+                try:
+                    rate_data = await connector.get_exchange_rate(base=base, target=target)
+                    rates.append(rate_data)
+                except ConnectorError as e:
+                    rates.append({"base": base, "target": target, "error": str(e)})
+        # Fetch news
+        news_items = []
+        if news_connector is not None:
+            news_items = news_connector.get_fx_news(query=news_query, max_items=max_news)
+        return {
+            "type": "insight",
+            "pairs": pairs,
+            "rates": rates,
+            "news": news_items,
+        }
     else:
         raise AgentError(f"Unknown tool: {tool_name}")

@@ -26,6 +26,7 @@ Guidelines:
 - When the user asks to show, chart, visualize, plot, or display rate trends or comparisons over a date range, use the generate_dashboard tool.
 - When the user asks about news, current events, why a currency is moving, or what is happening in the market, use the get_fx_news tool.
 - You may optionally pass a query parameter to get_fx_news to filter news by currency pair (e.g. 'EUR/USD') or topic (e.g. 'Fed', 'inflation', 'BOJ').
+- When the user asks for a market overview, briefing, insight summary, or a combined view of rates and news for specific currencies, use the generate_market_insight tool. Pass the relevant currency pairs (e.g. ['EUR/USD', 'GBP/USD']) and an optional news_query to focus the news.
 """.strip()
 
 MAX_TOOL_ROUNDS = 5
