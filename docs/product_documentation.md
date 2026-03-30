@@ -1,9 +1,9 @@
 # AI Market Studio — Product Documentation
 
-> **Version:** 2.1
-> **Date:** 2026-03-27
+> **Version:** 2.2
+> **Date:** 2026-03-30
 > **Status:** Active
-> **Scope:** FX Rate Trend Dashboard (Feature 02) — Delivered
+> **Scope:** F7 Market Insight Summary — Delivered; live exchangerate.host connector active
 
 ---
 
@@ -477,8 +477,8 @@ The layout is determined server-side based on panel count and returned as the `g
 
 | Priority | Theme | Features |
 |----------|-------|----------|
-| **P0 — Done** | Foundation | Chat assistant, spot & historical FX rates, conversational dashboard, market news, GKE deployment |
-| **P1 — Awareness** | Market Intelligence | F7: Market Insight Summary — AI-generated "why is EUR/USD moving?" commentary from news + rate data; F3: Market News (delivered) |
+| **P0 — Done** | Foundation | Chat assistant, spot & historical FX rates, conversational dashboard, market news, GKE deployment, F7: Market Insight Summary (rates + news + AI commentary) |
+| **P1 — Awareness** | Market Intelligence | F7: Market Insight Summary (delivered — see P0); F3: Market News (delivered) |
 | **P2 — Productivity** | Output Generation | F9: PPT / Excel / PDF report generation; F8: Email sending of insights and reports |
 | **P3 — Intelligence** | Research | F5: Web search integration for live market context; F4: Research report generation via RAG pipeline over internal documents |
 | **P4 — Data Breadth** | Data & Collaboration | F1: Multi-source market data connectors; F6: Sales/trader commentary capture and retrieval; F12: Scheduled report function |
@@ -509,6 +509,14 @@ The layout is determined server-side based on panel count and returned as the `g
 - Inline Chart.js chart renders inside the chat bubble — no tab switching
 - Supports line trend (time series) and bar comparison chart types
 - UI simplified to single-pane chat; dashboard tab removed
+
+#### Feature 07 — Market Insight Summary (2026-03-30)
+- `generate_market_insight` GPT-4o tool: accepts pairs list, fetches spot rates + news in one turn
+- Batched rate fetch: groups pairs by common target currency — one API call instead of N
+- Returns `{type:"insight", pairs, rates, news}` payload; frontend renders rate chips + news cards inline
+- `_summarise_tool_result()` in agent.py sends GPT-4o a compact summary (not raw JSON) to prevent reply pollution
+- Fixed USD-target triangulation bug in `ExchangeRateHostConnector` (was looking up non-existent `USDUSD` key)
+- Live connector (`USE_MOCK_CONNECTOR=false`) active on GKE; real rates from exchangerate.host
 
 ---
 
