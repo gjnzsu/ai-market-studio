@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     cors_origins: str = "*"
     max_historical_days: int = 7
+    rag_service_url: str = "http://localhost:8000"
 
     @property
     def cors_origins_list(self) -> list[str]:
