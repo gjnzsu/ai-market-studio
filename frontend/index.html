@@ -157,6 +157,19 @@
       font-weight: 400;
       margin-right: 4px;
     }
+    .rag-sources {
+      margin-top: 8px;
+      padding: 8px;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 6px;
+      font-size: 0.8rem;
+    }
+    .rag-sources ul {
+      margin-top: 4px;
+      padding-left: 20px;
+      color: #a5b4fc;
+    }
     #input-area {
       padding: 1rem 1.5rem;
       background: #1a1d27;
@@ -452,7 +465,7 @@
     const div = document.createElement('div');
     div.className = 'bubble ' + role;
     div.textContent = text;
-    if (data && data.type !== 'dashboard' && data.type !== 'news' && data.type !== 'insight') {
+    if (data && data.type !== 'dashboard' && data.type !== 'news' && data.type !== 'insight' && data.type !== 'rag') {
       const block = document.createElement('div');
       block.className = 'data-block';
       block.textContent = JSON.stringify(data, null, 2);
@@ -494,6 +507,12 @@
           renderInlineNews(assistantBubble, data.data);
         } else if (data.data && data.data.type === 'insight') {
           renderInlineInsight(assistantBubble, data.data);
+        } else if (data.data && data.data.type === 'rag') {
+          const sourcesHtml = data.data.sources.map(s => `<li>${s.name || s}</li>`).join('');
+          const sourcesDiv = document.createElement('div');
+          sourcesDiv.className = 'rag-sources';
+          sourcesDiv.innerHTML = `Sources:<ul>${sourcesHtml}</ul>`;
+          assistantBubble.appendChild(sourcesDiv);
         }
       }
     } catch (e) {

@@ -27,6 +27,7 @@ Guidelines:
 - When the user asks about news, current events, why a currency is moving, or what is happening in the market, use the get_fx_news tool.
 - You may optionally pass a query parameter to get_fx_news to filter news by currency pair (e.g. 'EUR/USD') or topic (e.g. 'Fed', 'inflation', 'BOJ').
 - When the user asks for a market overview, briefing, insight summary, or a combined view of rates and news for specific currencies, use the generate_market_insight tool. Pass the relevant currency pairs (e.g. ['EUR/USD', 'GBP/USD']) and an optional news_query to focus the news.
+- When the user asks for internal research, analyst reports, or internal docs, use the get_internal_research tool.
 """.strip()
 
 MAX_TOOL_ROUNDS = 5
@@ -48,6 +49,9 @@ def _summarise_tool_result(result: dict) -> dict:
         return {"panel_type": result.get("panel_type"), "pairs": result.get("targets"), "series_count": len(result.get("series", []))}
     if rtype == "news":
         return {"headlines": [n["title"] for n in result.get("items", [])]}
+    if result.get("type") == "rag":
+        sources_list = [s["name"] for s in result.get("sources", [])]
+        return {"type": "rag", "sources": sources_list}
     return result
 
 
@@ -110,7 +114,7 @@ async def run_agent(
                     last_tool_data = result
                     # For structured UI payloads, send GPT-4o a compact summary
                     # instead of the full JSON so it doesn't echo the raw payload.
-                    if isinstance(result, dict) and result.get("type") in ("insight", "dashboard", "news"):
+                    if isinstance(result, dict) and result.get("type") in ("insight", "dashboard", "news", "rag"):
                         tool_result_content = json.dumps(_summarise_tool_result(result))
                     else:
                         tool_result_content = json.dumps(result)
