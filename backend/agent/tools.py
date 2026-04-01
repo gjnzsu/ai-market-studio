@@ -206,6 +206,20 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_internal_research",
+            "description": "Search internal research documents (PDFs, Jira, Confluence) for market insights.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string", "description": "The specific query to search in internal docs."}
+                },
+                "required": ["question"]
+            }
+        }
+    }
 ]
 
 
@@ -336,5 +350,9 @@ async def dispatch_tool(
             "rates": rates,
             "news": news_items,
         }
+    elif tool_name == "get_internal_research":
+        from backend.connectors.rag_connector import RAGConnector
+        rag = RAGConnector()
+        return await rag.query_research(tool_args.get("question"))
     else:
         raise AgentError(f"Unknown tool: {tool_name}")
