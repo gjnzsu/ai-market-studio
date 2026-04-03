@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
 from backend.router import router
@@ -58,21 +57,16 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS — restrict in production
-    # TODO: lock down allow_origins before deployment (currently PoC shortcut)
+    # CORS configuration for separate frontend service
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
-        allow_credentials=False,
-        allow_methods=["POST", "GET"],
-        allow_headers=["Content-Type"],
+        allow_credentials=True,
+        allow_methods=["POST", "GET", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"],
     )
 
     app.include_router(router, prefix="/api")
-
-    from pathlib import Path
-    frontend_dir = Path(__file__).parent.parent / "frontend"
-    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
 
     return app
 

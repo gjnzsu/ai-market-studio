@@ -1,6 +1,13 @@
-﻿# AI Market Studio
+﻿# AI Market Studio - Backend API
 
-A conversational FX market data platform. Ask natural-language questions about exchange rates and internal research, and get inline charts, news, and RAG-cited answers in a single-pane chat UI.
+Backend API for the AI Market Studio conversational FX market data platform.
+
+## Architecture
+
+This is the backend component of a microservices architecture:
+- **Backend API**: This repository (FastAPI)
+- **Frontend UI**: [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) (Static HTML/JS)
+- **RAG Service**: [ai-rag-service](https://github.com/gjnzsu/ai-rag-service) (Research document query)
 
 > **Vision:** AI-native market intelligence platform for natural language-driven data retrieval, automated dashboard generation, and context-aware insights.
 
@@ -56,10 +63,10 @@ A conversational FX market data platform. Ask natural-language questions about e
 ## Architecture
 
 ```text
-Browser - single-pane chat UI (Vanilla JS + Chart.js)
+Frontend (ai-market-studio-ui)
    |
    v
-FastAPI Backend (backend/)
+Backend API (this repo - FastAPI)
    |-- /api/chat              -> GPT-4o agent loop
    |-- /api/rates/historical  -> daily FX rates, LRU cached
    |-- /api/dashboard         -> batch panel fetch
@@ -70,7 +77,7 @@ Connector Layer
    |-- MockConnector             -> deterministic synthetic FX data
    |-- RSSNewsConnector          -> free RSS feeds
    |-- MockNewsConnector         -> deterministic synthetic news
-   `-- RAGConnector              -> external research-report RAG service (`POST /query`)
+   `-- RAGConnector              -> external RAG service (ai-rag-service)
 ```
 
 **GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`, `get_internal_research`
@@ -79,17 +86,19 @@ Connector Layer
 
 ## Live Deployment
 
-The app is deployed on Google Kubernetes Engine (GKE):
+The backend API is deployed on Google Kubernetes Engine (GKE):
 
-**http://35.224.3.54/**
+**Backend API:** Internal service (accessed via frontend)
+**Frontend UI:** http://35.224.3.54/
 
 | Detail | Value |
 |---|---|
 | Cluster | `helloworld-cluster` (us-central1) |
 | GCP Project | `gen-lang-client-0896070179` |
-| Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio:latest` |
+| Backend Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio:latest` |
+| Frontend Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio-ui:latest` |
 | FX Connector | `USE_MOCK_CONNECTOR=true` in the current ConfigMap; set `false` for live exchangerate.host data |
-| RAG Service | `http://34.10.130.210/query` via `RAG_SERVICE_URL=http://34.10.130.210` |
+| RAG Service | `http://ai-rag-service:8000` (internal Kubernetes service) |
 
 ---
 
@@ -123,13 +132,26 @@ RAG_SERVICE_URL=http://34.10.130.210
 
 > The exchangerate.host free tier has a low request quota. Keep `USE_MOCK_CONNECTOR=true` during development unless you specifically need live FX data.
 
-### 3. Start the server
+### 3. Start the backend API
 
 ```bash
 uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
-Open [http://localhost:8000](http://localhost:8000) in your browser.
+The API will be available at [http://localhost:8000](http://localhost:8000).
+
+### 4. Start the frontend (separate repo)
+
+Clone and run the frontend:
+
+```bash
+git clone https://github.com/gjnzsu/ai-market-studio-ui.git
+cd ai-market-studio-ui
+# Update API_BASE_URL in index.html or use environment config
+python -m http.server 8080
+```
+
+Open [http://localhost:8080](http://localhost:8080) in your browser.
 
 ### 4. Test RAG from the UI
 
@@ -141,6 +163,8 @@ Find internal research about RAG ingestion
 ```
 
 If the RAG tool is selected, the assistant response should include a **Sources** block listing matched documents.
+
+> **Note:** The frontend UI is in a separate repository. See [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) for frontend setup.
 
 ---
 
@@ -245,7 +269,7 @@ python test_dashboard.py
 ## Project Structure
 
 ```text
-ai-market-studio/
+ai-market-studio/ (Backend API)
 |-- backend/
 |   |-- main.py
 |   |-- router.py
@@ -264,13 +288,15 @@ ai-market-studio/
 |   `-- tests/
 |       |-- unit/
 |       `-- e2e/
-|-- frontend/
-|   `-- index.html
 |-- docs/
 |-- k8s/
-|-- test_dashboard.py
+|-- Dockerfile
 `-- .env
 ```
+
+**Related Repositories:**
+- Frontend: [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui)
+- RAG Service: [ai-rag-service](https://github.com/gjnzsu/ai-rag-service)
 
 ---
 
