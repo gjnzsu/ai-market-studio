@@ -1,8 +1,8 @@
-# AI Market Studio
+﻿# AI Market Studio
 
-A conversational FX market data platform. Ask natural-language questions about exchange rates and get instant inline charts — all in a clean single-pane chat interface with no build step.
+A conversational FX market data platform. Ask natural-language questions about exchange rates and internal research, and get inline charts, news, and RAG-cited answers in a single-pane chat UI.
 
-> **Vision:** AI-native market intelligence platform that enables natural language–driven data retrieval, automated dashboard generation, and context-aware insights.
+> **Vision:** AI-native market intelligence platform for natural language-driven data retrieval, automated dashboard generation, and context-aware insights.
 
 ![Chat UI](shot_07_chat_ui.png)
 
@@ -10,39 +10,44 @@ A conversational FX market data platform. Ask natural-language questions about e
 
 ## Features
 
-### Feature 01 — FX Chat Assistant
+### Feature 01 - FX Chat Assistant
 - Natural-language queries: *"What is EUR/USD today?"*, *"Compare USD vs JPY and CHF"*
-- GPT-4o function calling with five tools: spot rate, multi-pair rates, supported currencies list, dashboard generation, market news
+- GPT-4o function calling for FX rates, historical rates, dashboards, market news, and internal research
 - Conversation history maintained client-side
 
-### Feature 02 — FX Rate Historical Data
-- `POST /api/rates/historical` — daily FX rates with in-memory LRU cache (TTL=300s)
-- `POST /api/dashboard` — batch panel data fetch (up to 9 panels)
+### Feature 02 - FX Rate Historical Data
+- `POST /api/rates/historical` - daily FX rates with in-memory LRU cache (TTL=300s)
+- `POST /api/dashboard` - batch panel data fetch (up to 9 panels)
 - Supports line trend, bar comparison, and stat summary panel types
-- Toggle between live API and mock data via `USE_MOCK_CONNECTOR` env var
+- Toggle between live API and mock data via `USE_MOCK_CONNECTOR`
 
-### Feature 03 — Market News
+### Feature 03 - Market News
 - Ask in natural language: *"What's the latest FX news?"*, *"Any news on EUR/USD?"*
 - GPT-4o calls the `get_fx_news` tool; results render as inline news cards in the chat bubble
-- Free RSS feeds (BBC Business, Investing.com FX, FXStreet) — no paid API key required
-- Query filtering and item cap; fully decoupled from rate connector via `USE_MOCK_NEWS_CONNECTOR`
-- Mock news connector used in all tests (8+ hardcoded items, deterministic)
+- Free RSS feeds (BBC Business, Investing.com FX, FXStreet); no paid news API key required
+- Query filtering and item cap; fully decoupled from the rate connector via `USE_MOCK_NEWS_CONNECTOR`
+- Mock news connector used in tests for deterministic output
 
-### Feature 04 — Conversational Dashboard Generation
+### Feature 04 - Conversational Dashboard Generation
 - Ask in natural language: *"Show me EUR/USD and GBP/USD trend for the last 5 days"*
 - LLM detects chart/visualize/show intent and calls the `generate_dashboard` tool
-- Inline Chart.js chart renders directly inside the chat bubble — no tab switching
-- Supports line trend (time series) and bar comparison chart types
-- Suggested example chips in the UI for quick access
+- Inline Chart.js chart renders directly inside the chat bubble; no tab switching
+- Supports line-trend and bar-comparison chart types
 
 ![Conversational Dashboard](shot_08_inline_chart.png)
 
-### Feature 07 — Market Insight Summary
+### Feature 05 - Research Report RAG Query
+- Ask in natural language: *"Search internal research docs for deployment checklist"*, *"Find internal research about RAG ingestion"*
+- GPT-4o calls the `get_internal_research` tool, which queries the external RAG service configured by `RAG_SERVICE_URL`
+- `RAGConnector` normalizes service responses into `{type: "rag", answer, sources[]}` so the chat UI can render cited source names inline
+- Source names are derived from `title` first, then `document_id`, while preserving source metadata such as `source_type`, `excerpt`, and `score`
+- Research-report/PDF ingestion is handled by the external RAG service; this repo currently provides the query and citation UI layer
+
+### Feature 07 - Market Insight Summary
 - Ask in natural language: *"Give me a market insight on EUR/USD and GBP/USD"*
-- GPT-4o calls `generate_market_insight` tool: fetches live spot rates + RSS news in one turn
-- Batched API calls — all pairs with a shared target currency fetched in a single request
+- GPT-4o calls `generate_market_insight` to fetch spot rates and RSS news in one turn
+- Batched API calls: all pairs with a shared target currency are fetched in a single request
 - Renders inline rate chips and news cards inside the chat bubble
-- Live data from exchangerate.host (real rates, not mock)
 
 ![Market Insight Summary](shot_f7_live.png)
 
@@ -50,24 +55,25 @@ A conversational FX market data platform. Ask natural-language questions about e
 
 ## Architecture
 
-```
-Browser — single-pane chat UI (Vanilla JS + Chart.js)
-        │
-        ▼
-FastAPI Backend  (backend/)
-   ├── /api/chat              ← GPT-4o agent loop (5 tools)
-   ├── /api/rates/historical  ← daily FX rates, LRU cached
-   └── /api/dashboard         ← batch panel fetch
-        │
-        ▼
+```text
+Browser - single-pane chat UI (Vanilla JS + Chart.js)
+   |
+   v
+FastAPI Backend (backend/)
+   |-- /api/chat              -> GPT-4o agent loop
+   |-- /api/rates/historical  -> daily FX rates, LRU cached
+   |-- /api/dashboard         -> batch panel fetch
+   |
+   v
 Connector Layer
-   ├── ExchangeRateHostConnector  ← live FX data (exchangerate.host)
-   ├── MockConnector              ← deterministic synthetic FX data
-   ├── RSSNewsConnector           ← free RSS feeds (BBC, Investing.com, FXStreet)
-   └── MockNewsConnector          ← deterministic synthetic news (tests + dev)
+   |-- ExchangeRateHostConnector -> live FX data (exchangerate.host)
+   |-- MockConnector             -> deterministic synthetic FX data
+   |-- RSSNewsConnector          -> free RSS feeds
+   |-- MockNewsConnector         -> deterministic synthetic news
+   `-- RAGConnector              -> external research-report RAG service (`POST /query`)
 ```
 
-**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`
+**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`, `get_internal_research`
 
 ---
 
@@ -82,7 +88,8 @@ The app is deployed on Google Kubernetes Engine (GKE):
 | Cluster | `helloworld-cluster` (us-central1) |
 | GCP Project | `gen-lang-client-0896070179` |
 | Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio:latest` |
-| Connector | `USE_MOCK_CONNECTOR=false` (live exchangerate.host data) |
+| FX Connector | `USE_MOCK_CONNECTOR=true` in the current ConfigMap; set `false` for live exchangerate.host data |
+| RAG Service | `http://34.10.130.210/query` via `RAG_SERVICE_URL=http://34.10.130.210` |
 
 ---
 
@@ -91,7 +98,8 @@ The app is deployed on Google Kubernetes Engine (GKE):
 ### Prerequisites
 - Python 3.12+
 - An [OpenAI API key](https://platform.openai.com/)
-- An [exchangerate.host API key](https://exchangerate.host/) (free tier)
+- An [exchangerate.host API key](https://exchangerate.host/) if you want live FX data
+- Access to a deployed RAG service that supports `POST /query` with `{"question": "..."}`
 
 ### 1. Clone and install
 
@@ -108,10 +116,12 @@ Create a `.env` file in the repo root:
 ```env
 OPENAI_API_KEY=sk-...
 EXCHANGERATE_API_KEY=your_key_here
-USE_MOCK_CONNECTOR=true   # set false to use live exchangerate.host data
+USE_MOCK_CONNECTOR=true
+USE_MOCK_NEWS_CONNECTOR=true
+RAG_SERVICE_URL=http://34.10.130.210
 ```
 
-> **Note:** The exchangerate.host free tier has a ~100 req/month quota. Keep `USE_MOCK_CONNECTOR=true` during development to avoid exhausting it.
+> The exchangerate.host free tier has a low request quota. Keep `USE_MOCK_CONNECTOR=true` during development unless you specifically need live FX data.
 
 ### 3. Start the server
 
@@ -121,14 +131,36 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 Open [http://localhost:8000](http://localhost:8000) in your browser.
 
+### 4. Test RAG from the UI
+
+Try prompts such as:
+
+```text
+Search internal research docs for deployment checklist
+Find internal research about RAG ingestion
+```
+
+If the RAG tool is selected, the assistant response should include a **Sources** block listing matched documents.
+
+---
+
+## RAG Service Integration
+
+### Query flow
+1. The user asks a research-document question in `/api/chat`.
+2. GPT-4o selects `get_internal_research`.
+3. `backend/connectors/rag_connector.py` sends `POST {RAG_SERVICE_URL}/query` with `{"question": "..."}`.
+4. The connector normalizes the service response to `type="rag"`, `answer`, and `sources[].name`.
+5. `frontend/index.html` renders the answer and source list in the assistant chat bubble.
+
+### Research report ingestion
+- Ingest PDFs/research reports into the external RAG service before querying from AI Market Studio.
+- In the current GCP setup, the app points to the deployed RAG endpoint at `http://34.10.130.210`.
+- First-party PDF upload/ingestion endpoints and UI are not yet exposed in this repository; ingestion is owned by the external RAG service.
+
 ---
 
 ## Deploy to GKE
-
-### Prerequisites
-- [Docker](https://docs.docker.com/get-docker/) with GCR auth configured
-- [gcloud CLI](https://cloud.google.com/sdk/docs/install) authenticated
-- `kubectl` configured for your cluster
 
 ### 1. Build and push the image
 
@@ -152,23 +184,29 @@ kubectl create secret generic ai-market-studio-secrets \
   --from-literal=EXCHANGERATE_API_KEY=<your-key-or-dummy>
 ```
 
-> Do not commit real API keys to `k8s/secret.yaml`. Always create secrets imperatively.
+### 4. Configure RAG endpoint
 
-### 4. Apply manifests
+Update `k8s/configmap.yaml`:
+
+```yaml
+RAG_SERVICE_URL: "http://34.10.130.210"
+```
+
+### 5. Apply manifests and restart the deployment
 
 ```bash
 kubectl apply -f k8s/configmap.yaml
 kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
+kubectl rollout restart deployment/ai-market-studio
+kubectl rollout status deployment/ai-market-studio --timeout=300s
 ```
 
-### 5. Get the external IP
+### 6. Get the external IP
 
 ```bash
-kubectl get service ai-market-studio --watch
+kubectl get service ai-market-studio -o wide
 ```
-
-Once `EXTERNAL-IP` is assigned, the app is available at `http://<EXTERNAL-IP>/`.
 
 ---
 
@@ -176,11 +214,12 @@ Once `EXTERNAL-IP` is assigned, the app is available at `http://<EXTERNAL-IP>/`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | — | Required. OpenAI API key |
+| `OPENAI_API_KEY` | required | OpenAI API key |
 | `OPENAI_MODEL` | `gpt-4o` | Model used by the agent |
-| `EXCHANGERATE_API_KEY` | — | Required. exchangerate.host API key |
+| `EXCHANGERATE_API_KEY` | required | exchangerate.host API key |
 | `USE_MOCK_CONNECTOR` | `false` | Use synthetic FX data instead of live exchangerate.host API |
 | `USE_MOCK_NEWS_CONNECTOR` | `false` | Use synthetic news data instead of live RSS feeds |
+| `RAG_SERVICE_URL` | `http://localhost:8000` | Base URL of the external RAG service; `RAGConnector` calls `POST {RAG_SERVICE_URL}/query` |
 | `MAX_HISTORICAL_DAYS` | `7` | Max date range per dashboard request |
 | `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
 
@@ -190,44 +229,47 @@ Once `EXTERNAL-IP` is assigned, the app is available at `http://<EXTERNAL-IP>/`.
 
 ```bash
 # Unit and E2E API tests
-pytest backend/tests/ -v
+python -m pytest backend/tests/ -v
+
+# RAG connector + chat integration tests
+python -m pytest backend/tests/unit/test_rag_connector.py backend/tests/e2e/test_rag_integration.py -q
 
 # Playwright end-to-end test (requires server running on :8000)
 python test_dashboard.py
 ```
 
-> Tests always use `MockConnector` — no API quota consumed.
+> Most automated tests use `MockConnector` or mocked RAG HTTP responses so they do not consume external API quota.
 
 ---
 
 ## Project Structure
 
-```
+```text
 ai-market-studio/
-├── backend/
-│   ├── main.py              # FastAPI app factory
-│   ├── router.py            # API endpoints
-│   ├── models.py            # Pydantic request/response models
-│   ├── config.py            # Settings (pydantic-settings)
-│   ├── cache.py             # In-memory LRU rate cache
-│   ├── agent/
-│   │   ├── agent.py         # GPT-4o function-calling loop
-│   │   └── tools.py         # Tool definitions and dispatch
-│   ├── connectors/
-│   │   ├── base.py              # Abstract FX connector interface
-│   │   ├── news_base.py         # Abstract news connector interface
-│   │   ├── exchangerate_host.py
-│   │   ├── mock_connector.py
-│   │   ├── rss_news_connector.py
-│   │   └── mock_news_connector.py
-│   └── tests/
-│       ├── unit/
-│       └── e2e/
-├── frontend/
-│   └── index.html           # Single-page app (no build step)
-├── docs/                    # Design and product documentation
-├── test_dashboard.py        # Playwright E2E test
-└── .env                     # Local secrets (not committed)
+|-- backend/
+|   |-- main.py
+|   |-- router.py
+|   |-- models.py
+|   |-- config.py
+|   |-- cache.py
+|   |-- agent/
+|   |   |-- agent.py
+|   |   `-- tools.py
+|   |-- connectors/
+|   |   |-- base.py
+|   |   |-- exchangerate_host.py
+|   |   |-- mock_connector.py
+|   |   |-- news_connector.py
+|   |   `-- rag_connector.py
+|   `-- tests/
+|       |-- unit/
+|       `-- e2e/
+|-- frontend/
+|   `-- index.html
+|-- docs/
+|-- k8s/
+|-- test_dashboard.py
+`-- .env
 ```
 
 ---
@@ -235,13 +277,13 @@ ai-market-studio/
 ## Roadmap
 
 | Priority | Theme | Features |
-|----------|-------|----------|
-| **P0 — Done** | Foundation | Chat assistant, spot & historical FX rates, conversational dashboard, market news, GKE deployment, F7: Market Insight Summary |
-| **P1 — Awareness** | Market Intelligence | F7: Market Insight Summary (delivered); F3: Market News (delivered) |
-| **P2 — Productivity** | Output Generation | F9: PPT / Excel / PDF report generation; F8: Email sending of insights and reports |
-| **P3 — Intelligence** | Research | F5: Web search integration for live market context; F4: Research report generation via RAG pipeline over internal documents |
-| **P4 — Data Breadth** | Data & Collaboration | F1: Multi-source market data connectors; F6: Sales/trader commentary capture and retrieval; F12: Scheduled report function |
-| **P5 — Advanced** | Platform & Simulation | F10: Custom agent creation; F11: OCR / document ingestion (scanned reports, PDFs); F13: Paper trading / FX trade simulation |
-| **P6 — Execution & Risk** | Live Trading | F14: Broker / venue connectivity for live FX order placement; F15: Pre-trade risk checks, account permissions, audit logs, and kill switch controls |
+|---|---|---|
+| P0 - Done | Foundation | Chat assistant, spot and historical FX rates, conversational dashboard, market news, GKE deployment, market insight summary |
+| P1 - Awareness | Market Intelligence | Market insight summary and market news |
+| P2 - Productivity | Output Generation | PPT / Excel / PDF report generation, email delivery of insights and reports |
+| P3 - Intelligence | Research | Web search integration, deeper RAG workflows over internal documents, first-party report ingestion UI/API |
+| P4 - Data Breadth | Data & Collaboration | Multi-source market data connectors, sales/trader commentary capture, scheduled reports |
+| P5 - Advanced | Platform & Simulation | Custom agent creation, OCR/document ingestion for scanned PDFs, paper-trading simulation |
+| P6 - Execution & Risk | Live Trading | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls |
 
-> **Recommendation:** Keep P5 as simulation-only. Add live FX execution in P6 only after authentication, role-based authorization, audit logging, and pre-trade risk controls are in place.
+> Recommendation: keep P5 simulation-only. Add live FX execution in P6 only after authentication, RBAC, audit logging, and pre-trade risk controls are in place.
