@@ -241,4 +241,7 @@ ai-market-studio/
 | **P2 — Productivity** | Output Generation | F9: PPT / Excel / PDF report generation; F8: Email sending of insights and reports |
 | **P3 — Intelligence** | Research | F5: Web search integration for live market context; F4: Research report generation via RAG pipeline over internal documents |
 | **P4 — Data Breadth** | Data & Collaboration | F1: Multi-source market data connectors; F6: Sales/trader commentary capture and retrieval; F12: Scheduled report function |
-| **P5 — Advanced** | Platform | F10: Custom agent creation; F11: OCR / document ingestion (scanned reports, PDFs) |
+| **P5 — Advanced** | Platform & Simulation | F10: Custom agent creation; F11: OCR / document ingestion (scanned reports, PDFs); F13: Paper trading / FX trade simulation |
+| **P6 — Execution & Risk** | Live Trading | F14: Broker / venue connectivity for live FX order placement; F15: Pre-trade risk checks, account permissions, audit logs, and kill switch controls |
+
+> **Recommendation:** Keep P5 as simulation-only. Add live FX execution in P6 only after authentication, role-based authorization, audit logging, and pre-trade risk controls are in place.
