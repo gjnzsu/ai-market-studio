@@ -50,7 +50,11 @@
       "Bash(curl -s -X POST http://35.224.3.54/api/chat -H 'Content-Type: application/json' -d '{\"\"\"\"message\"\"\"\": \"\"\"\"Show me EUR/USD trend last 5 days\"\"\"\", \"\"\"\"history\"\"\"\": []}')",
       "Bash(kubectl patch:*)",
       "Bash(kubectl exec:*)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(find c:/SourceCode/ai-market-studio -name *.png -newer c:/SourceCode/ai-market-studio/shot_08_inline_chart.png)",
+      "Bash(ls -lt c:/SourceCode/ai-market-studio/*.png)",
+      "Bash(docker images:*)",
+      "Bash(kubectl logs:*)"
     ]
   },
   "hooks": {

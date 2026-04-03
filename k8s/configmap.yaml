@@ -7,4 +7,4 @@ data:
   OPENAI_MODEL: "gpt-4o"
   CORS_ORIGINS: "*"
   MAX_HISTORICAL_DAYS: "7"
-  RAG_SERVICE_URL: "http://ai-rag-service:8000"
+  RAG_SERVICE_URL: "http://34.10.130.210"
