@@ -4,16 +4,72 @@ Backend API for the AI Market Studio conversational FX market data platform.
 
 ## Architecture
 
-This is the backend component of a microservices architecture:
-- **Backend API**: This repository (FastAPI)
-- **Frontend UI**: [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) (Static HTML/JS)
-- **RAG Service**: [ai-rag-service](https://github.com/gjnzsu/ai-rag-service) (Research document query)
+This repository is part of a **microservices architecture** that was split from a monolithic application for better scalability and independent deployment:
+
+- **Backend API**: This repository (FastAPI) - Port 8000
+- **Frontend UI**: [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) (Static HTML/JS) - Port 80
+- **RAG Service**: [ai-rag-service](https://github.com/gjnzsu/ai-rag-service) (Research document query) - Port 8000
+
+### Why Microservices?
+
+The original monolithic application was split to achieve:
+- **Independent scaling**: Frontend and backend can scale separately based on load
+- **Independent deployment**: Deploy API changes without affecting the UI
+- **Technology flexibility**: Each service uses the best tool for its purpose
+- **Better resource utilization**: Each service has its own resource limits and can be optimized independently
+
+### Communication Flow
+
+```text
+User Browser
+   |
+   | HTTP (external)
+   v
+Frontend (ai-market-studio-ui) - nginx on port 80
+   |
+   | HTTP (external LoadBalancer IP)
+   v
+Backend API (this repo) - FastAPI on port 8000
+   |
+   | HTTP (internal Kubernetes DNS)
+   v
+RAG Service (ai-rag-service) - FastAPI on port 8000
+```
+
+**Key Points:**
+- Frontend → Backend: Uses external LoadBalancer IP (browser cannot access internal DNS)
+- Backend → RAG Service: Uses internal Kubernetes DNS (`http://ai-rag-service:8000`)
 
 > **Vision:** AI-native market intelligence platform for natural language-driven data retrieval, automated dashboard generation, and context-aware insights.
 
 ![Chat UI](shot_07_chat_ui.png)
 
 ---
+
+## Live Deployment
+
+The application is deployed on Google Kubernetes Engine (GKE):
+
+| Component | URL | Status | Replicas |
+|-----------|-----|--------|----------|
+| **Frontend UI** | http://136.116.205.168 | ✓ Running | 2 |
+| **Backend API** | http://35.224.3.54 | ✓ Running | 1 |
+| **API Docs** | http://35.224.3.54/docs | ✓ Available | - |
+| **RAG Service** | `http://ai-rag-service:8000` (internal) | ✓ Running | 1 |
+
+**GKE Cluster:** `helloworld-cluster` (us-central1)
+**GCP Project:** `gen-lang-client-0896070179`
+
+### Deployment Details
+
+| Detail | Value |
+|---|---|
+| Backend Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio:latest` |
+| Frontend Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio-ui:latest` |
+| FX Connector | `USE_MOCK_CONNECTOR=true` (set `false` for live exchangerate.host data) |
+| News Connector | `USE_MOCK_NEWS_CONNECTOR=true` (set `false` for live RSS feeds) |
+| RAG Service URL | `http://ai-rag-service:8000` (internal Kubernetes service) |
+| CORS Origins | `http://136.116.205.168` (frontend URL) |
 
 ## Features
 
@@ -63,10 +119,16 @@ This is the backend component of a microservices architecture:
 ## Architecture
 
 ```text
-Frontend (ai-market-studio-ui)
+User Browser
    |
+   | HTTP (external: http://136.116.205.168)
    v
-Backend API (this repo - FastAPI)
+Frontend (ai-market-studio-ui) - nginx on port 80
+   |
+   | HTTP POST (external: http://35.224.3.54/api/*)
+   v
+Backend API (this repo - FastAPI) on port 8000
+   |
    |-- /api/chat              -> GPT-4o agent loop
    |-- /api/rates/historical  -> daily FX rates, LRU cached
    |-- /api/dashboard         -> batch panel fetch
@@ -77,10 +139,89 @@ Connector Layer
    |-- MockConnector             -> deterministic synthetic FX data
    |-- RSSNewsConnector          -> free RSS feeds
    |-- MockNewsConnector         -> deterministic synthetic news
-   `-- RAGConnector              -> external RAG service (ai-rag-service)
+   `-- RAGConnector              -> external RAG service
+                                    |
+                                    | HTTP (internal: http://ai-rag-service:8000)
+                                    v
+                                 RAG Service (ai-rag-service)
 ```
 
 **GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`, `get_internal_research`
+
+---
+
+## API Endpoints
+
+### Chat Endpoint
+
+**POST** `/api/chat`
+
+Main conversational interface with GPT-4o agent.
+
+**Request:**
+```json
+{
+  "message": "What is the EUR/USD rate?",
+  "history": []
+}
+```
+
+**Response:**
+```json
+{
+  "reply": "The EUR/USD rate is 1.0868 as of 2026-04-03.",
+  "data": {
+    "base": "EUR",
+    "target": "USD",
+    "rate": 1.086838,
+    "date": "2026-04-03",
+    "source": "mock"
+  },
+  "tool_used": "get_exchange_rate"
+}
+```
+
+### Historical Rates Endpoint
+
+**POST** `/api/rates/historical`
+
+Fetch daily FX rates with LRU caching (TTL=300s).
+
+**Request:**
+```json
+{
+  "base": "EUR",
+  "target": "USD",
+  "start_date": "2026-03-28",
+  "end_date": "2026-04-03"
+}
+```
+
+### Dashboard Endpoint
+
+**POST** `/api/dashboard`
+
+Batch panel data fetch (up to 9 panels).
+
+**Request:**
+```json
+{
+  "panels": [
+    {
+      "type": "line-trend",
+      "base": "EUR",
+      "target": "USD",
+      "days": 7
+    }
+  ]
+}
+```
+
+### Health Check
+
+**GET** `/docs`
+
+OpenAPI documentation and health check endpoint.
 
 ---
 
@@ -147,11 +288,13 @@ Clone and run the frontend:
 ```bash
 git clone https://github.com/gjnzsu/ai-market-studio-ui.git
 cd ai-market-studio-ui
-# Update API_BASE_URL in index.html or use environment config
+# Update API_BASE_URL in env-config.html if needed (default: http://localhost:8000)
 python -m http.server 8080
 ```
 
 Open [http://localhost:8080](http://localhost:8080) in your browser.
+
+> **Note:** The frontend UI is in a separate repository. See [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) for frontend setup and deployment instructions.
 
 ### 4. Test RAG from the UI
 
@@ -163,8 +306,6 @@ Find internal research about RAG ingestion
 ```
 
 If the RAG tool is selected, the assistant response should include a **Sources** block listing matched documents.
-
-> **Note:** The frontend UI is in a separate repository. See [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) for frontend setup.
 
 ---
 
