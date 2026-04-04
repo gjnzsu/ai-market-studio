@@ -15,6 +15,8 @@ class RAGConnector:
             return []
 
         normalized_sources: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
+
         for source in raw_sources:
             if isinstance(source, dict):
                 source_name = (
@@ -23,9 +25,15 @@ class RAGConnector:
                     or source.get("name")
                     or "Unknown source"
                 )
-                normalized_sources.append({"name": source_name, **source})
+                # Deduplicate by source name
+                if source_name not in seen_names:
+                    seen_names.add(source_name)
+                    normalized_sources.append({"name": source_name, **source})
             else:
-                normalized_sources.append({"name": str(source)})
+                source_str = str(source)
+                if source_str not in seen_names:
+                    seen_names.add(source_str)
+                    normalized_sources.append({"name": source_str})
         return normalized_sources
 
     def _normalize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
