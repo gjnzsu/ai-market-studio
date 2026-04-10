@@ -153,7 +153,7 @@ Backend API (this repo - FastAPI) on port 8000
    |-- /api/chat              -> GPT-4o agent loop
    |-- /api/rates/historical  -> daily FX rates, LRU cached
    |-- /api/dashboard         -> batch panel fetch
-   |-- /api/export/pdf        -> PDF report generation (reportlab)
+   |-- /api/export/pdf        -> PDF report generation (reportlab via skills/pdf/pdf_skill.py)
    |
    v
 Connector Layer
@@ -301,7 +301,10 @@ The backend API is deployed on Google Kubernetes Engine (GKE):
 ```bash
 git clone https://github.com/gjnzsu/ai-market-studio.git
 cd ai-market-studio
-pip install -r backend/requirements.txt
+pip install -r backend/requirements.txt   # all deps (dev + test + runtime)
+
+# For production-only deps (smaller image, faster deploy):
+pip install -r backend/runtime.txt
 ```
 
 ### 2. Configure environment
@@ -376,8 +379,13 @@ If the RAG tool is selected, the assistant response should include a **Sources**
 
 ```bash
 gcloud auth configure-docker
+
+# Normal deploy (code-only changes) — uses Docker layer cache, ~1-2 sec
 docker build -t gcr.io/<PROJECT_ID>/ai-market-studio:latest .
 docker push gcr.io/<PROJECT_ID>/ai-market-studio:latest
+
+# Force clean pip reinstall (only when adding new dependencies)
+docker build --no-cache -t gcr.io/<PROJECT_ID>/ai-market-studio:latest .
 ```
 
 ### 2. Get cluster credentials
@@ -462,6 +470,8 @@ ai-market-studio/ (Backend API)
 |   |-- models.py
 |   |-- config.py
 |   |-- cache.py
+|   |-- runtime.txt           # production-only dependencies (no test deps)
+|   |-- requirements.txt       # all dependencies (dev + test + runtime)
 |   |-- agent/
 |   |   |-- agent.py
 |   |   `-- tools.py
@@ -471,14 +481,15 @@ ai-market-studio/ (Backend API)
 |   |   |-- mock_connector.py
 |   |   |-- news_connector.py
 |   |   `-- rag_connector.py
-|   |-- exporters/
-|   |   `-- pdf_exporter.py     # reportlab-powered PDF rendering
+|   |-- skills/
+|   |   `-- pdf/
+|   |       `-- pdf_skill.py   # PDF generation skill (reportlab Platypus)
 |   `-- tests/
 |       |-- unit/
 |       `-- e2e/
 |-- docs/
 |-- k8s/
-|-- Dockerfile
+|-- Dockerfile              # multi-stage build (builder + production stages)
 `-- .env
 ```
 
