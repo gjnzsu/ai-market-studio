@@ -106,6 +106,27 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - Source names are derived from `title` first, then `document_id`, while preserving source metadata such as `source_type`, `excerpt`, and `score`
 - Research-report/PDF ingestion is handled by the external RAG service; this repo currently provides the query and citation UI layer
 
+### Feature 06 - Export to PDF
+- Ask a question that returns structured data (market insight, dashboard, news, or research), then click **Export to PDF**
+- The button appears automatically below any assistant response that contains `insight`, `dashboard`, `news`, or `rag` data
+- The backend renders a branded PDF via `reportlab` containing:
+  - Report title, timestamp, and tool used
+  - LLM reply/summary text
+  - FX rates table (for insight responses)
+  - Market news table (for insight and news responses)
+  - Dashboard series table (for dashboard responses)
+  - Source documents list (for RAG responses)
+- **Endpoint:** `POST /api/export/pdf`
+- **Request body:**
+  ```json
+  {
+    "reply": "EUR/USD is trading at 1.0850...",
+    "data": { "type": "insight", "rates": [...], "news": [...] },
+    "tool_used": "generate_market_insight"
+  }
+  ```
+- **Response:** Binary PDF file (`application/pdf`) with `Content-Disposition: attachment; filename="fx-insight-YYYYMMDD_HHMM.pdf"`
+
 ### Feature 07 - Market Insight Summary
 - Ask in natural language: *"Give me a market insight on EUR/USD and GBP/USD"*
 - GPT-4o calls `generate_market_insight` to fetch spot rates and RSS news in one turn
@@ -132,6 +153,7 @@ Backend API (this repo - FastAPI) on port 8000
    |-- /api/chat              -> GPT-4o agent loop
    |-- /api/rates/historical  -> daily FX rates, LRU cached
    |-- /api/dashboard         -> batch panel fetch
+   |-- /api/export/pdf        -> PDF report generation (reportlab)
    |
    v
 Connector Layer
@@ -216,6 +238,29 @@ Batch panel data fetch (up to 9 panels).
   ]
 }
 ```
+
+### Export to PDF
+
+**POST** `/api/export/pdf`
+
+Render a chat response as a downloadable PDF. Accepts the current reply text and structured data from the agent.
+
+**Request:**
+```json
+{
+  "reply": "EUR/USD is trading at 1.0850, up 0.3% on the day.",
+  "data": {
+    "type": "insight",
+    "rates": [{"base": "EUR", "target": "USD", "rate": 1.085}],
+    "news": [{"title": "Fed signals pause", "source": "FXStreet"}]
+  },
+  "tool_used": "generate_market_insight"
+}
+```
+
+**Response:** Binary PDF file (`Content-Type: application/pdf`).
+
+**Try it from the UI:** Ask for a market insight on EUR/USD, then click **Export to PDF** below the response.
 
 ### Health Check
 
@@ -426,6 +471,8 @@ ai-market-studio/ (Backend API)
 |   |   |-- mock_connector.py
 |   |   |-- news_connector.py
 |   |   `-- rag_connector.py
+|   |-- exporters/
+|   |   `-- pdf_exporter.py     # reportlab-powered PDF rendering
 |   `-- tests/
 |       |-- unit/
 |       `-- e2e/
@@ -446,8 +493,8 @@ ai-market-studio/ (Backend API)
 | Priority | Theme | Features |
 |---|---|---|
 | P0 - Done | Foundation | Chat assistant, spot and historical FX rates, conversational dashboard, market news, GKE deployment, market insight summary |
-| P1 - Awareness | Market Intelligence | Market insight summary and market news |
-| P2 - Productivity | Output Generation | PPT / Excel / PDF report generation, email delivery of insights and reports |
+| P1 - Done | Market Intelligence | Market insight summary (Feature 07) and market news (Feature 03) |
+| P2 - Done | Output Generation | PDF report generation via Export to PDF button, email delivery pending |
 | P3 - Intelligence | Research | Web search integration, deeper RAG workflows over internal documents, first-party report ingestion UI/API |
 | P4 - Data Breadth | Data & Collaboration | Multi-source market data connectors, sales/trader commentary capture, scheduled reports |
 | P5 - Advanced | Platform & Simulation | Custom agent creation, OCR/document ingestion for scanned PDFs, paper-trading simulation |
