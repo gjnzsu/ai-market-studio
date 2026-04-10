@@ -143,7 +143,8 @@ def _news_table(news: list[dict], styles: dict) -> Optional[Table]:
     rows = [[Paragraph("Headline", header), Paragraph("Source", header)]]
     for n in news[:10]:
         rows.append([
-            Paragraph(n.get("title", "—"), Paragraph(n.get("source", n.get("published", "")[:20]), styles["muted"]),
+            Paragraph(n.get("title", "\u2014"), styles["body"]),
+            Paragraph(n.get("source", n.get("published", "")[:20]), styles["muted"]),
         ])
     table = Table(rows, colWidths=[100*mm, 30*mm], repeatRows=1)
     table.setStyle(TableStyle(_base_table_style(BRAND_ACCENT)))
