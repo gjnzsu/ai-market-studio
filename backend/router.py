@@ -12,7 +12,7 @@ from backend.models import (
 from backend.agent.agent import run_agent
 from backend.connectors.base import ConnectorError
 from backend.cache import RateCache
-from backend.exporters.pdf_exporter import generate_insight_pdf
+from backend.skills.pdf.pdf_skill import generate as generate_pdf
 
 rate_cache = RateCache()
 
@@ -139,11 +139,16 @@ async def export_pdf(body: ExportPdfRequest) -> Response:
     renders a formatted PDF, and returns it as application/pdf.
     """
     try:
-        pdf_bytes = generate_insight_pdf(
-            reply=body.reply,
-            data=body.data,
-            tool_used=body.tool_used,
-        )
+        dtype = body.data.get("type", "insight") if body.data else "insight"
+        report_type = f"fx-{dtype}"
+        generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        pdf_bytes = generate_pdf({
+            "report_type": report_type,
+            "reply": body.reply,
+            "data": body.data or {},
+            "tool_used": body.tool_used or "N/A",
+            "generated_at": generated_at,
+        })
     except Exception as e:
         logger.exception("PDF export failed: %s", e)
         raise HTTPException(status_code=500, detail="PDF generation failed.")
