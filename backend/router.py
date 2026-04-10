@@ -1,14 +1,18 @@
 import logging
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
 
 from backend.models import (
     ChatRequest, ChatResponse,
     HistoricalRatesRequest, HistoricalRatesResponse, DailyRates,
     DashboardConfig, DashboardDataResponse,
+    ExportPdfRequest,
 )
 from backend.agent.agent import run_agent
 from backend.connectors.base import ConnectorError
 from backend.cache import RateCache
+from backend.exporters.pdf_exporter import generate_insight_pdf
 
 rate_cache = RateCache()
 
@@ -123,4 +127,35 @@ async def get_dashboard_data(
     return DashboardDataResponse(
         dashboard_id=config.dashboard_id,
         panels=panels_out,
+    )
+
+
+@router.post("/export/pdf")
+async def export_pdf(body: ExportPdfRequest) -> Response:
+    """
+    Render a chat response as a PDF and return it as a downloadable file.
+
+    Accepts the current chat reply text + structured data from the agent,
+    renders a formatted PDF, and returns it as application/pdf.
+    """
+    try:
+        pdf_bytes = generate_insight_pdf(
+            reply=body.reply,
+            data=body.data,
+            tool_used=body.tool_used,
+        )
+    except Exception as e:
+        logger.exception("PDF export failed: %s", e)
+        raise HTTPException(status_code=500, detail="PDF generation failed.")
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M")
+    filename = f"fx-insight-{timestamp}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
     )

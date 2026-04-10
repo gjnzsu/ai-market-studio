@@ -86,3 +86,13 @@ class DashboardConfig(BaseModel):
 class DashboardDataResponse(BaseModel):
     dashboard_id: str
     panels: list[dict]  # {panel_id, panel_type, data: HistoricalRatesResponse}
+
+
+# ---------------------------------------------------------------------------
+# Feature 03 — Export to PDF
+# ---------------------------------------------------------------------------
+
+class ExportPdfRequest(BaseModel):
+    reply: str
+    data: Optional[Any] = None
+    tool_used: Optional[str] = None
