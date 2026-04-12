@@ -136,13 +136,15 @@ The application is deployed on Google Kubernetes Engine (GKE):
 ![Market Insight Summary](shot_f7_live.png)
 
 ### Feature 08 - FRED Interest Rate Queries
-- Ask in natural language: *"What is the current federal funds rate?"*, *"Show me the 10-Year Treasury rate over the last 30 days"*
-- GPT-4o calls `get_interest_rates` tool to fetch Federal Reserve Economic Data (FRED)
+- Ask in natural language: *"What is the current federal funds rate?"*, *"Show me the 10-Year Treasury rate"*, *"30-year mortgage rate"*
+- GPT-4o calls `get_interest_rate` tool to fetch Federal Reserve Economic Data (FRED)
 - Backend directly integrates FRED API via `backend/connectors/fred_connector.py`
-- Common series: DFF (Federal Funds), T10Y2Y (Treasury Spread), DGS10 (10-Year), MORTGAGE30US, etc.
-- Supports both current rates and historical date ranges
+- Common series: DFF (Federal Funds), T10Y2Y (Treasury Spread), DGS10 (10-Year), MORTGAGE30US, DTB3, DGS2, DGS5, T10Y3M
+- Supports both current rates and optional historical date queries
 - Error handling: timeout, missing data, and API errors all caught and reported
-- Renders inline rate cards with source attribution (FRED)
+- Renders inline rate cards with source attribution (Federal Reserve Economic Data)
+- **Live Deployment Status:** ✅ Deployed 2026-04-12, verified working on GKE (35.224.3.54)
+- **Test Result:** Query "What is the current federal funds rate?" → Returns 3.64% as of 2026-04-09
 
 ---
 
@@ -178,7 +180,7 @@ Connector Layer
                                  RAG Service (ai-rag-service)
 ```
 
-**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `get_interest_rates`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`, `get_internal_research`
+**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `get_interest_rate`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`, `get_internal_research`
 
 ---
 
@@ -605,18 +607,21 @@ ai-market-studio/ (Backend API)
 | P0 - Done | Foundation | Chat assistant, spot and historical FX rates, conversational dashboard, market news, GKE deployment, market insight summary | ✅ Complete |
 | P1 - Done | Market Intelligence | Market insight summary (Feature 07) and market news (Feature 03) | ✅ Complete |
 | P2 - Done | Output Generation | PDF report generation via Export to PDF button, email delivery pending | ✅ Complete |
-| P3 - In Progress | Intelligence & Economic Data | RAG research integration (Feature 05), FRED interest rates (Feature 08), economic indicator queries | ✅ FRED complete, RAG complete; Web search TBD |
+| P3 - Done | Intelligence & Economic Data | RAG research integration (Feature 05), FRED interest rates (Feature 08), economic indicator queries | ✅ FRED complete, RAG complete; Web search TBD |
 | P4 - In Progress | Data Breadth & Connectivity | Direct FRED connector (no MCP subprocess), AI Gateway service for multi-LLM (OpenAI + DeepSeek), market data enrichment | ✅ FRED & AI Gateway complete; Multi-source connectors TBD |
 | P5 - Planned | Platform & Simulation | Custom agent creation, OCR/document ingestion for scanned PDFs, paper-trading simulation | 🔄 Planned |
 | P6 - Planned | Execution & Risk | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls | 🔄 Planned |
 
 ### Completed in P3/P4 (Phase 2026-04-12)
 
-✅ **Feature 08 - FRED Interest Rates**
-- Connector: `backend/connectors/fred_connector.py`
-- Tool: `get_interest_rates` (GPT-4o callable)
-- Common series: DFF, T10Y2Y, DGS10, MORTGAGE30US
-- Endpoint: `POST /api/fred/rate` (for direct API calls)
+✅ **Feature 08 - FRED Interest Rates** (Deployed 2026-04-12)
+- Connector: `backend/connectors/fred_connector.py` (direct HTTP to Federal Reserve API)
+- Tool: `get_interest_rate` (GPT-4o function calling)
+- Supported series: DFF (Federal Funds), T10Y2Y (10Y-2Y Spread), DGS10 (10-Year), DGS2 (2-Year), DGS5 (5-Year), DTB3 (3-Month), MORTGAGE30US (30Y Mortgage), T10Y3M (10Y-3M Spread)
+- Dispatch handler: `backend/agent/tools.py` lines 381-389
+- Agent awareness: SYSTEM_PROMPT updated with FRED guidance (backend/agent/agent.py line 29)
+- Testing: 2 unit tests added (test_dispatch_get_interest_rate + error handling), 0 regressions
+- GKE Live: `POST http://35.224.3.54/api/chat` with message "What is the current federal funds rate?" → Returns 3.64% as of 2026-04-09 ✅
 
 ✅ **P3 - RAG Integration** (Feature 05, 2026-04-04)
 - External RAG service integration via `RAGConnector`
