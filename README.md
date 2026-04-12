@@ -170,6 +170,7 @@ Connector Layer
    |-- MockConnector             -> deterministic synthetic FX data
    |-- RSSNewsConnector          -> free RSS feeds
    |-- MockNewsConnector         -> deterministic synthetic news
+   |-- FREDConnector             -> Federal Reserve interest rates (direct FRED API)
    `-- RAGConnector              -> external RAG service
                                     |
                                     | HTTP (internal: http://ai-rag-service:8000)
@@ -177,7 +178,7 @@ Connector Layer
                                  RAG Service (ai-rag-service)
 ```
 
-**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`, `get_internal_research`
+**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `get_interest_rates`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`, `get_internal_research`
 
 ---
 
