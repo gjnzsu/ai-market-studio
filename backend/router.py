@@ -7,12 +7,10 @@ from backend.models import (
     ChatRequest, ChatResponse,
     HistoricalRatesRequest, HistoricalRatesResponse, DailyRates,
     DashboardConfig, DashboardDataResponse,
-    ExportPdfRequest,
 )
 from backend.agent.agent import run_agent
 from backend.connectors.base import ConnectorError
 from backend.cache import RateCache
-from backend.skills.pdf.pdf_skill import generate as generate_pdf
 
 rate_cache = RateCache()
 
@@ -130,37 +128,3 @@ async def get_dashboard_data(
     )
 
 
-@router.post("/export/pdf")
-async def export_pdf(body: ExportPdfRequest) -> Response:
-    """
-    Render a chat response as a PDF and return it as a downloadable file.
-
-    Accepts the current chat reply text + structured data from the agent,
-    renders a formatted PDF, and returns it as application/pdf.
-    """
-    try:
-        dtype = body.data.get("type", "insight") if body.data else "insight"
-        report_type = f"fx-{dtype}"
-        generated_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        pdf_bytes = generate_pdf({
-            "report_type": report_type,
-            "reply": body.reply,
-            "data": body.data or {},
-            "tool_used": body.tool_used or "N/A",
-            "generated_at": generated_at,
-        })
-    except Exception as e:
-        logger.exception("PDF export failed: %s", e)
-        raise HTTPException(status_code=500, detail="PDF generation failed.")
-
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M")
-    filename = f"fx-insight-{timestamp}.pdf"
-
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Content-Length": str(len(pdf_bytes)),
-        },
-    )

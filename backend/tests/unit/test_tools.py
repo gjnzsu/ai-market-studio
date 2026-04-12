@@ -6,7 +6,7 @@ from backend.connectors.news_connector import MockNewsConnector
 
 def test_tool_definitions_are_valid():
     assert isinstance(TOOL_DEFINITIONS, list)
-    assert len(TOOL_DEFINITIONS) == 8
+    assert len(TOOL_DEFINITIONS) == 9
     names = [t["function"]["name"] for t in TOOL_DEFINITIONS]
     assert "get_exchange_rate" in names
     assert "get_exchange_rates" in names
@@ -16,6 +16,7 @@ def test_tool_definitions_are_valid():
     assert "get_fx_news" in names
     assert "generate_market_insight" in names
     assert "get_internal_research" in names
+    assert "get_interest_rate" in names
 
 
 def test_tool_definitions_have_required_fields():
@@ -189,6 +190,37 @@ async def test_dispatch_generate_market_insight_max_news_capped():
         news_connector=news,
     )
     assert len(result["news"]) <= 10
+
+
+@pytest.mark.asyncio
+async def test_dispatch_get_interest_rate():
+    """get_interest_rate tool dispatches to FREDConnector and returns rate data."""
+    result = await dispatch_tool(
+        "get_interest_rate",
+        {"series_id": "DFF"},
+        MockConnector(),
+    )
+    assert isinstance(result, dict)
+    assert "series_id" in result
+    assert "series_name" in result
+    assert "date" in result
+    assert "value" in result
+    assert "unit" in result
+    assert result["series_id"] == "DFF"
+    assert result["unit"] == "percent"
+    assert result["source"] == "FRED (Federal Reserve Economic Data)"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_get_interest_rate_missing_series_id():
+    """get_interest_rate raises AgentError if series_id is missing."""
+    with pytest.raises(AgentError) as exc_info:
+        await dispatch_tool(
+            "get_interest_rate",
+            {},
+            MockConnector(),
+        )
+    assert "series_id is required" in str(exc_info.value)
 
 
 @pytest.mark.asyncio

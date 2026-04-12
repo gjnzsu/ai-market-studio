@@ -219,7 +219,31 @@ TOOL_DEFINITIONS = [
                 "required": ["question"]
             }
         }
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_interest_rate",
+            "description": (
+                "Get current or historical interest rates from the Federal Reserve (FRED API). "
+                "Use when the user asks about federal funds rate, treasury rates, mortgage rates, or other economic indicators."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "series_id": {
+                        "type": "string",
+                        "description": "FRED series ID (e.g. 'DFF' for Effective Federal Funds Rate, 'DGS10' for 10-Year Treasury, 'T10Y2Y' for 10Y-2Y spread, 'MORTGAGE30US' for 30-Year Mortgage Rate)",
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Optional specific date in YYYY-MM-DD format. If omitted, returns latest available data.",
+                    },
+                },
+                "required": ["series_id"],
+            },
+        },
+    },
 ]
 
 
@@ -354,5 +378,14 @@ async def dispatch_tool(
         from backend.connectors.rag_connector import RAGConnector
         rag = RAGConnector()
         return await rag.query_research(tool_args.get("question"))
+    elif tool_name == "get_interest_rate":
+        from backend.connectors.fred_connector import FREDConnector
+        fred = FREDConnector()
+        series_id = tool_args.get("series_id")
+        date = tool_args.get("date")
+        if not series_id:
+            raise AgentError("series_id is required for get_interest_rate")
+        result = await fred.get_current_rate(series_id=series_id, date=date)
+        return result.model_dump()
     else:
         raise AgentError(f"Unknown tool: {tool_name}")
