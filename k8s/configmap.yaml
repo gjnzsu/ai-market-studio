@@ -4,6 +4,7 @@ metadata:
   name: ai-market-studio-config
 data:
   USE_MOCK_CONNECTOR: "true"
+  USE_MOCK_NEWS_CONNECTOR: "false"
   OPENAI_MODEL: "gpt-4o"
   CORS_ORIGINS: "http://136.116.205.168,http://ai-market-studio-ui,http://localhost:8080"
   MAX_HISTORICAL_DAYS: "7"
