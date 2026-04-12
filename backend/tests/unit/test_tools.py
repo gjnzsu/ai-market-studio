@@ -6,7 +6,7 @@ from backend.connectors.news_connector import MockNewsConnector
 
 def test_tool_definitions_are_valid():
     assert isinstance(TOOL_DEFINITIONS, list)
-    assert len(TOOL_DEFINITIONS) == 7
+    assert len(TOOL_DEFINITIONS) == 8
     names = [t["function"]["name"] for t in TOOL_DEFINITIONS]
     assert "get_exchange_rate" in names
     assert "get_exchange_rates" in names
@@ -15,6 +15,7 @@ def test_tool_definitions_are_valid():
     assert "generate_dashboard" in names
     assert "get_fx_news" in names
     assert "generate_market_insight" in names
+    assert "get_internal_research" in names
 
 
 def test_tool_definitions_have_required_fields():
