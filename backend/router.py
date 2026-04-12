@@ -12,7 +12,7 @@ from backend.models import (
 from backend.agent.agent import run_agent
 from backend.connectors.base import ConnectorError
 from backend.cache import RateCache
-from skills.pdf.pdf_skill import generate as generate_pdf
+from backend.skills.pdf.pdf_skill import generate as generate_pdf
 
 rate_cache = RateCache()
 
