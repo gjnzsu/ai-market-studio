@@ -135,6 +135,15 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ![Market Insight Summary](shot_f7_live.png)
 
+### Feature 08 - FRED Interest Rate Queries
+- Ask in natural language: *"What is the current federal funds rate?"*, *"Show me the 10-Year Treasury rate over the last 30 days"*
+- GPT-4o calls `get_interest_rates` tool to fetch Federal Reserve Economic Data (FRED)
+- Backend directly integrates FRED API via `backend/connectors/fred_connector.py`
+- Common series: DFF (Federal Funds), T10Y2Y (Treasury Spread), DGS10 (10-Year), MORTGAGE30US, etc.
+- Supports both current rates and historical date ranges
+- Error handling: timeout, missing data, and API errors all caught and reported
+- Renders inline rate cards with source attribution (FRED)
+
 ---
 
 ## Architecture
@@ -460,6 +469,95 @@ python test_dashboard.py
 
 ---
 
+## MCP Integration & FRED Connector Testing
+
+### Architecture Decision: Direct API vs MCP
+
+**Rationale:** Backend now calls FRED API directly via `httpx` instead of via MCP subprocess.
+
+**Why?**
+- **Simpler deployment:** One less GKE service to operate
+- **Lower latency:** No subprocess overhead or IPC serialization
+- **Better error handling:** Synchronous error handling in FastAPI context
+- **No extra dependencies:** MCP subprocess would require service discovery, health checks, and failure modes
+
+### Reference Implementation
+
+The `ai-mcp-server` repository remains as a **working MCP protocol reference** (not deployed to GKE).
+
+**Use case:** If workflows become complex (e.g., multiple data providers, tool composition), the reference implementation shows how to convert them to MCP servers.
+
+### FRED Connector Testing
+
+**Connector:** `backend/connectors/fred_connector.py`
+
+**Methods:**
+```python
+FREDConnector.get_current_rate(series_id: str, date?: str) → InterestRateData
+FREDConnector.get_historical_rates(series_id: str, start_date: str, end_date: str) → HistoricalRatesData
+FREDConnector.list_fred_series() → dict[str, str]
+```
+
+**Common Series:**
+- `DFF` — Effective Federal Funds Rate (daily)
+- `T10Y2Y` — 10-Year minus 2-Year Treasury Spread
+- `DGS10` — 10-Year Treasury Constant Maturity Rate
+- `DGS2` — 2-Year Treasury Constant Maturity Rate
+- `MORTGAGE30US` — 30-Year Fixed Rate Mortgage Average
+
+**Test the connector locally:**
+```python
+import asyncio
+from backend.connectors.fred_connector import FREDConnector
+
+connector = FREDConnector(api_key="49902bd505135a5970742c278a2584a7")
+
+# Current federal funds rate
+rate = await connector.get_current_rate("DFF")
+print(rate)
+
+# 10-year treasury for last 30 days
+historical = await connector.get_historical_rates(
+    "DGS10",
+    start_date="2026-03-13",
+    end_date="2026-04-12"
+)
+print(historical)
+```
+
+**API Endpoint (via chat tool):**
+```bash
+# Ask the agent
+curl -X POST http://localhost:8000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What is the current federal funds rate?", "history": []}'
+```
+
+GPT-4o will call `get_interest_rates`, which invokes the FRED connector and returns formatted rate data.
+
+### Deployment Checklist
+
+- [x] FRED connector implemented and tested locally
+- [x] FRED API Key stored in ConfigMap (K8s secret)
+- [x] Router endpoints wired to connector
+- [x] Agent tools updated to call `get_interest_rates`
+- [ ] E2E test with live FRED API (optional, quota-limited)
+- [ ] Add FRED rates to dashboard panels (future feature)
+
+### Future: MCP Server Integration
+
+If you need to integrate additional data providers (e.g., Bloomberg, Refinitiv) or create a tool composition layer, follow this pattern:
+
+1. **Write an MCP server** (e.g., `ai-mcp-server` or a new `ai-mcp-market-data`)
+2. **Test it standalone** with `mcp-server-test` or raw stdio
+3. **Integrate as subprocess** in backend via `subprocess.Popen`
+4. **Add health checks** and error handling for subprocess lifecycle
+5. **Monitor latency** and consider caching layers
+
+See `ai-mcp-server/app.py` for the reference stdio MCP implementation.
+
+---
+
 ## Project Structure
 
 ```text
@@ -501,14 +599,33 @@ ai-market-studio/ (Backend API)
 
 ## Roadmap
 
-| Priority | Theme | Features |
-|---|---|---|
-| P0 - Done | Foundation | Chat assistant, spot and historical FX rates, conversational dashboard, market news, GKE deployment, market insight summary |
-| P1 - Done | Market Intelligence | Market insight summary (Feature 07) and market news (Feature 03) |
-| P2 - Done | Output Generation | PDF report generation via Export to PDF button, email delivery pending |
-| P3 - Intelligence | Research | Web search integration, deeper RAG workflows over internal documents, first-party report ingestion UI/API |
-| P4 - Data Breadth | Data & Collaboration | Multi-source market data connectors, sales/trader commentary capture, scheduled reports |
-| P5 - Advanced | Platform & Simulation | Custom agent creation, OCR/document ingestion for scanned PDFs, paper-trading simulation |
-| P6 - Execution & Risk | Live Trading | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls |
+| Priority | Theme | Features | Status |
+|---|---|---|---|
+| P0 - Done | Foundation | Chat assistant, spot and historical FX rates, conversational dashboard, market news, GKE deployment, market insight summary | ✅ Complete |
+| P1 - Done | Market Intelligence | Market insight summary (Feature 07) and market news (Feature 03) | ✅ Complete |
+| P2 - Done | Output Generation | PDF report generation via Export to PDF button, email delivery pending | ✅ Complete |
+| P3 - In Progress | Intelligence & Economic Data | RAG research integration (Feature 05), FRED interest rates (Feature 08), economic indicator queries | ✅ FRED complete, RAG complete; Web search TBD |
+| P4 - In Progress | Data Breadth & Connectivity | Direct FRED connector (no MCP subprocess), AI Gateway service for multi-LLM (OpenAI + DeepSeek), market data enrichment | ✅ FRED & AI Gateway complete; Multi-source connectors TBD |
+| P5 - Planned | Platform & Simulation | Custom agent creation, OCR/document ingestion for scanned PDFs, paper-trading simulation | 🔄 Planned |
+| P6 - Planned | Execution & Risk | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls | 🔄 Planned |
+
+### Completed in P3/P4 (Phase 2026-04-12)
+
+✅ **Feature 08 - FRED Interest Rates**
+- Connector: `backend/connectors/fred_connector.py`
+- Tool: `get_interest_rates` (GPT-4o callable)
+- Common series: DFF, T10Y2Y, DGS10, MORTGAGE30US
+- Endpoint: `POST /api/fred/rate` (for direct API calls)
+
+✅ **P3 - RAG Integration** (Feature 05, 2026-04-04)
+- External RAG service integration via `RAGConnector`
+- Citation/source rendering in chat UI
+- Deduplication at backend layer
+
+✅ **P4 - AI Gateway** (ai-gateway-service, 2026-04-11)
+- Unified OpenAI-compatible API gateway (LiteLLM)
+- Model routing: `gpt-4o` → OpenAI, `deepseek-chat` → DeepSeek
+- GKE deployment: `ai-gateway` namespace
+- Ready for future multi-LLM feature toggle
 
 > Recommendation: keep P5 simulation-only. Add live FX execution in P6 only after authentication, RBAC, audit logging, and pre-trade risk controls are in place.
