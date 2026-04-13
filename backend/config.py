@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     openai_api_key: SecretStr
     openai_model: str = "gpt-4o"
+    openai_base_url: str = "https://api.openai.com/v1"
 
     exchangerate_api_key: SecretStr
     use_mock_connector: bool = False
