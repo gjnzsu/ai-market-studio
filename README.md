@@ -31,14 +31,21 @@ Frontend (ai-market-studio-ui) - nginx on port 80
    v
 Backend API (this repo) - FastAPI on port 8000
    |
-   | HTTP (internal Kubernetes DNS)
-   v
-RAG Service (ai-rag-service) - FastAPI on port 8000
+   |-- HTTP (internal) --> AI Gateway Service (LiteLLM proxy)
+   |                          |
+   |                          |-- OpenAI (gpt-4o, gpt-4o-mini)
+   |                          `-- DeepSeek (deepseek-chat)
+   |
+   `-- HTTP (internal Kubernetes DNS)
+       v
+   RAG Service (ai-rag-service) - FastAPI on port 8000
 ```
 
 **Key Points:**
 - Frontend → Backend: Uses external LoadBalancer IP (browser cannot access internal DNS)
+- Backend → AI Gateway: Uses internal Kubernetes DNS (`http://ai-gateway.ai-gateway.svc.cluster.local/v1`)
 - Backend → RAG Service: Uses internal Kubernetes DNS (`http://ai-rag-service:8000`)
+- AI Gateway routes LLM requests to OpenAI or DeepSeek based on model name
 
 > **Vision:** AI-native market intelligence platform for natural language-driven data retrieval, automated dashboard generation, and context-aware insights.
 
@@ -55,6 +62,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 | **Frontend UI** | http://136.116.205.168 | ✓ Running | 2 |
 | **Backend API** | http://35.224.3.54 | ✓ Running | 1 |
 | **API Docs** | http://35.224.3.54/docs | ✓ Available | - |
+| **AI Gateway** | `http://ai-gateway.ai-gateway.svc.cluster.local/v1` (internal) | ✓ Running | 2 |
 | **RAG Service** | `http://ai-rag-service:8000` (internal) | ✓ Running | 1 |
 
 **GKE Cluster:** `helloworld-cluster` (us-central1)
@@ -66,6 +74,8 @@ The application is deployed on Google Kubernetes Engine (GKE):
 |---|---|
 | Backend Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio:latest` |
 | Frontend Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio-ui:latest` |
+| LLM Provider | AI Gateway Service (routes to OpenAI/DeepSeek) |
+| LLM Model | `gpt-4o` (configurable: `gpt-4o-mini`, `deepseek-chat`) |
 | FX Connector | `USE_MOCK_CONNECTOR=true` (set `false` for live exchangerate.host data) |
 | News Connector | `USE_MOCK_NEWS_CONNECTOR=true` (set `false` for live RSS feeds) |
 | RAG Service URL | `http://ai-rag-service:8000` (internal Kubernetes service) |
@@ -76,6 +86,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 ### Feature 01 - FX Chat Assistant
 - Natural-language queries: *"What is EUR/USD today?"*, *"Compare USD vs JPY and CHF"*
 - GPT-4o function calling for FX rates, historical rates, dashboards, market news, and internal research
+- **LLM routing via AI Gateway**: All OpenAI calls route through internal gateway service for centralized key management and multi-provider support
 - Conversation history maintained client-side
 
 ### Feature 02 - FX Rate Historical Data
@@ -146,6 +157,19 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Live Deployment Status:** ✅ Deployed 2026-04-12, verified working on GKE (35.224.3.54)
 - **Test Result:** Query "What is the current federal funds rate?" → Returns 3.64% as of 2026-04-09
 
+### Feature 09 - AI Gateway Integration (2026-04-13)
+- **Centralized LLM Management**: All OpenAI API calls route through internal AI Gateway service
+- **Multi-Provider Support**: Seamless routing to OpenAI (gpt-4o, gpt-4o-mini) or DeepSeek (deepseek-chat)
+- **Dynamic Model Selection**: Switch models via ConfigMap without code changes
+- **Cost Optimization**: Route queries to cost-effective models (gpt-4o-mini, deepseek-chat) based on complexity
+- **Centralized Key Management**: API keys managed only in gateway, not in backend
+- **Single Observability Point**: All LLM requests logged and monitored at gateway level
+- **Architecture**: Backend → AI Gateway (ClusterIP) → OpenAI/DeepSeek
+- **Gateway Endpoint**: `http://ai-gateway.ai-gateway.svc.cluster.local/v1` (internal)
+- **Available Models**: `gpt-4o` (default), `gpt-4o-mini`, `deepseek-chat`
+- **Model Switching**: Update `OPENAI_MODEL` in ConfigMap, rolling restart deployment
+- **Rollback**: Easy revert to direct OpenAI calls via ConfigMap change
+
 ---
 
 ## Architecture
@@ -165,6 +189,14 @@ Backend API (this repo - FastAPI) on port 8000
    |-- /api/rates/historical  -> daily FX rates, LRU cached
    |-- /api/dashboard         -> batch panel fetch
    |-- /api/export/pdf        -> PDF report generation (reportlab via skills/pdf/pdf_skill.py)
+   |
+   v
+AI Gateway Service (LiteLLM) - http://ai-gateway.ai-gateway.svc.cluster.local/v1
+   |
+   |-- OpenAI (gpt-4o, gpt-4o-mini)
+   `-- DeepSeek (deepseek-chat)
+
+Backend also connects to:
    |
    v
 Connector Layer
@@ -325,11 +357,15 @@ Create a `.env` file in the repo root:
 
 ```env
 OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o
 EXCHANGERATE_API_KEY=your_key_here
 USE_MOCK_CONNECTOR=true
 USE_MOCK_NEWS_CONNECTOR=true
 RAG_SERVICE_URL=http://34.10.130.210
 ```
+
+> **Note:** In GKE deployment, `OPENAI_BASE_URL` points to the AI Gateway service (`http://ai-gateway.ai-gateway.svc.cluster.local/v1`). For local development, use the default OpenAI endpoint or run the gateway locally.
 
 > The exchangerate.host free tier has a low request quota. Keep `USE_MOCK_CONNECTOR=true` during development unless you specifically need live FX data.
 
@@ -444,8 +480,9 @@ kubectl get service ai-market-studio -o wide
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | required | OpenAI API key |
-| `OPENAI_MODEL` | `gpt-4o` | Model used by the agent |
+| `OPENAI_API_KEY` | required | OpenAI API key (or dummy value if using AI Gateway) |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI API base URL (set to gateway URL in GKE: `http://ai-gateway.ai-gateway.svc.cluster.local/v1`) |
+| `OPENAI_MODEL` | `gpt-4o` | Model used by the agent (options: `gpt-4o`, `gpt-4o-mini`, `deepseek-chat`) |
 | `EXCHANGERATE_API_KEY` | required | exchangerate.host API key |
 | `USE_MOCK_CONNECTOR` | `false` | Use synthetic FX data instead of live exchangerate.host API |
 | `USE_MOCK_NEWS_CONNECTOR` | `false` | Use synthetic news data instead of live RSS feeds |
@@ -469,6 +506,147 @@ python test_dashboard.py
 ```
 
 > Most automated tests use `MockConnector` or mocked RAG HTTP responses so they do not consume external API quota.
+
+---
+
+## AI Gateway Integration
+
+### Overview
+
+All LLM requests from the backend now route through the **AI Gateway Service**, a centralized LiteLLM proxy that provides:
+
+- **Unified API**: OpenAI-compatible `/v1/chat/completions` endpoint
+- **Multi-provider routing**: Automatic routing to OpenAI or DeepSeek based on model name
+- **Centralized key management**: API keys stored only in gateway, not in backend
+- **Cost optimization**: Easy switching between models (gpt-4o, gpt-4o-mini, deepseek-chat)
+- **Single observability point**: All LLM requests logged at gateway level
+
+### Architecture
+
+```text
+Backend (ai-market-studio)
+   |
+   | AsyncOpenAI(base_url=OPENAI_BASE_URL)
+   v
+AI Gateway (ai-gateway.ai-gateway.svc.cluster.local/v1)
+   |
+   |-- model=gpt-4o       --> OpenAI API
+   |-- model=gpt-4o-mini  --> OpenAI API
+   `-- model=deepseek-chat --> DeepSeek API
+```
+
+### Configuration
+
+**Backend Configuration** (`backend/config.py`):
+```python
+openai_api_key: SecretStr           # Dummy value in GKE (gateway manages real keys)
+openai_base_url: str = "https://api.openai.com/v1"  # Overridden in GKE
+openai_model: str = "gpt-4o"        # Configurable via ConfigMap
+```
+
+**Kubernetes ConfigMap** (`k8s/configmap.yaml`):
+```yaml
+OPENAI_BASE_URL: "http://ai-gateway.ai-gateway.svc.cluster.local/v1"
+OPENAI_MODEL: "gpt-4o"  # Change to gpt-4o-mini or deepseek-chat
+```
+
+**Kubernetes Secret** (`k8s/secret.yaml`):
+```yaml
+OPENAI_API_KEY: "dummy"  # Real keys managed by AI Gateway
+```
+
+### Switching Models
+
+To switch between models, update the ConfigMap and restart the deployment:
+
+```bash
+# Switch to gpt-4o-mini (faster, cheaper)
+kubectl patch configmap ai-market-studio-config \
+  --patch '{"data":{"OPENAI_MODEL":"gpt-4o-mini"}}'
+
+# Switch to deepseek-chat (cost-effective for reasoning tasks)
+kubectl patch configmap ai-market-studio-config \
+  --patch '{"data":{"OPENAI_MODEL":"deepseek-chat"}}'
+
+# Switch back to gpt-4o (default)
+kubectl patch configmap ai-market-studio-config \
+  --patch '{"data":{"OPENAI_MODEL":"gpt-4o"}}'
+
+# Apply changes (rolling restart)
+kubectl rollout restart deployment/ai-market-studio
+kubectl rollout status deployment/ai-market-studio
+```
+
+### Available Models
+
+| Model | Provider | Use Case | Cost |
+|-------|----------|----------|------|
+| `gpt-4o` | OpenAI | High-capability general purpose (default) | $$$ |
+| `gpt-4o-mini` | OpenAI | Fast, cost-effective tasks | $ |
+| `deepseek-chat` | DeepSeek | Reasoning-heavy workloads, cost savings | $$ |
+
+### Rollback to Direct OpenAI
+
+If needed, revert to direct OpenAI calls:
+
+```bash
+# Update ConfigMap to point to OpenAI directly
+kubectl patch configmap ai-market-studio-config \
+  --patch '{"data":{"OPENAI_BASE_URL":"https://api.openai.com/v1"}}'
+
+# Update Secret with real OpenAI API key
+kubectl patch secret ai-market-studio-secrets \
+  --patch '{"stringData":{"OPENAI_API_KEY":"sk-real-key-here"}}'
+
+# Rolling restart
+kubectl rollout restart deployment/ai-market-studio
+```
+
+### Verification
+
+**Check backend logs:**
+```bash
+kubectl logs -l app=ai-market-studio --tail=50
+```
+
+Look for: `INFO: AI Market Studio started.` with no OpenAI authentication errors.
+
+**Check gateway logs:**
+```bash
+kubectl -n ai-gateway logs -l app=ai-gateway --tail=50
+```
+
+Look for: `POST /v1/chat/completions` requests with `200 OK` responses.
+
+**Test chat endpoint:**
+```bash
+curl -X POST http://35.224.3.54/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What is the EUR/USD rate?", "history": []}'
+```
+
+Expected: Valid JSON response with `reply`, `data`, and `tool_used` fields.
+
+### Implementation Details
+
+**Files Modified:**
+- `backend/config.py` - Added `openai_base_url` field
+- `backend/agent/agent.py` - Pass `base_url` to `AsyncOpenAI` client
+- `k8s/configmap.yaml` - Added `OPENAI_BASE_URL` pointing to gateway
+- `k8s/secret.yaml` - Changed to dummy `OPENAI_API_KEY`
+- `backend/tests/e2e/test_gateway_integration.py` - E2E tests for gateway integration
+
+**Commits:**
+- `a3e39a9` - Backend config with openai_base_url field
+- `468f4ec` - Agent client using configurable base_url
+- `e3888ef` - ConfigMap with gateway endpoint
+- `d923dfb` - Secret template for security
+- `bae0f92` - E2E tests for gateway integration
+- `fb4fbe5` - Final summary commit
+
+### Related Repository
+
+- **AI Gateway Service**: [ai-gateway-service](https://github.com/gjnzsu/ai-gateway-service)
 
 ---
 
@@ -628,7 +806,19 @@ ai-market-studio/ (Backend API)
 - Citation/source rendering in chat UI
 - Deduplication at backend layer
 
-✅ **P4 - AI Gateway** (ai-gateway-service, 2026-04-11)
+✅ **P4 - AI Gateway Integration** (2026-04-13)
+- Centralized LLM management via AI Gateway service
+- Multi-provider routing: OpenAI (gpt-4o, gpt-4o-mini) and DeepSeek (deepseek-chat)
+- Dynamic model selection via ConfigMap without code changes
+- Centralized API key management (keys only in gateway)
+- Single observability point for all LLM requests
+- Cost optimization through model selection
+- GKE deployment: `ai-gateway` namespace, 2 replicas
+- Backend integration: `OPENAI_BASE_URL=http://ai-gateway.ai-gateway.svc.cluster.local/v1`
+- Verified working: All features tested through gateway (chat, dashboard, news, RAG, PDF)
+- Model switching tested: gpt-4o, gpt-4o-mini, deepseek-chat all operational
+
+✅ **P4 - FRED Integration** (ai-gateway-service, 2026-04-11)
 - Unified OpenAI-compatible API gateway (LiteLLM)
 - Model routing: `gpt-4o` → OpenAI, `deepseek-chat` → DeepSeek
 - GKE deployment: `ai-gateway` namespace
