@@ -78,6 +78,7 @@ async def run_agent(
         import httpx
         client = AsyncOpenAI(
             api_key=settings.openai_api_key.get_secret_value(),
+            base_url=settings.openai_base_url,
             http_client=httpx.AsyncClient(trust_env=False),
         )
 
