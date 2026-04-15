@@ -93,6 +93,7 @@ async def run_agent(
     last_tool_data = None
 
     for _ in range(MAX_TOOL_ROUNDS):
+        logger.info(f"[Agent] Making request with model: {settings.openai_model}")
         response = await client.chat.completions.create(
             model=settings.openai_model,
             messages=messages,

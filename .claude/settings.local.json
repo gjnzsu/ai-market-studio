@@ -54,7 +54,9 @@
       "Bash(find c:/SourceCode/ai-market-studio -name *.png -newer c:/SourceCode/ai-market-studio/shot_08_inline_chart.png)",
       "Bash(ls -lt c:/SourceCode/ai-market-studio/*.png)",
       "Bash(docker images:*)",
-      "Bash(kubectl logs:*)"
+      "Bash(kubectl logs:*)",
+      "Bash(curl -X POST http://localhost:8000/api/chat -H \"Content-Type: application/json\" -d '{\"\"\"\"message\"\"\"\": \"\"\"\"What is the current federal funds rate?\"\"\"\", \"\"\"\"history\"\"\"\": []}' -s)",
+      "Bash(pkill -f uvicorn)"
     ]
   },
   "hooks": {
