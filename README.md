@@ -137,6 +137,11 @@ The application is deployed on Google Kubernetes Engine (GKE):
   }
   ```
 - **Response:** Binary PDF file (`application/pdf`) with `Content-Disposition: attachment; filename="fx-insight-YYYYMMDD_HHMM.pdf"`
+- **Testing:** Comprehensive E2E test suite in `backend/tests/e2e/test_pdf_export.py`
+  - 8 test cases covering all data types (rates, insights, dashboard, news, RAG)
+  - Tests verify PDF generation, content validation, file size, and error handling
+  - Run tests: `pytest backend/tests/e2e/test_pdf_export.py -v`
+  - Coverage: 93% of PDF exporter module
 
 ### Feature 07 - Market Insight Summary
 - Ask in natural language: *"Give me a market insight on EUR/USD and GBP/USD"*
@@ -825,3 +830,36 @@ ai-market-studio/ (Backend API)
 - Ready for future multi-LLM feature toggle
 
 > Recommendation: keep P5 simulation-only. Add live FX execution in P6 only after authentication, RBAC, audit logging, and pre-trade risk controls are in place.
+
+---
+
+## Deployment History
+
+### 2026-04-18 - PDF Export & AI Gateway Production Deployment
+
+**Changes:**
+- ✅ Fixed AI Gateway authentication (updated secret with real OpenAI API key)
+- ✅ Added PDF export endpoint (`POST /api/export/pdf`) to backend router
+- ✅ Created comprehensive PDF export test suite (8 tests, 100% passing, 93% code coverage)
+- ✅ Updated frontend pre-defined prompts with FRED API example
+- ✅ All services redeployed and verified working
+
+**Deployed Images:**
+- Backend: `gcr.io/gen-lang-client-0896070179/ai-market-studio:latest`
+- Frontend: `gcr.io/gen-lang-client-0896070179/ai-market-studio-ui:v2026-04-18-fred`
+
+**Verification:**
+- Chat endpoint: ✅ Working (tested EUR/USD, GBP/USD queries)
+- AI Gateway: ✅ Authenticated and routing correctly (200 OK responses)
+- PDF Export: ✅ Generating valid PDFs (2.2KB, version 1.4)
+- Frontend: ✅ Accessible at http://136.116.205.168
+- FRED API: ✅ "What is the current Federal Funds Rate?" prompt working
+
+**Documentation:**
+- Deployment summary: `DEPLOYMENT_SUMMARY_2026-04-18.md`
+- Test suite: `backend/tests/e2e/test_pdf_export.py`
+
+**Commits:**
+- `4378d98` - feat: add PDF export endpoint and comprehensive test suite
+- `e3a2859` - docs: add comprehensive deployment summary for 2026-04-18
+- `837a2d7` - feat: update pre-defined query prompts with FRED API example
