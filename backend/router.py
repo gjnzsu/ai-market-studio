@@ -7,10 +7,12 @@ from backend.models import (
     ChatRequest, ChatResponse,
     HistoricalRatesRequest, HistoricalRatesResponse, DailyRates,
     DashboardConfig, DashboardDataResponse,
+    ExportPdfRequest,
 )
 from backend.agent.agent import run_agent
 from backend.connectors.base import ConnectorError
 from backend.cache import RateCache
+from backend.exporters.pdf_exporter import generate_insight_pdf
 
 rate_cache = RateCache()
 
@@ -127,4 +129,24 @@ async def get_dashboard_data(
         panels=panels_out,
     )
 
+
+@router.post("/export/pdf")
+async def export_pdf(body: ExportPdfRequest) -> Response:
+    """Export chat response to PDF."""
+    try:
+        pdf_bytes = generate_insight_pdf(
+            reply=body.reply,
+            data=body.data,
+            tool_used=body.tool_used,
+        )
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="fx-insight-{datetime.utcnow().strftime("%Y%m%d-%H%M%S")}.pdf"'
+            }
+        )
+    except Exception as e:
+        logger.exception("Error generating PDF: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to generate PDF")
 
