@@ -9,6 +9,7 @@ from backend.config import settings
 from backend.connectors.base import MarketDataConnector, ConnectorError
 from backend.connectors.news_connector import NewsConnectorBase
 from backend.agent.tools import TOOL_DEFINITIONS, dispatch_tool, AgentError
+from ai_sre_observability import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -92,52 +93,129 @@ async def run_agent(
     last_tool_used: Optional[str] = None
     last_tool_data = None
 
-    for _ in range(MAX_TOOL_ROUNDS):
-        logger.info(f"[Agent] Making request with model: {settings.openai_model}")
-        response = await client.chat.completions.create(
-            model=settings.openai_model,
-            messages=messages,
-            tools=TOOL_DEFINITIONS,
-            tool_choice="auto",
-        )
+    # Get observability client (graceful degradation)
+    try:
+        obs = get_client()
+    except RuntimeError:
+        obs = None
+        logger.warning("Observability not initialized, skipping metrics")
 
-        choice = response.choices[0]
-        msg = choice.message
-        messages.append(msg.model_dump(exclude_unset=True))
+    # Track token accumulation across all LLM calls
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
 
-        if choice.finish_reason == "tool_calls" and msg.tool_calls:
-            for tool_call in msg.tool_calls:
-                tool_name = tool_call.function.name
-                tool_args = json.loads(tool_call.function.arguments)
-                logger.info("Tool call: %s args=%s", tool_name, tool_args)
+    # Wrap agent loop with observability tracking
+    if obs:
+        async with obs.track_llm_call(
+            provider="openai",
+            model=settings.openai_model
+        ) as tracker:
+            for _ in range(MAX_TOOL_ROUNDS):
+                logger.info(f"[Agent] Making request with model: {settings.openai_model}")
+                response = await client.chat.completions.create(
+                    model=settings.openai_model,
+                    messages=messages,
+                    tools=TOOL_DEFINITIONS,
+                    tool_choice="auto",
+                )
 
-                try:
-                    result = await dispatch_tool(tool_name, tool_args, connector, news_connector)
-                    last_tool_used = tool_name
-                    last_tool_data = result
-                    # For structured UI payloads, send GPT-4o a compact summary
-                    # instead of the full JSON so it doesn't echo the raw payload.
-                    if isinstance(result, dict) and result.get("type") in ("insight", "dashboard", "news", "rag"):
-                        tool_result_content = json.dumps(_summarise_tool_result(result))
-                    else:
-                        tool_result_content = json.dumps(result)
-                except ConnectorError as e:
-                    logger.warning("Connector error: %s", e)
-                    tool_result_content = json.dumps({"error": str(e)})
-                except AgentError as e:
-                    logger.error("Agent error: %s", e)
-                    tool_result_content = json.dumps({"error": str(e)})
+                # Accumulate tokens
+                if response.usage:
+                    total_prompt_tokens += response.usage.prompt_tokens
+                    total_completion_tokens += response.usage.completion_tokens
 
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "content": tool_result_content,
-                })
-            continue
+                choice = response.choices[0]
+                msg = choice.message
+                messages.append(msg.model_dump(exclude_unset=True))
 
-        # Final text response
-        reply = msg.content or ""
-        return {"reply": reply, "data": last_tool_data, "tool_used": last_tool_used}
+                if choice.finish_reason == "tool_calls" and msg.tool_calls:
+                    for tool_call in msg.tool_calls:
+                        tool_name = tool_call.function.name
+                        tool_args = json.loads(tool_call.function.arguments)
+                        logger.info("Tool call: %s args=%s", tool_name, tool_args)
+
+                        try:
+                            result = await dispatch_tool(tool_name, tool_args, connector, news_connector)
+                            last_tool_used = tool_name
+                            last_tool_data = result
+                            # For structured UI payloads, send GPT-4o a compact summary
+                            # instead of the full JSON so it doesn't echo the raw payload.
+                            if isinstance(result, dict) and result.get("type") in ("insight", "dashboard", "news", "rag"):
+                                tool_result_content = json.dumps(_summarise_tool_result(result))
+                            else:
+                                tool_result_content = json.dumps(result)
+                        except ConnectorError as e:
+                            logger.warning("Connector error: %s", e)
+                            tool_result_content = json.dumps({"error": str(e)})
+                        except AgentError as e:
+                            logger.error("Agent error: %s", e)
+                            tool_result_content = json.dumps({"error": str(e)})
+
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": tool_result_content,
+                        })
+                    continue
+
+                # Final text response
+                reply = msg.content or ""
+                # Set accumulated totals before exiting context
+                tracker.prompt_tokens = total_prompt_tokens
+                tracker.completion_tokens = total_completion_tokens
+                return {"reply": reply, "data": last_tool_data, "tool_used": last_tool_used}
+
+            # Max rounds reached - set totals before exiting
+            tracker.prompt_tokens = total_prompt_tokens
+            tracker.completion_tokens = total_completion_tokens
+    else:
+        # No observability - run agent normally
+        for _ in range(MAX_TOOL_ROUNDS):
+            logger.info(f"[Agent] Making request with model: {settings.openai_model}")
+            response = await client.chat.completions.create(
+                model=settings.openai_model,
+                messages=messages,
+                tools=TOOL_DEFINITIONS,
+                tool_choice="auto",
+            )
+
+            choice = response.choices[0]
+            msg = choice.message
+            messages.append(msg.model_dump(exclude_unset=True))
+
+            if choice.finish_reason == "tool_calls" and msg.tool_calls:
+                for tool_call in msg.tool_calls:
+                    tool_name = tool_call.function.name
+                    tool_args = json.loads(tool_call.function.arguments)
+                    logger.info("Tool call: %s args=%s", tool_name, tool_args)
+
+                    try:
+                        result = await dispatch_tool(tool_name, tool_args, connector, news_connector)
+                        last_tool_used = tool_name
+                        last_tool_data = result
+                        # For structured UI payloads, send GPT-4o a compact summary
+                        # instead of the full JSON so it doesn't echo the raw payload.
+                        if isinstance(result, dict) and result.get("type") in ("insight", "dashboard", "news", "rag"):
+                            tool_result_content = json.dumps(_summarise_tool_result(result))
+                        else:
+                            tool_result_content = json.dumps(result)
+                    except ConnectorError as e:
+                        logger.warning("Connector error: %s", e)
+                        tool_result_content = json.dumps({"error": str(e)})
+                    except AgentError as e:
+                        logger.error("Agent error: %s", e)
+                        tool_result_content = json.dumps({"error": str(e)})
+
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": tool_result_content,
+                    })
+                continue
+
+            # Final text response
+            reply = msg.content or ""
+            return {"reply": reply, "data": last_tool_data, "tool_used": last_tool_used}
 
     return {
         "reply": "I was unable to complete your request after several attempts. Please try again.",

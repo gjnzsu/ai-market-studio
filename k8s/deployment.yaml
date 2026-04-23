@@ -24,6 +24,9 @@ spec:
                 name: ai-market-studio-config
             - secretRef:
                 name: ai-market-studio-secrets
+          env:
+            - name: OBSERVABILITY_URL
+              value: "http://ai-sre-observability.default.svc.cluster.local:8080"
           resources:
             requests:
               cpu: "250m"

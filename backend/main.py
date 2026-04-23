@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -6,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
 from backend.router import router
+from ai_sre_observability import setup_observability
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,10 +42,30 @@ def create_news_connector():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Initialize connectors
     if not getattr(app.state, 'connector', None):
         app.state.connector = create_connector()
     if not getattr(app.state, 'news_connector', None):
         app.state.news_connector = create_news_connector()
+
+    # Initialize observability
+    observability_url = os.getenv(
+        "OBSERVABILITY_URL",
+        "http://ai-sre-observability.default.svc.cluster.local:8080"
+    )
+
+    try:
+        setup_observability(
+            service_name="ai-market-studio",
+            observability_url=observability_url,
+            batch_interval=5.0,
+            timeout=5.0
+        )
+        logger.info(f"Observability initialized: {observability_url}")
+    except Exception as e:
+        logger.warning(f"Failed to initialize observability: {e}")
+        # Continue without observability - graceful degradation
+
     logger.info("AI Market Studio started.")
     yield
     logger.info("AI Market Studio shutting down.")
