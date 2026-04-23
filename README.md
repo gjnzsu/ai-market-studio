@@ -66,7 +66,7 @@ Observability Stack:
 
 > **Vision:** AI-native market intelligence platform for natural language-driven data retrieval, automated dashboard generation, and context-aware insights.
 
-![Chat UI](shot_07_chat_ui.png)
+![Chat UI](docs/screenshots/shot_07_chat_ui.png)
 
 ---
 
@@ -128,7 +128,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - Inline Chart.js chart renders directly inside the chat bubble; no tab switching
 - Supports line-trend and bar-comparison chart types
 
-![Conversational Dashboard](shot_08_inline_chart.png)
+![Conversational Dashboard](docs/screenshots/shot_08_inline_chart.png)
 
 ### Feature 05 - Research Report RAG Query
 - Ask in natural language: *"Search internal research docs for deployment checklist"*, *"Find internal research about RAG ingestion"*
@@ -169,7 +169,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - Batched API calls: all pairs with a shared target currency are fetched in a single request
 - Renders inline rate chips and news cards inside the chat bubble
 
-![Market Insight Summary](shot_f7_live.png)
+![Market Insight Summary](docs/screenshots/shot_f7_live.png)
 
 ### Feature 08 - FRED Interest Rate Queries
 - Ask in natural language: *"What is the current federal funds rate?"*, *"Show me the 10-Year Treasury rate"*, *"30-year mortgage rate"*
