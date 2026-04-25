@@ -968,3 +968,291 @@ ai-market-studio/ (Backend API)
 - `4378d98` - feat: add PDF export endpoint and comprehensive test suite
 - `e3a2859` - docs: add comprehensive deployment summary for 2026-04-18
 - `837a2d7` - feat: update pre-defined query prompts with FRED API example
+
+---
+
+## Financial Analysis Integration
+
+### Overview
+
+AI Market Studio integrates with Claude Code's financial analyst skills to provide advanced FX market analysis capabilities. This integration enables:
+
+- **Trend Analysis**: Analyze FX rate trends based on historical data and market news
+- **Technical Analysis**: Apply financial ratios and indicators to currency pairs
+- **Market Intelligence**: Combine FRED economic data with FX rates for comprehensive analysis
+- **Research Integration**: Query internal research documents via RAG for market insights
+
+### Available Financial Analysis Skills
+
+The following Claude Code skills can be used with AI Market Studio:
+
+| Skill | Description | Use Case |
+|-------|-------------|----------|
+| `financial-analyst` | Financial ratio analysis, DCF valuation, budget variance | Analyze FX market fundamentals, economic indicators |
+| `saas-metrics-coach` | SaaS financial health metrics (ARR, MRR, churn, LTV, CAC) | Not directly applicable to FX markets |
+| `business-investment-advisor` | Investment analysis, ROI, NPV, IRR calculations | Evaluate FX trading strategies, capital allocation |
+
+### How to Use Financial Analysis Skills
+
+#### 1. Basic FX Trend Analysis
+
+**Query the AI Market Studio API with financial context:**
+
+```bash
+curl -X POST http://35.224.3.54/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Analyze the EUR/USD trend over the last 30 days using the latest market news and FRED economic indicators",
+    "history": []
+  }'
+```
+
+**What happens:**
+1. GPT-4o calls `get_historical_rates` to fetch EUR/USD data
+2. GPT-4o calls `get_fx_news` to fetch recent market news
+3. GPT-4o calls `get_interest_rate` to fetch relevant FRED data (e.g., DFF, T10Y2Y)
+4. The agent synthesizes all data into a comprehensive trend analysis
+
+#### 2. Multi-Currency Comparison with Economic Context
+
+**Example query:**
+```
+Compare EUR/USD, GBP/USD, and USD/JPY trends for the last 7 days.
+Include Federal Funds Rate and 10-Year Treasury data for context.
+```
+
+**Backend flow:**
+```python
+# The agent automatically orchestrates multiple tool calls:
+1. get_historical_rates(base="EUR", target="USD", days=7)
+2. get_historical_rates(base="GBP", target="USD", days=7)
+3. get_historical_rates(base="USD", target="JPY", days=7)
+4. get_interest_rate(series_id="DFF")  # Federal Funds Rate
+5. get_interest_rate(series_id="DGS10")  # 10-Year Treasury
+6. get_fx_news(query="EUR USD GBP JPY")
+```
+
+#### 3. Research-Backed Analysis
+
+**Query internal research documents:**
+```
+Search internal research for FX market outlook reports,
+then analyze EUR/USD based on those insights.
+```
+
+**Backend flow:**
+```python
+1. get_internal_research(question="FX market outlook EUR/USD")
+   # Returns: RAG results with source citations
+2. get_historical_rates(base="EUR", target="USD", days=30)
+3. get_fx_news(query="EUR USD")
+# Agent synthesizes research findings with live data
+```
+
+#### 4. Using Claude Code Skills Directly
+
+**In Claude Code CLI:**
+
+```bash
+# Invoke financial-analyst skill for FX analysis
+/financial-analyst
+
+# Then provide context:
+"I need to analyze EUR/USD trend based on:
+- Historical rates from ai-market-studio API (http://35.224.3.54/api/rates/historical)
+- Latest market news from RSS feeds
+- FRED economic indicators (Federal Funds Rate, Treasury yields)
+
+Please perform a comprehensive financial analysis including:
+1. Trend direction and momentum
+2. Key support/resistance levels
+3. Economic factors influencing the pair
+4. Risk assessment and outlook"
+```
+
+**The skill will:**
+1. Fetch data from ai-market-studio API endpoints
+2. Apply financial analysis frameworks
+3. Generate structured analysis report
+4. Provide actionable insights
+
+### Integration Architecture
+
+```text
+User Query
+   |
+   v
+AI Market Studio Frontend (http://136.116.205.168)
+   |
+   | POST /api/chat
+   v
+AI Market Studio Backend (http://35.224.3.54)
+   |
+   |-- GPT-4o Agent (via AI Gateway)
+   |     |
+   |     |-- get_historical_rates() → FX data
+   |     |-- get_interest_rate() → FRED data
+   |     |-- get_fx_news() → Market news
+   |     `-- get_internal_research() → RAG insights
+   |
+   v
+Claude Code Financial Analyst Skills (optional enhancement)
+   |
+   |-- Financial ratio analysis
+   |-- Trend analysis frameworks
+   |-- Risk assessment models
+   `-- Investment recommendations
+```
+
+### Example: Complete FX Analysis Workflow
+
+**Step 1: Gather Data**
+```bash
+# Query AI Market Studio
+curl -X POST http://35.224.3.54/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Get EUR/USD rates for last 30 days, current Federal Funds Rate, and latest FX news",
+    "history": []
+  }'
+```
+
+**Step 2: Analyze with Financial Skills**
+```bash
+# In Claude Code
+/financial-analyst
+
+# Provide the data from Step 1 and request analysis:
+"Based on this EUR/USD data:
+- 30-day trend: 1.0850 → 1.0920 (+0.65%)
+- Federal Funds Rate: 3.64%
+- Latest news: ECB signals rate hold, Fed dovish pivot
+
+Perform financial analysis:
+1. Calculate volatility and momentum indicators
+2. Assess interest rate differential impact
+3. Identify key technical levels
+4. Provide 7-day outlook with confidence intervals"
+```
+
+**Step 3: Export Results**
+```bash
+# Export analysis to PDF via AI Market Studio
+curl -X POST http://35.224.3.54/api/export/pdf \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reply": "[Financial analysis results from Step 2]",
+    "data": {
+      "type": "insight",
+      "rates": [...],
+      "news": [...]
+    },
+    "tool_used": "financial_analysis"
+  }' \
+  --output fx-analysis-report.pdf
+```
+
+### Configuration for Financial Analysis
+
+**Environment Variables:**
+
+```env
+# Enable all data sources for comprehensive analysis
+USE_MOCK_CONNECTOR=false          # Use live FX data
+USE_MOCK_NEWS_CONNECTOR=false     # Use live market news
+RAG_SERVICE_URL=http://ai-rag-service:8000  # Enable research queries
+
+# FRED API for economic indicators
+FRED_API_KEY=your_fred_api_key
+
+# AI Gateway for LLM routing
+OPENAI_BASE_URL=http://ai-gateway.ai-gateway.svc.cluster.local/v1
+OPENAI_MODEL=gpt-4o  # Use gpt-4o for complex financial analysis
+```
+
+### Best Practices
+
+#### 1. Data Quality
+- **Use live data** for production analysis (`USE_MOCK_CONNECTOR=false`)
+- **Verify FRED data** is current (check observation dates)
+- **Cross-reference** multiple news sources
+
+#### 2. Analysis Depth
+- **Simple queries**: Use gpt-4o-mini for cost efficiency
+- **Complex analysis**: Use gpt-4o for better reasoning
+- **Research-heavy**: Enable RAG service for document insights
+
+#### 3. Performance Optimization
+- **Batch requests**: Use `generate_market_insight` for multi-pair analysis
+- **Cache results**: Historical data is cached for 5 minutes (TTL=300s)
+- **Parallel calls**: Agent automatically parallelizes independent tool calls
+
+#### 4. Cost Management
+- **Model selection**: Switch to `deepseek-chat` for cost-effective analysis
+- **Token tracking**: Monitor costs via AI SRE Observability dashboards
+- **Query optimization**: Be specific to reduce token usage
+
+### Monitoring Financial Analysis
+
+**Grafana Dashboards** (http://136.114.77.0):
+
+1. **LLM Cost & Usage**
+   - Track cost per financial analysis query
+   - Monitor token consumption patterns
+   - Identify expensive queries
+
+2. **Service Overview**
+   - Request latency for financial queries
+   - Success rate of tool calls
+   - Error patterns
+
+3. **Request Tracing**
+   - End-to-end trace of analysis workflow
+   - Tool call sequence visualization
+   - Performance bottlenecks
+
+### Troubleshooting
+
+#### Issue: Analysis lacks depth
+**Solution:** Switch to gpt-4o model for better reasoning
+```bash
+kubectl patch configmap ai-market-studio-config \
+  --patch '{"data":{"OPENAI_MODEL":"gpt-4o"}}'
+kubectl rollout restart deployment/ai-market-studio
+```
+
+#### Issue: Missing economic context
+**Solution:** Verify FRED API key is configured
+```bash
+kubectl get configmap ai-market-studio-config -o yaml | grep FRED_API_KEY
+```
+
+#### Issue: No research insights
+**Solution:** Check RAG service connectivity
+```bash
+kubectl get svc ai-rag-service
+curl http://ai-rag-service:8000/health
+```
+
+### Future Enhancements
+
+**Planned for P5:**
+- **Custom financial indicators**: Add RSI, MACD, Bollinger Bands
+- **Backtesting framework**: Test strategies against historical data
+- **Portfolio analysis**: Multi-currency portfolio optimization
+- **Risk metrics**: VaR, Sharpe ratio, maximum drawdown
+
+**Planned for P6:**
+- **Real-time alerts**: Notify on significant rate movements
+- **Automated trading signals**: Generate buy/sell recommendations
+- **Compliance checks**: Pre-trade risk validation
+- **Audit trail**: Full logging of analysis and decisions
+
+### Related Documentation
+
+- **FRED Integration**: See Feature 08 above for FRED API details
+- **RAG Integration**: See Feature 05 for research document queries
+- **AI Gateway**: See Feature 09 for LLM routing configuration
+- **Observability**: See Feature 10 for cost tracking and monitoring
+
+---
