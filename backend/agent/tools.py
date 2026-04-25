@@ -244,6 +244,39 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_fx_economic_correlation",
+            "description": (
+                "Analyze correlation between FX pair movements and economic indicators "
+                "(interest rates, GDP, inflation) over a time period. Use this when the user "
+                "asks why a currency is moving or wants to understand economic drivers of FX trends."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pair": {
+                        "type": "string",
+                        "description": "Currency pair in format BASE/TARGET (e.g., 'EUR/USD', 'GBP/USD')",
+                    },
+                    "indicators": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "FRED series IDs to correlate (e.g., ['DFF', 'DGS10', 'CPIAUCSL']). "
+                            "Common: DFF=Fed Funds, DGS10=10Y Treasury, CPIAUCSL=CPI, GDPC1=GDP"
+                        ),
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Lookback period in days (default: 90, min: 30, max: 365)",
+                    },
+                },
+                "required": ["pair", "indicators"],
+            },
+        },
+    },
 ]
 
 
@@ -387,5 +420,33 @@ async def dispatch_tool(
             raise AgentError("series_id is required for get_interest_rate")
         result = await fred.get_current_rate(series_id=series_id, date=date)
         return result.model_dump()
+    elif tool_name == "analyze_fx_economic_correlation":
+        from backend.connectors.correlation_connector import CorrelationConnector
+        from backend.connectors.fred_connector import FREDConnector
+
+        correlation_connector = CorrelationConnector(
+            market_connector=connector,
+            fred_connector=FREDConnector()
+        )
+
+        pair = tool_args.get("pair")
+        indicators = tool_args.get("indicators")
+        days = tool_args.get("days", 90)
+
+        if not pair:
+            raise AgentError("pair is required for analyze_fx_economic_correlation")
+        if not indicators:
+            raise AgentError("indicators is required for analyze_fx_economic_correlation")
+
+        result = await correlation_connector.analyze_correlation(
+            pair=pair,
+            indicators=indicators,
+            days=days
+        )
+
+        return {
+            "type": "economic_correlation",
+            "data": result
+        }
     else:
         raise AgentError(f"Unknown tool: {tool_name}")
