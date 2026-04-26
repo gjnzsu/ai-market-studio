@@ -1,6 +1,25 @@
+"""Report Generator Agent — formats market data and analysis into reports.
+
+Generates formatted outputs in multiple formats:
+- PDF: Export-ready report structure (integrates with PDF skill)
+- Dashboard: Chart.js-compatible visualization data
+- Summary: Human-readable text summary
+
+Routes requests by format parameter and returns structured payloads with metadata.
+"""
+
+import logging
 from typing import Any, Dict, Optional, Literal
 from datetime import datetime, timezone
-import json
+
+logger = logging.getLogger(__name__)
+
+# Default titles for each format
+DEFAULT_TITLES = {
+    "pdf": "Market Report",
+    "dashboard": "Market Dashboard",
+    "summary": "Market Summary"
+}
 
 
 async def generate_report(
@@ -20,15 +39,29 @@ async def generate_report(
 
     Returns:
         Dict with format, title, content, and metadata
+
+    Raises:
+        ValueError: If format is invalid or data is empty
     """
-    if format == "pdf":
-        return await _generate_pdf(data, analysis, title)
-    elif format == "dashboard":
-        return await _generate_dashboard(data, analysis, title)
-    elif format == "summary":
-        return await _generate_summary(data, analysis, title)
-    else:
-        raise ValueError(f"Unknown format: {format}")
+    logger.info(f"Generating {format} report with title: {title}")
+
+    if not data:
+        logger.error("Cannot generate report: data is empty")
+        raise ValueError("data parameter cannot be empty")
+
+    try:
+        if format == "pdf":
+            return await _generate_pdf(data, analysis, title)
+        elif format == "dashboard":
+            return await _generate_dashboard(data, analysis, title)
+        elif format == "summary":
+            return await _generate_summary(data, analysis, title)
+        else:
+            logger.error(f"Invalid format requested: {format}")
+            raise ValueError(f"Unknown format: {format}")
+    except Exception as e:
+        logger.error(f"Error generating {format} report: {e}")
+        raise
 
 
 async def _generate_pdf(
@@ -37,6 +70,8 @@ async def _generate_pdf(
     title: Optional[str]
 ) -> Dict[str, Any]:
     """Generate PDF report."""
+    logger.debug("Generating PDF report")
+
     # This would integrate with existing PDF skill
     # For now, return a mock structure
 
@@ -53,7 +88,7 @@ async def _generate_pdf(
 
     return {
         "format": "pdf",
-        "title": title or "Market Report",
+        "title": title or DEFAULT_TITLES["pdf"],
         "content": content,
         "metadata": metadata
     }
@@ -65,6 +100,8 @@ async def _generate_dashboard(
     title: Optional[str]
 ) -> Dict[str, Any]:
     """Generate inline Chart.js dashboard."""
+    logger.debug("Generating dashboard report")
+
     rates_data = data.get("data", [])
 
     # Format for Chart.js
@@ -75,7 +112,7 @@ async def _generate_dashboard(
         "chart_type": "line",
         "labels": labels,
         "datasets": [{
-            "label": title or "FX Rates",
+            "label": title or DEFAULT_TITLES["dashboard"],
             "data": values,
             "borderColor": "rgb(75, 192, 192)",
             "tension": 0.1
@@ -89,7 +126,7 @@ async def _generate_dashboard(
 
     return {
         "format": "dashboard",
-        "title": title or "FX Dashboard",
+        "title": title or DEFAULT_TITLES["dashboard"],
         "content": content,
         "metadata": metadata
     }
@@ -101,6 +138,8 @@ async def _generate_summary(
     title: Optional[str]
 ) -> Dict[str, Any]:
     """Generate text summary."""
+    logger.debug("Generating summary report")
+
     summary_lines = []
 
     if title:
@@ -110,11 +149,19 @@ async def _generate_summary(
     rates_data = data.get("data", [])
     if rates_data:
         summary_lines.append(f"\nData points: {len(rates_data)}")
-        if "rate" in rates_data[0]:
+
+        # Defensive: check if rates_data has items and first item has 'rate' key
+        if len(rates_data) > 0 and "rate" in rates_data[0]:
             first_rate = rates_data[0]["rate"]
             last_rate = rates_data[-1]["rate"]
-            change = ((last_rate - first_rate) / first_rate) * 100
-            summary_lines.append(f"Change: {change:+.2f}%")
+
+            # Defensive: prevent division by zero
+            if first_rate != 0:
+                change = ((last_rate - first_rate) / first_rate) * 100
+                summary_lines.append(f"Change: {change:+.2f}%")
+            else:
+                logger.warning("Cannot calculate change: first_rate is zero")
+                summary_lines.append("Change: N/A (base rate is zero)")
 
     # Summarize analysis
     if analysis:
@@ -134,7 +181,7 @@ async def _generate_summary(
 
     return {
         "format": "summary",
-        "title": title or "Summary",
+        "title": title or DEFAULT_TITLES["summary"],
         "content": content,
         "metadata": metadata
     }
