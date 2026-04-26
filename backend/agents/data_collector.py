@@ -10,7 +10,7 @@ Routes requests by data_type and returns normalized payloads with metadata.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 
 from backend.connectors.base import MarketDataConnector
@@ -108,8 +108,30 @@ async def _collect_rates(
     source = "unknown"
 
     try:
-        # Historical rates
-        if start_date and end_date:
+        # Historical rates with days parameter
+        if days:
+            end = datetime.now(timezone.utc)
+            start = end - timedelta(days=days)
+            calc_start_date = start.strftime("%Y-%m-%d")
+            calc_end_date = end.strftime("%Y-%m-%d")
+
+            for pair in pairs:
+                base, target = pair.split("/")
+                historical = await connector.get_historical_rates(
+                    base=base,
+                    targets=[target],
+                    start_date=calc_start_date,
+                    end_date=calc_end_date,
+                )
+                data.append({
+                    "pair": pair,
+                    "base": base,
+                    "target": target,
+                    "historical": historical,
+                })
+                source = "historical_rates"
+        # Historical rates with explicit date range
+        elif start_date and end_date:
             for pair in pairs:
                 base, target = pair.split("/")
                 historical = await connector.get_historical_rates(
@@ -212,8 +234,21 @@ async def _collect_fred(
         raise ValueError("series_id parameter is required for fred data_type")
 
     try:
-        # Historical rates
-        if start_date and end_date:
+        # Historical rates with days parameter
+        if days:
+            end = datetime.now(timezone.utc)
+            start = end - timedelta(days=days)
+            calc_start_date = start.strftime("%Y-%m-%d")
+            calc_end_date = end.strftime("%Y-%m-%d")
+
+            historical_data = await connector.get_historical_rates(
+                series_id=series_id,
+                start_date=calc_start_date,
+                end_date=calc_end_date,
+            )
+            data = historical_data.model_dump()
+        # Historical rates with explicit date range
+        elif start_date and end_date:
             historical_data = await connector.get_historical_rates(
                 series_id=series_id,
                 start_date=start_date,

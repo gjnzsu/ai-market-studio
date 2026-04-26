@@ -138,3 +138,82 @@ async def test_collect_invalid_data_type():
     assert "Invalid data_type: invalid_type" in str(exc_info.value)
     assert "Must be one of: rates, news, fred, rag" in str(exc_info.value)
 
+
+@pytest.mark.asyncio
+async def test_collect_rates_with_days():
+    """Test collecting historical rates using days parameter."""
+    mock_connector = AsyncMock()
+    mock_connector.get_historical_rates.return_value = {
+        "2026-03-27": {"USD": 1.0800},
+        "2026-03-28": {"USD": 1.0820},
+        "2026-04-25": {"USD": 1.0840},
+        "2026-04-26": {"USD": 1.0850}
+    }
+
+    result = await collect_market_data(
+        data_type="rates",
+        pairs=["EUR/USD"],
+        days=30,
+        connector=mock_connector
+    )
+
+    assert result["data_type"] == "rates"
+    assert result["source"] == "historical_rates"
+    assert len(result["data"]) == 1
+    assert result["data"][0]["pair"] == "EUR/USD"
+    assert result["data"][0]["base"] == "EUR"
+    assert result["data"][0]["target"] == "USD"
+    assert "historical" in result["data"][0]
+    assert result["metadata"]["days"] == 30
+
+    # Verify get_historical_rates was called with calculated dates
+    mock_connector.get_historical_rates.assert_called_once()
+    call_args = mock_connector.get_historical_rates.call_args
+    assert call_args.kwargs["base"] == "EUR"
+    assert call_args.kwargs["targets"] == ["USD"]
+    # Verify dates are in correct format (YYYY-MM-DD)
+    assert len(call_args.kwargs["start_date"]) == 10
+    assert len(call_args.kwargs["end_date"]) == 10
+
+
+@pytest.mark.asyncio
+async def test_collect_fred_with_days():
+    """Test collecting FRED historical data using days parameter."""
+    mock_connector = AsyncMock()
+    mock_historical_data = MagicMock()
+    mock_historical_data.model_dump.return_value = {
+        "series_id": "DFF",
+        "series_name": "Effective Federal Funds Rate",
+        "start_date": "2026-03-27",
+        "end_date": "2026-04-26",
+        "observations": [
+            {"date": "2026-03-27", "value": 3.60},
+            {"date": "2026-04-25", "value": 3.64}
+        ],
+        "count": 2,
+        "source": "FRED"
+    }
+    mock_connector.get_historical_rates.return_value = mock_historical_data
+
+    result = await collect_market_data(
+        data_type="fred",
+        fred_connector=mock_connector,
+        series_id="DFF",
+        days=30
+    )
+
+    assert result["data_type"] == "fred"
+    assert result["source"] == "FRED"
+    assert result["data"]["series_id"] == "DFF"
+    assert result["data"]["count"] == 2
+    assert result["metadata"]["days"] == 30
+
+    # Verify get_historical_rates was called with calculated dates
+    mock_connector.get_historical_rates.assert_called_once()
+    call_args = mock_connector.get_historical_rates.call_args
+    assert call_args.kwargs["series_id"] == "DFF"
+    # Verify dates are in correct format (YYYY-MM-DD)
+    assert len(call_args.kwargs["start_date"]) == 10
+    assert len(call_args.kwargs["end_date"]) == 10
+
+
