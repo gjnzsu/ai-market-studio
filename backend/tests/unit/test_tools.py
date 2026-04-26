@@ -6,8 +6,9 @@ from backend.connectors.news_connector import MockNewsConnector
 
 def test_tool_definitions_are_valid():
     assert isinstance(TOOL_DEFINITIONS, list)
-    assert len(TOOL_DEFINITIONS) == 9
+    assert len(TOOL_DEFINITIONS) == 14  # 10 legacy + 4 new sub-agent tools
     names = [t["function"]["name"] for t in TOOL_DEFINITIONS]
+    # Legacy tools
     assert "get_exchange_rate" in names
     assert "get_exchange_rates" in names
     assert "get_historical_rates" in names
@@ -17,6 +18,12 @@ def test_tool_definitions_are_valid():
     assert "generate_market_insight" in names
     assert "get_internal_research" in names
     assert "get_interest_rate" in names
+    assert "analyze_fx_economic_correlation" in names
+    # New sub-agent tools
+    assert "collect_market_data" in names
+    assert "analyze_market_trends" in names
+    assert "generate_report" in names
+    assert "synthesize_research" in names
 
 
 def test_tool_definitions_have_required_fields():
