@@ -1,40 +1,103 @@
 # AI Market Studio — Product Documentation
 
-> **Version:** 2.2
-> **Date:** 2026-03-30
+> **Version:** 3.0
+> **Date:** 2026-04-26
 > **Status:** Active
-> **Scope:** F7 Market Insight Summary — Delivered; live exchangerate.host connector active
+> **Scope:** Updated with product positioning, target persona, and business value proposition
 
 ---
 
 ## Table of Contents
 
 1. [Product Vision](#1-product-vision)
-2. [User Stories — FX Dashboard](#2-user-stories--fx-dashboard)
-3. [API Contract — New Endpoints](#3-api-contract--new-endpoints)
-4. [Dashboard Type Definitions](#4-dashboard-type-definitions)
-5. [Panel Type Definitions](#5-panel-type-definitions)
-6. [Multi-Panel Layout Specification](#6-multi-panel-layout-specification)
-7. [Gaps, Risks, and Constraints](#7-gaps-risks-and-constraints)
-8. [Roadmap](#8-roadmap)
+2. [Target User Persona](#2-target-user-persona)
+3. [User Stories — FX Dashboard](#3-user-stories--fx-dashboard)
+4. [API Contract — New Endpoints](#4-api-contract--new-endpoints)
+5. [Dashboard Type Definitions](#5-dashboard-type-definitions)
+6. [Panel Type Definitions](#6-panel-type-definitions)
+7. [Multi-Panel Layout Specification](#7-multi-panel-layout-specification)
+8. [Gaps, Risks, and Constraints](#8-gaps-risks-and-constraints)
+9. [Roadmap](#9-roadmap)
 
 ---
 
 ## 1. Product Vision
 
-AI Market Studio is a conversational FX market data platform. Feature 01 delivered real-time single-pair rate queries via chat. Feature 02 extends the product with a **visual FX Rate Trend Dashboard**: users can create dashboards composed of multiple independent panels, each displaying historical or live FX data in a chosen visualization format. Users may switch between dashboard types (single-pair trend, multi-pair comparison, currency heatmap) without losing their panel configuration.
+### Positioning Statement
 
-**Target Users:** FX traders, finance analysts, treasury teams who need rapid visual context alongside conversational queries.
+**For** FX traders at banks and hedge funds (buy-side/sell-side)
+
+**that need** to stop wasting time switching between fragmented data sources (Bloomberg, Reuters, news feeds, internal systems) and are overwhelmed by raw data without AI-powered synthesis to quickly understand "what matters now" for their trading decisions
+
+**AI Market Studio**
+
+**is a** FX trading copilot (MVP) evolving into an AI-powered market intelligence platform
+
+**that** reduces market research time from 30+ minutes to under 2 minutes, enabling traders to form informed trading views 10x faster by instantly synthesizing FX rates, news, and economic indicators through conversational queries
+
+### Differentiation
+
+**Unlike** Bloomberg Terminal (which requires navigating complex menus and multiple screens) and the manual multi-tool workflow (switching between Bloomberg, Reuters, internal systems, Excel, news sites)
+
+**AI Market Studio**
+
+**provides** instant conversational access to unified FX data with AI-synthesized insights in seconds, eliminating context-switching and information overload
+
+### One-Sentence Positioning
+
+AI Market Studio is an FX trading copilot for professional traders at banks and hedge funds that reduces market research time from 30+ minutes to under 2 minutes through conversational AI that unifies fragmented data sources, unlike Bloomberg Terminal's complex UI and manual multi-tool workflows.
+
+### Product Evolution
+
+**Current State (MVP):** Conversational FX market data platform with real-time spot rates, historical data, visual dashboards, market news, interest rate data (FRED), and AI-powered market insight summaries. Users interact via natural language chat to query data, generate visualizations, and receive synthesized intelligence.
+
+**Long-Term Vision:** AI-powered market intelligence platform that aggregates multi-source financial data and delivers proactive, context-aware insights to trading desks, eliminating the need for fragmented tool workflows entirely.
 
 ---
 
-## 2. User Stories — FX Dashboard
+## 2. Target User Persona
+
+**Primary Persona:** Alex Chen, Senior FX Trader at banks/hedge funds
+
+**Full persona documentation:** See [target_persona.md](./target_persona.md) for comprehensive profile including demographics, pain points, use cases, buying process, and success metrics.
+
+### Quick Profile
+
+- **Role:** Senior FX Trader (5-10 years experience)
+- **Organization:** Mid-sized hedge fund or bank trading desk
+- **Daily Workflow:** Monitors 10-15 currency pairs, executes 20-50 trades/day
+- **Current Tools:** Bloomberg Terminal, Reuters Eikon, internal risk systems, Excel, FX news sites
+
+### Critical Pain Points
+
+1. **Fragmented Data Sources:** Wastes 2-3 hours/day switching between Bloomberg, Reuters, internal systems, Excel, news sites
+2. **Information Overload:** Drowns in raw data without AI-powered synthesis to understand "what matters now"
+3. **Slow Insight Generation:** Spends 30+ minutes manually correlating rates, news, and economic indicators
+
+### Value Proposition for Alex
+
+AI Market Studio reduces market research time from **30+ minutes to under 2 minutes**, enabling traders to form informed trading views **10x faster** by instantly synthesizing FX rates, news, and economic indicators through conversational queries.
+
+**Quantified Impact:**
+- Time saved: 2-3 hours/day per trader
+- Context switches: Reduced from 50-100/day to <10/day
+- Annual productivity gain: 112-175 hours per trader
+
+### Quote
+
+> "I need to know what's moving EUR/USD right now and why — but I'm stuck toggling between five different screens just to piece together the story."
+>
+> — Alex Chen, Senior FX Trader
+
+---
+
+## 3. User Stories — FX Dashboard
 
 ### US-01 — Historical Rate Query for a Currency Pair
 
-**As a** finance analyst,
+**As a** FX trader (Alex Chen),
 **I want to** query the historical exchange rate for a specific currency pair over a chosen date range,
-**So that** I can identify rate trends and support trading decisions.
+**So that** I can identify rate trends and support trading decisions without manually building Excel models.
 
 **Acceptance Criteria:**
 - AC-01.1: User can specify a base currency, quote currency, start date, and end date.
@@ -48,9 +111,9 @@ AI Market Studio is a conversational FX market data platform. Feature 01 deliver
 
 ### US-02 — Create a Dashboard
 
-**As a** user,
+**As a** FX trader (Alex Chen),
 **I want to** create a named dashboard and choose its type,
-**So that** I can organize my FX analysis in a structured, reusable workspace.
+**So that** I can organize my FX analysis in a structured workspace without maintaining multiple Bloomberg screens.
 
 **Acceptance Criteria:**
 - AC-02.1: User can create a dashboard by providing a name (1–80 chars) and a dashboard type (`single_pair_trend` | `multi_pair_comparison` | `currency_heatmap`).
@@ -64,9 +127,9 @@ AI Market Studio is a conversational FX market data platform. Feature 01 deliver
 
 ### US-03 — Add Panels to a Dashboard
 
-**As a** analyst,
+**As a** FX trader (Alex Chen),
 **I want to** add multiple independent data panels to a dashboard,
-**So that** I can view different FX data side-by-side without creating separate dashboards.
+**So that** I can view different FX data side-by-side without toggling between Bloomberg screens.
 
 **Acceptance Criteria:**
 - AC-03.1: User can add a panel to an existing dashboard by specifying panel type, currency pair(s), date range, and display options.
@@ -80,7 +143,7 @@ AI Market Studio is a conversational FX market data platform. Feature 01 deliver
 
 ### US-04 — Switch Dashboard Type
 
-**As a** user,
+**As a** FX trader (Alex Chen),
 **I want to** switch the type of an existing dashboard,
 **So that** I can change the visualization mode without rebuilding the dashboard from scratch.
 
@@ -95,9 +158,9 @@ AI Market Studio is a conversational FX market data platform. Feature 01 deliver
 
 ### US-05 — View Multi-Panel Dashboard Layout
 
-**As a** user,
+**As a** FX trader (Alex Chen),
 **I want to** see all panels in a dashboard rendered in a grid layout,
-**So that** I can compare multiple FX data views at a glance.
+**So that** I can compare multiple FX data views at a glance without context-switching between tools.
 
 **Acceptance Criteria:**
 - AC-05.1: Dashboard layout API returns all panels with their data, position, and render hints in a single response.
@@ -123,7 +186,7 @@ AI Market Studio is a conversational FX market data platform. Feature 01 deliver
 
 ---
 
-## 3. API Contract — New Endpoints
+## 4. API Contract — New Endpoints
 
 All endpoints are prefixed `/api/v1`. Request and response bodies are JSON. All timestamps are ISO 8601 UTC.
 
@@ -368,7 +431,7 @@ Return all panel data in a single response for rendering.
 
 ---
 
-## 4. Dashboard Type Definitions
+## 5. Dashboard Type Definitions
 
 | Dashboard Type | ID | Description | Allowed Panel Types |
 |---|---|---|---|
@@ -392,7 +455,7 @@ Return all panel data in a single response for rendering.
 - A 5-currency heatmap = 5×4/2 = **10 unique pairs** (symmetric matrix, no diagonal). Cold: up to 10 upstream calls; warm (cache hit): 0 calls. See §7 GAP-08 and GAP-12.
 - Date range applies to the whole dashboard (single range, not per-panel).
 
-## 5. Panel Type Definitions
+## 6. Panel Type Definitions
 
 | Panel Type | ID | Description | Compatible Dashboard Types |
 |---|---|---|---|
@@ -428,7 +491,7 @@ quote:         string                   required
 (date range inherited from dashboard)
 ```
 
-## 6. Multi-Panel Layout Specification
+## 7. Multi-Panel Layout Specification
 
 The layout is determined server-side based on panel count and returned as the `grid` field in the layout response.
 
@@ -461,7 +524,7 @@ The layout is determined server-side based on panel count and returned as the `g
   `pct_change` = ((last - first) / first) × 100.
 - Both shapes are produced by the backend API layer from the connector's raw `[{"date": "YYYY-MM-DD", "rate": float}]` output. The connector does not compute stats or serialize chart data.
 
-## 7. Gaps, Risks, and Constraints
+## 8. Gaps, Risks, and Constraints
 
 | ID | Risk / Gap | Severity | Mitigation |
 |---|---|---|---|
@@ -473,7 +536,7 @@ The layout is determined server-side based on panel count and returned as the `g
 | GAP-13 | **No authentication**: All dashboard and rate endpoints are unauthenticated. Any user on the network can read or delete any dashboard by ID. | LOW (PoC only) | Document as known PoC shortcut. Add to Phase 3 hardening backlog. |
 | GAP-14 | **GPT-4o system prompt not defined**: The agent system prompt is still an open action item from Feature 01. Feature 02 adds dashboard context (e.g. user asking "add a EUR/USD panel") that the agent must handle. | HIGH | Define system prompt before Feature 02 agent integration. Out of scope for dashboard API but blocks conversational dashboard control. |
 
-## 8. Roadmap
+## 9. Roadmap
 
 | Priority | Theme | Features |
 |----------|-------|----------|
