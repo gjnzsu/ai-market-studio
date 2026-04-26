@@ -9,7 +9,8 @@ from backend.config import settings
 from backend.connectors.base import MarketDataConnector, ConnectorError
 from backend.connectors.news_connector import NewsConnectorBase
 from backend.agent.tools import TOOL_DEFINITIONS, dispatch_tool, AgentError
-from ai_sre_observability import get_client
+# Temporarily disabled for Cloud Build deployment
+# from ai_sre_observability import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -128,12 +129,13 @@ async def run_agent(
     last_tool_used: Optional[str] = None
     last_tool_data = None
 
-    # Get observability client (graceful degradation)
-    try:
-        obs = get_client()
-    except RuntimeError:
-        obs = None
-        logger.warning("Observability not initialized, skipping metrics")
+    # Get observability client (graceful degradation) - temporarily disabled
+    obs = None
+    # try:
+    #     obs = get_client()
+    # except RuntimeError:
+    #     obs = None
+    #     logger.warning("Observability not initialized, skipping metrics")
 
     # Track token accumulation across all LLM calls
     total_prompt_tokens = 0

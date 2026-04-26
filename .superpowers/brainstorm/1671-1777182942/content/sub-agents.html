@@ -1,0 +1,89 @@
+<h2>Sub-Agent Responsibilities</h2>
+<p class="subtitle">What specialized agents should we create?</p>
+
+<div class="section">
+  <p>Now that we're using a <strong>Hybrid (Hierarchical + Parallel)</strong> architecture, let's define the sub-agents. Based on your existing features, here are the natural boundaries:</p>
+</div>
+
+<div class="section">
+  <h3>Proposed Agent Team</h3>
+  <p>Select the agents you want to include in your system. You can pick multiple.</p>
+</div>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="data-collector" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Data Collector Agent</h3>
+      <p><strong>Responsibility:</strong> Fetch raw market data from all sources</p>
+      <p><strong>Tools:</strong> ExchangeRateHostConnector, FREDConnector, RSSNewsConnector, RAGConnector</p>
+      <p><strong>Input:</strong> Data request (pairs, date ranges, series IDs, queries)</p>
+      <p><strong>Output:</strong> Raw structured data (rates, news, economic indicators, research)</p>
+      <p style="margin-top: 8px;"><em>This agent knows HOW to fetch data but doesn't analyze it.</em></p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="market-analyst" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Market Analyst Agent</h3>
+      <p><strong>Responsibility:</strong> Analyze trends, correlations, patterns in market data</p>
+      <p><strong>Tools:</strong> Statistical analysis, trend detection, correlation analysis</p>
+      <p><strong>Input:</strong> Raw market data (from Data Collector)</p>
+      <p><strong>Output:</strong> Analysis results (trends, insights, signals, risk assessments)</p>
+      <p style="margin-top: 8px;"><em>This agent understands WHAT the data means.</em></p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="report-generator" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Report Generator Agent</h3>
+      <p><strong>Responsibility:</strong> Create formatted outputs (PDFs, dashboards, summaries)</p>
+      <p><strong>Tools:</strong> PDF skill, Chart.js rendering, dashboard builder</p>
+      <p><strong>Input:</strong> Analysis results + raw data</p>
+      <p><strong>Output:</strong> Formatted reports, visualizations, export files</p>
+      <p style="margin-top: 8px;"><em>This agent knows HOW to present information.</em></p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="risk-monitor" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Risk Monitor Agent</h3>
+      <p><strong>Responsibility:</strong> Watch for anomalies, threshold breaches, risk events</p>
+      <p><strong>Tools:</strong> Threshold detection, anomaly detection, alert generation</p>
+      <p><strong>Input:</strong> Real-time data stream + risk parameters</p>
+      <p><strong>Output:</strong> Alerts, warnings, risk scores</p>
+      <p style="margin-top: 8px;"><em>This agent watches for WHEN things go wrong.</em></p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="research-synthesizer" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h3>Research Synthesizer Agent</h3>
+      <p><strong>Responsibility:</strong> Combine multi-source intelligence into coherent insights</p>
+      <p><strong>Tools:</strong> RAG queries, news analysis, economic indicator correlation</p>
+      <p><strong>Input:</strong> Research docs + news + economic data</p>
+      <p><strong>Output:</strong> Synthesized intelligence reports, context-aware insights</p>
+      <p style="margin-top: 8px;"><em>This agent connects the dots across sources.</em></p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="conversation-manager" onclick="toggleSelect(this)">
+    <div class="letter">F</div>
+    <div class="content">
+      <h3>Conversation Manager Agent</h3>
+      <p><strong>Responsibility:</strong> Handle user interaction, maintain context, route requests</p>
+      <p><strong>Tools:</strong> Chat history, user preferences, intent detection</p>
+      <p><strong>Input:</strong> User messages, conversation history</p>
+      <p><strong>Output:</strong> Routed requests to other agents, conversational responses</p>
+      <p style="margin-top: 8px;"><em>This agent understands WHAT the user wants.</em></p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <p><strong>Recommendation:</strong> Start with A (Data Collector), B (Market Analyst), and C (Report Generator) as your core trio. Add D (Risk Monitor) and E (Research Synthesizer) for advanced features. F (Conversation Manager) can be your orchestrator itself.</p>
+</div>

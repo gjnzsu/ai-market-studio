@@ -1,0 +1,119 @@
+<h2>Sub-Agent Implementation Strategy</h2>
+<p class="subtitle">How should we implement each sub-agent?</p>
+
+<div class="section">
+  <p>You've chosen <strong>Conversational Orchestrator (C)</strong> — your GPT-4o agent becomes the orchestrator, and sub-agents become specialized tools.</p>
+  <p style="margin-top: 8px;"><strong>Great news about GPT-5.x!</strong> The architecture we're designing will work seamlessly with model upgrades. Now let's decide how to implement each sub-agent.</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="tools" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Sub-Agents as GPT Function Tools</h3>
+      <p><strong>Implementation:</strong> Each sub-agent is a new GPT-4o function tool (like your current tools)</p>
+      <p><strong>How it works:</strong></p>
+      <ul>
+        <li>Data Collector → <code>collect_market_data()</code> tool</li>
+        <li>Market Analyst → <code>analyze_market_trends()</code> tool</li>
+        <li>Report Generator → <code>generate_report()</code> tool</li>
+        <li>Research Synthesizer → <code>synthesize_research()</code> tool</li>
+      </ul>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Minimal refactoring (extend existing pattern)</li>
+            <li>GPT-4o/5.x handles coordination automatically</li>
+            <li>Fast to implement</li>
+            <li>Works with any OpenAI model</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Sub-agents are just Python functions (not true agents)</li>
+            <li>No sub-agent autonomy or reasoning</li>
+            <li>Limited to synchronous execution</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 12px;"><strong>Best for:</strong> Quick MVP, leveraging existing architecture</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="llm-agents" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Sub-Agents as Independent LLM Agents</h3>
+      <p><strong>Implementation:</strong> Each sub-agent is its own GPT-4o/5.x instance with specialized system prompts</p>
+      <p><strong>How it works:</strong></p>
+      <ul>
+        <li>Data Collector → GPT-4o with "You are a data collection specialist" prompt</li>
+        <li>Market Analyst → GPT-4o with "You are a financial analyst" prompt</li>
+        <li>Report Generator → GPT-4o with "You are a report writer" prompt</li>
+        <li>Research Synthesizer → GPT-4o with "You are a research synthesizer" prompt</li>
+      </ul>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>True agent autonomy and reasoning</li>
+            <li>Each agent can use tools independently</li>
+            <li>Specialized expertise per agent</li>
+            <li>Can run in parallel</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>4x LLM cost (one call per sub-agent)</li>
+            <li>More complex coordination</li>
+            <li>Slower (multiple LLM round-trips)</li>
+            <li>Harder to debug</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 12px;"><strong>Best for:</strong> Complex reasoning tasks, true multi-agent systems</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid: Tools + LLM Agents (Selective)</h3>
+      <p><strong>Implementation:</strong> Simple sub-agents are tools, complex ones are LLM agents</p>
+      <p><strong>How it works:</strong></p>
+      <ul>
+        <li>Data Collector → Python function tool (deterministic data fetching)</li>
+        <li>Market Analyst → GPT-4o agent (needs reasoning for trend analysis)</li>
+        <li>Report Generator → Python function tool (deterministic formatting)</li>
+        <li>Research Synthesizer → GPT-4o agent (needs reasoning to connect dots)</li>
+      </ul>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Balance cost and capability</li>
+            <li>LLM only where reasoning needed</li>
+            <li>Deterministic where possible</li>
+            <li>Flexible architecture</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Mixed implementation patterns</li>
+            <li>Need to decide tool vs agent per case</li>
+            <li>More code paths to maintain</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 12px;"><strong>Best for:</strong> Production systems optimizing for cost and performance</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <p><strong>Recommendation:</strong> Start with <strong>A (Function Tools)</strong> for MVP speed, then evolve to <strong>C (Hybrid)</strong> as you identify which sub-agents need reasoning. Market Analyst and Research Synthesizer are good candidates for LLM agents; Data Collector and Report Generator can stay as tools.</p>
+</div>

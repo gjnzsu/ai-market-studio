@@ -1,0 +1,116 @@
+<h2>Orchestrator Responsibilities</h2>
+<p class="subtitle">What should the main orchestrator agent do?</p>
+
+<div class="section">
+  <p>You've selected 4 sub-agents: <strong>Data Collector, Market Analyst, Report Generator, and Research Synthesizer</strong>.</p>
+  <p>Now we need to define what the <strong>Orchestrator</strong> (main agent) is responsible for. This is the "brain" that coordinates everything.</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="thin" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Thin Orchestrator (Router Only)</h3>
+      <p><strong>Responsibilities:</strong></p>
+      <ul>
+        <li>Parse user intent</li>
+        <li>Route to appropriate sub-agent(s)</li>
+        <li>Pass results back to user</li>
+        <li>Maintain conversation history</li>
+      </ul>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Simple, focused logic</li>
+            <li>Sub-agents do all the work</li>
+            <li>Easy to test</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>No cross-agent coordination</li>
+            <li>Sub-agents must be very smart</li>
+            <li>Limited workflow flexibility</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 12px;"><strong>Example:</strong> User asks "Analyze EUR/USD" → Orchestrator routes to Market Analyst → Returns result</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="smart" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Smart Orchestrator (Workflow Planner)</h3>
+      <p><strong>Responsibilities:</strong></p>
+      <ul>
+        <li>Parse user intent</li>
+        <li>Plan multi-step workflow</li>
+        <li>Coordinate sub-agent execution (parallel/sequential)</li>
+        <li>Synthesize final response</li>
+        <li>Handle errors and retries</li>
+      </ul>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Handles complex workflows</li>
+            <li>Sub-agents stay simple</li>
+            <li>Flexible execution strategies</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>More complex orchestrator logic</li>
+            <li>Orchestrator becomes critical path</li>
+            <li>Harder to debug</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 12px;"><strong>Example:</strong> User asks "Analyze EUR/USD" → Orchestrator plans: (1) Data Collector fetches rates, (2) Market Analyst analyzes, (3) Report Generator creates PDF → Returns result</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="conversational" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Conversational Orchestrator (Your Current GPT-4o Agent)</h3>
+      <p><strong>Responsibilities:</strong></p>
+      <ul>
+        <li>Natural language understanding</li>
+        <li>Decide which sub-agents to call (via function calling)</li>
+        <li>Compose natural language responses</li>
+        <li>Maintain conversation context</li>
+        <li>Handle clarifying questions</li>
+      </ul>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Natural user experience</li>
+            <li>Leverages existing GPT-4o agent</li>
+            <li>Handles ambiguity well</li>
+            <li>Minimal refactoring needed</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>LLM cost for every request</li>
+            <li>Less deterministic</li>
+            <li>Harder to optimize</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 12px;"><strong>Example:</strong> User asks "Analyze EUR/USD" → GPT-4o decides to call Data Collector tool, then Market Analyst tool → Composes natural language response</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <p><strong>Recommendation:</strong> Start with <strong>C (Conversational Orchestrator)</strong> — your existing GPT-4o agent becomes the orchestrator. Sub-agents become new GPT-4o function tools. This is the easiest migration path and preserves your conversational UX.</p>
+  <p>Later, you can evolve to B (Smart Orchestrator) if you need more deterministic workflows or want to reduce LLM costs.</p>
+</div>

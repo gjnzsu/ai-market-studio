@@ -1,0 +1,101 @@
+<h2>Workflow Examples</h2>
+<p class="subtitle">Let's validate the design with real use cases</p>
+
+<div class="section">
+  <p>You've chosen <strong>Sub-Agents as Function Tools (A)</strong> — each sub-agent is a Python function that GPT-4o/5.x calls via function calling.</p>
+  <p>Let's walk through some example workflows to make sure this architecture handles your use cases. Select the workflow you'd like to explore first:</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="simple" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Simple Query: "What is EUR/USD today?"</h3>
+      <p><strong>Expected flow:</strong></p>
+      <ol style="margin-left: 20px; margin-top: 8px;">
+        <li>User sends message</li>
+        <li>Orchestrator (GPT-4o) detects intent: spot rate query</li>
+        <li>Calls <code>collect_market_data(pairs=["EUR/USD"], type="spot")</code></li>
+        <li>Data Collector fetches from ExchangeRateHostConnector</li>
+        <li>Returns rate to orchestrator</li>
+        <li>Orchestrator composes natural language response</li>
+      </ol>
+      <p style="margin-top: 12px;"><strong>Sub-agents involved:</strong> Data Collector only</p>
+      <p><strong>Parallel execution:</strong> No (single tool call)</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="multi-step" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Multi-Step: "Analyze EUR/USD trend and create a PDF report"</h3>
+      <p><strong>Expected flow:</strong></p>
+      <ol style="margin-left: 20px; margin-top: 8px;">
+        <li>User sends message</li>
+        <li>Orchestrator detects intent: trend analysis + report</li>
+        <li>Calls <code>collect_market_data(pairs=["EUR/USD"], days=30)</code></li>
+        <li>Data Collector fetches historical rates</li>
+        <li>Calls <code>analyze_market_trends(data=rates)</code></li>
+        <li>Market Analyst computes trends, volatility, signals</li>
+        <li>Calls <code>generate_report(analysis=results, format="pdf")</code></li>
+        <li>Report Generator creates PDF</li>
+        <li>Returns PDF download link</li>
+      </ol>
+      <p style="margin-top: 12px;"><strong>Sub-agents involved:</strong> Data Collector → Market Analyst → Report Generator</p>
+      <p><strong>Parallel execution:</strong> No (sequential pipeline)</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="parallel" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Parallel: "Give me market insight on EUR/USD, GBP/USD, and USD/JPY"</h3>
+      <p><strong>Expected flow:</strong></p>
+      <ol style="margin-left: 20px; margin-top: 8px;">
+        <li>User sends message</li>
+        <li>Orchestrator detects intent: multi-pair market insight</li>
+        <li><strong>Parallel calls:</strong>
+          <ul style="margin-left: 20px; margin-top: 4px;">
+            <li><code>collect_market_data(pairs=["EUR/USD","GBP/USD","USD/JPY"])</code></li>
+            <li><code>collect_market_data(type="news", query="FX")</code></li>
+            <li><code>collect_market_data(type="fred", series=["DFF"])</code></li>
+          </ul>
+        </li>
+        <li>Calls <code>synthesize_research(rates=..., news=..., indicators=...)</code></li>
+        <li>Research Synthesizer combines all sources</li>
+        <li>Returns inline insight with rate chips + news cards</li>
+      </ol>
+      <p style="margin-top: 12px;"><strong>Sub-agents involved:</strong> Data Collector (3x parallel) → Research Synthesizer</p>
+      <p><strong>Parallel execution:</strong> Yes (3 data collection calls in parallel)</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="complex" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Complex: "Research EUR/USD outlook, analyze trend, and generate dashboard"</h3>
+      <p><strong>Expected flow:</strong></p>
+      <ol style="margin-left: 20px; margin-top: 8px;">
+        <li>User sends message</li>
+        <li>Orchestrator detects intent: research + analysis + visualization</li>
+        <li><strong>Parallel calls:</strong>
+          <ul style="margin-left: 20px; margin-top: 4px;">
+            <li><code>collect_market_data(pairs=["EUR/USD"], days=30)</code></li>
+            <li><code>collect_market_data(type="rag", query="EUR/USD outlook")</code></li>
+            <li><code>collect_market_data(type="news", query="EUR USD")</code></li>
+          </ul>
+        </li>
+        <li>Calls <code>synthesize_research(rates=..., rag=..., news=...)</code></li>
+        <li>Calls <code>analyze_market_trends(data=rates, context=synthesis)</code></li>
+        <li>Calls <code>generate_report(analysis=..., format="dashboard")</code></li>
+        <li>Returns inline Chart.js dashboard</li>
+      </ol>
+      <p style="margin-top: 12px;"><strong>Sub-agents involved:</strong> Data Collector (3x parallel) → Research Synthesizer → Market Analyst → Report Generator</p>
+      <p><strong>Parallel execution:</strong> Yes (initial data collection), then sequential</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <p><strong>Key insight:</strong> GPT-4o/5.x function calling already supports parallel tool calls when they're independent. Your orchestrator will automatically parallelize Data Collector calls when fetching from multiple sources.</p>
+</div>

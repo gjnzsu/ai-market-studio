@@ -1,0 +1,126 @@
+<h2>Multi-Agent Architecture for AI Market Studio</h2>
+<p class="subtitle">How should we structure the agent team?</p>
+
+<div class="section">
+  <p>You're building a multi-agent orchestrator. Now we need to decide on the architecture pattern. Each has different trade-offs for complexity, flexibility, and control.</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="hierarchical" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Hierarchical (Manager-Worker)</h3>
+      <p><strong>Structure:</strong> One orchestrator agent manages all sub-agents. Sub-agents never talk to each other directly.</p>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Simple coordination logic</li>
+            <li>Clear control flow</li>
+            <li>Easy to debug</li>
+            <li>Predictable execution</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Orchestrator becomes bottleneck</li>
+            <li>No agent-to-agent collaboration</li>
+            <li>Less flexible for complex workflows</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 12px;"><strong>Best for:</strong> Predictable workflows, clear task decomposition</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="peer" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Peer-to-Peer (Collaborative)</h3>
+      <p><strong>Structure:</strong> Agents can communicate directly with each other. Orchestrator initiates but agents self-organize.</p>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Flexible collaboration</li>
+            <li>Agents can negotiate</li>
+            <li>Handles complex workflows</li>
+            <li>More autonomous</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Complex coordination</li>
+            <li>Harder to debug</li>
+            <li>Risk of infinite loops</li>
+            <li>Unpredictable execution</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 12px;"><strong>Best for:</strong> Complex research, emergent workflows, creative tasks</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="pipeline" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Pipeline (Sequential)</h3>
+      <p><strong>Structure:</strong> Agents arranged in a fixed sequence. Output of one becomes input of next.</p>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Very simple to implement</li>
+            <li>Easy to test each stage</li>
+            <li>Predictable flow</li>
+            <li>Clear data lineage</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Inflexible (fixed order)</li>
+            <li>No parallelization</li>
+            <li>Can't skip stages</li>
+            <li>Limited to linear workflows</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 12px;"><strong>Best for:</strong> ETL-style workflows, report generation pipelines</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Hybrid (Hierarchical + Parallel)</h3>
+      <p><strong>Structure:</strong> Orchestrator manages sub-agents, but can run multiple agents in parallel. Sub-agents don't communicate directly.</p>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Balance of control and speed</li>
+            <li>Parallel execution where possible</li>
+            <li>Still debuggable</li>
+            <li>Flexible enough for most workflows</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>More complex than pure hierarchical</li>
+            <li>Need to identify parallelizable tasks</li>
+            <li>Orchestrator still coordinates everything</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 12px;"><strong>Best for:</strong> Real-world production systems, mixed workflows</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <p><strong>Context for your project:</strong> You already have independent connectors (FX, FRED, News, RAG) that could run in parallel. Your current GPT-4o agent already orchestrates tool calls. The question is: how much autonomy do you want each sub-agent to have?</p>
+</div>
