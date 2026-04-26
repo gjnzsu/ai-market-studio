@@ -52,9 +52,8 @@ async def test_collect_news_data():
 
     result = await collect_market_data(
         data_type="news",
-        connector=mock_connector,
-        query="EUR",
-        max_items=5
+        news_connector=mock_connector,
+        query="EUR"
     )
 
     assert result["data_type"] == "news"
@@ -83,7 +82,7 @@ async def test_collect_fred_data():
 
     result = await collect_market_data(
         data_type="fred",
-        connector=mock_connector,
+        fred_connector=mock_connector,
         series_id="DFF"
     )
 
@@ -110,7 +109,7 @@ async def test_collect_rag_data():
 
     result = await collect_market_data(
         data_type="rag",
-        connector=mock_connector,
+        rag_connector=mock_connector,
         query="How does Fed policy affect FX markets?"
     )
 
