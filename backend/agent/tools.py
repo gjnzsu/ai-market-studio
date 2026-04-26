@@ -421,6 +421,8 @@ async def dispatch_tool(
     tool_args: dict[str, Any],
     connector: MarketDataConnector,
     news_connector: Optional[NewsConnectorBase] = None,
+    fred_connector = None,
+    rag_connector = None,
 ) -> Any:
     """Execute a tool call and return the result.
 
@@ -540,13 +542,13 @@ async def dispatch_tool(
         rag = RAGConnector()
         return await rag.query_research(tool_args.get("question"))
     elif tool_name == "get_interest_rate":
-        from backend.connectors.fred_connector import FREDConnector
-        fred = FREDConnector()
+        if fred_connector is None:
+            raise AgentError("FRED connector not available. Please configure FRED_API_KEY.")
         series_id = tool_args.get("series_id")
         date = tool_args.get("date")
         if not series_id:
             raise AgentError("series_id is required for get_interest_rate")
-        result = await fred.get_current_rate(series_id=series_id, date=date)
+        result = await fred_connector.get_current_rate(series_id=series_id, date=date)
         return result.model_dump()
     elif tool_name == "analyze_fx_economic_correlation":
         from backend.connectors.correlation_connector import CorrelationConnector
@@ -586,8 +588,8 @@ async def dispatch_tool(
             query=tool_args.get("query"),
             connector=connector,
             news_connector=news_connector,
-            fred_connector=None,  # Will be created inside collect_market_data
-            rag_connector=None    # Will be created inside collect_market_data
+            fred_connector=fred_connector,
+            rag_connector=rag_connector
         )
 
     elif tool_name == "analyze_market_trends":

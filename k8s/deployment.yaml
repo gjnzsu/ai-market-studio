@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: ai-market-studio
-          image: gcr.io/gen-lang-client-0896070179/ai-market-studio:latest
+          image: gcr.io/gen-lang-client-0896070179/ai-market-studio:v2026-04-26-fred-fix
           ports:
             - containerPort: 8000
           envFrom:

@@ -55,7 +55,7 @@ def create_rag_connector():
     """Create RAG connector - will fail gracefully if service is unavailable."""
     from backend.connectors.rag_connector import RAGConnector
     logger.info(f"Initializing RAGConnector (RAG_SERVICE_URL={settings.rag_service_url})")
-    return RAGConnector(base_url=settings.rag_service_url)
+    return RAGConnector(url=settings.rag_service_url)
 
 
 @asynccontextmanager

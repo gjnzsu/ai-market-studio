@@ -99,6 +99,8 @@ async def run_agent(
     connector: Optional[MarketDataConnector] = None,
     client: Optional[AsyncOpenAI] = None,
     news_connector: Optional[NewsConnectorBase] = None,
+    fred_connector = None,
+    rag_connector = None,
 ) -> dict:
     """Run the GPT-4o function-calling agent loop.
 
@@ -172,7 +174,7 @@ async def run_agent(
                         logger.info("Tool call: %s args=%s", tool_name, tool_args)
 
                         try:
-                            result = await dispatch_tool(tool_name, tool_args, connector, news_connector)
+                            result = await dispatch_tool(tool_name, tool_args, connector, news_connector, fred_connector, rag_connector)
                             last_tool_used = tool_name
                             last_tool_data = result
                             # For structured UI payloads, send GPT-4o a compact summary
@@ -227,7 +229,7 @@ async def run_agent(
                     logger.info("Tool call: %s args=%s", tool_name, tool_args)
 
                     try:
-                        result = await dispatch_tool(tool_name, tool_args, connector, news_connector)
+                        result = await dispatch_tool(tool_name, tool_args, connector, news_connector, fred_connector, rag_connector)
                         last_tool_used = tool_name
                         last_tool_data = result
                         # For structured UI payloads, send GPT-4o a compact summary
