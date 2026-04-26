@@ -14,7 +14,7 @@ async def test_synthesize_multi_source():
         },
         "news": {
             "data": [
-                {"title": "EUR strengthens", "sentiment": "positive"}
+                {"title": "EUR strengthens", "url": "http://example.com/1"}
             ]
         },
         "fred": {
@@ -86,7 +86,7 @@ async def test_synthesize_max_sources_limit():
     """Test that max_sources parameter limits insights."""
     sources = {
         "rates": {"data": [{"date": "2026-04-01", "rate": 1.0800}, {"date": "2026-04-26", "rate": 1.0850}]},
-        "news": {"data": [{"title": "EUR strengthens", "sentiment": "positive"}]},
+        "news": {"data": [{"title": "EUR strengthens", "url": "http://example.com/1"}]},
         "fred": {"data": {"series_id": "DFF", "value": 3.64}},
         "rag": {"data": {"answer": "Market analysis shows positive trends."}}
     }
@@ -125,32 +125,30 @@ async def test_synthesize_malformed_rates_data():
 
 
 @pytest.mark.asyncio
-async def test_synthesize_news_sentiment_analysis():
-    """Test news sentiment analysis with different ratios."""
-    # Test positive sentiment
-    sources_positive = {
+async def test_synthesize_news_coverage():
+    """Test news coverage counting."""
+    # Test with multiple articles
+    sources_multiple = {
         "news": {
             "data": [
-                {"title": "Good news 1", "sentiment": "positive"},
-                {"title": "Good news 2", "sentiment": "positive"},
-                {"title": "Bad news", "sentiment": "negative"}
+                {"title": "Article 1", "url": "http://example.com/1"},
+                {"title": "Article 2", "url": "http://example.com/2"},
+                {"title": "Article 3", "url": "http://example.com/3"}
             ]
         }
     }
 
-    result = await synthesize_research(sources=sources_positive)
-    assert "positive" in result["key_insights"][0]
+    result = await synthesize_research(sources=sources_multiple)
+    assert "News coverage: 3 recent articles" in result["key_insights"][0]
 
-    # Test negative sentiment
-    sources_negative = {
+    # Test with single article
+    sources_single = {
         "news": {
             "data": [
-                {"title": "Bad news 1", "sentiment": "negative"},
-                {"title": "Bad news 2", "sentiment": "negative"},
-                {"title": "Good news", "sentiment": "positive"}
+                {"title": "Single article", "url": "http://example.com/1"}
             ]
         }
     }
 
-    result = await synthesize_research(sources=sources_negative)
-    assert "negative" in result["key_insights"][0]
+    result = await synthesize_research(sources=sources_single)
+    assert "News coverage: 1 recent articles" in result["key_insights"][0]

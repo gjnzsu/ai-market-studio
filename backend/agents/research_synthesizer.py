@@ -106,7 +106,14 @@ async def synthesize_research(
 
 
 def _analyze_rates_source(rates_data: Dict[str, Any]) -> Optional[str]:
-    """Extract insight from rates data."""
+    """Extract insight from rates data.
+
+    Args:
+        rates_data: Dictionary containing rates data with 'data' key
+
+    Returns:
+        Insight string or None if data is insufficient
+    """
     try:
         data = rates_data.get("data", [])
         if not data:
@@ -135,41 +142,44 @@ def _analyze_rates_source(rates_data: Dict[str, Any]) -> Optional[str]:
         else:
             return f"Exchange rate down {change_pct:.2f}% to {last_rate:.4f}"
 
-    except (KeyError, TypeError, ZeroDivisionError) as e:
+    except Exception as e:
         logger.warning(f"Error analyzing rates source: {e}")
         return None
 
 
 def _analyze_news_source(news_data: Dict[str, Any]) -> Optional[str]:
-    """Extract insight from news data."""
+    """Extract insight from news data.
+
+    Args:
+        news_data: Dictionary containing news data with 'data' key
+
+    Returns:
+        Insight string with article count or None if no data
+    """
     try:
         data = news_data.get("data", [])
         if not data:
             return None
 
-        # Simple sentiment analysis based on titles
-        positive_count = sum(1 for item in data if "sentiment" in item and item["sentiment"] == "positive")
+        # Simply count articles - no sentiment analysis
         total_count = len(data)
+        return f"News coverage: {total_count} recent articles"
 
-        if total_count == 0:
-            return None
-
-        sentiment_pct = (positive_count / total_count) * 100
-
-        if sentiment_pct > 60:
-            return f"News sentiment: {sentiment_pct:.0f}% positive ({total_count} articles)"
-        elif sentiment_pct < 40:
-            return f"News sentiment: {100-sentiment_pct:.0f}% negative ({total_count} articles)"
-        else:
-            return f"News sentiment: mixed ({total_count} articles)"
-
-    except (KeyError, TypeError, ZeroDivisionError) as e:
+    except Exception as e:
         logger.warning(f"Error analyzing news source: {e}")
         return None
 
 
 def _analyze_fred_source(fred_data: Dict[str, Any], focus: Optional[str]) -> Optional[str]:
-    """Extract insight from FRED data."""
+    """Extract insight from FRED data.
+
+    Args:
+        fred_data: Dictionary containing FRED data with 'data' key
+        focus: Optional focus area to customize output
+
+    Returns:
+        Insight string or None if data is invalid
+    """
     try:
         data = fred_data.get("data", {})
 
@@ -184,13 +194,20 @@ def _analyze_fred_source(fred_data: Dict[str, Any], focus: Optional[str]) -> Opt
 
         return None
 
-    except (KeyError, TypeError) as e:
+    except Exception as e:
         logger.warning(f"Error analyzing FRED source: {e}")
         return None
 
 
 def _analyze_rag_source(rag_data: Dict[str, Any]) -> Optional[str]:
-    """Extract insight from RAG data."""
+    """Extract insight from RAG data.
+
+    Args:
+        rag_data: Dictionary containing RAG data with 'data' key
+
+    Returns:
+        Insight string (truncated if needed) or None if no answer
+    """
     try:
         data = rag_data.get("data", {})
 
@@ -203,13 +220,21 @@ def _analyze_rag_source(rag_data: Dict[str, Any]) -> Optional[str]:
 
         return None
 
-    except (KeyError, TypeError) as e:
+    except Exception as e:
         logger.warning(f"Error analyzing RAG source: {e}")
         return None
 
 
 def _generate_synthesis_narrative(insights: List[str], focus: Optional[str]) -> str:
-    """Generate coherent narrative from insights."""
+    """Generate coherent narrative from insights.
+
+    Args:
+        insights: List of insight strings from various sources
+        focus: Optional focus area to prepend to narrative
+
+    Returns:
+        Synthesized narrative string
+    """
     if not insights:
         return "Insufficient data for synthesis"
 
@@ -230,7 +255,15 @@ def _generate_synthesis_narrative(insights: List[str], focus: Optional[str]) -> 
 
 
 def _calculate_confidence(sources_used: List[Dict[str, Any]], insights: List[str]) -> float:
-    """Calculate confidence score based on sources and insights."""
+    """Calculate confidence score based on sources and insights.
+
+    Args:
+        sources_used: List of source metadata dictionaries
+        insights: List of insight strings generated
+
+    Returns:
+        Confidence score between 0.0 and 1.0
+    """
     if not sources_used or not insights:
         return 0.0
 
