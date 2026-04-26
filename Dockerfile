@@ -1,18 +1,9 @@
-# ── Stage 1: Builder (all deps) ───────────────────────────────────────────────
-# BuildKit registry cache: pip packages persist in GCR as image layers,
-# so subsequent builds restore them without re-downloading from PyPI.
-FROM python:3.12-slim AS builder
-
-WORKDIR /app
-
-COPY backend/requirements.txt backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
-
-# ── Stage 2: Production (runtime deps only) ───────────────────────────────────
+# ── Production Image ──────────────────────────────────────────────────────────
 FROM python:3.12-slim
 
 WORKDIR /app
 
+# Install runtime dependencies
 COPY backend/runtime.txt backend/runtime.txt
 RUN pip install --no-cache-dir -r backend/runtime.txt
 
