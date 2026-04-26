@@ -42,12 +42,17 @@ def create_news_connector():
 
 
 def create_fred_connector():
+    """Create FRED connector if API key is available."""
+    if not settings.fred_api_key:
+        logger.warning("FRED_API_KEY not set, FRED connector will be unavailable")
+        return None
     from backend.connectors.fred_connector import FREDConnector
     logger.info("Initializing FREDConnector")
     return FREDConnector(api_key=settings.fred_api_key.get_secret_value())
 
 
 def create_rag_connector():
+    """Create RAG connector - will fail gracefully if service is unavailable."""
     from backend.connectors.rag_connector import RAGConnector
     logger.info(f"Initializing RAGConnector (RAG_SERVICE_URL={settings.rag_service_url})")
     return RAGConnector(base_url=settings.rag_service_url)
