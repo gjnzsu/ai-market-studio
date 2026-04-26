@@ -25,6 +25,8 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     """Accept a user message and return an AI-generated reply with FX data."""
     connector = request.app.state.connector
     news_connector = getattr(request.app.state, 'news_connector', None)
+    fred_connector = getattr(request.app.state, 'fred_connector', None)
+    rag_connector = getattr(request.app.state, 'rag_connector', None)
     history = [m.model_dump() for m in body.history]
 
     try:
@@ -33,6 +35,8 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
             history=history,
             connector=connector,
             news_connector=news_connector,
+            fred_connector=fred_connector,
+            rag_connector=rag_connector,
         )
     except ConnectorError as e:
         logger.error("Connector error in /chat: %s", e)

@@ -41,6 +41,18 @@ def create_news_connector():
         return RSSNewsConnector()
 
 
+def create_fred_connector():
+    from backend.connectors.fred_connector import FREDConnector
+    logger.info("Initializing FREDConnector")
+    return FREDConnector(api_key=settings.fred_api_key.get_secret_value())
+
+
+def create_rag_connector():
+    from backend.connectors.rag_connector import RAGConnector
+    logger.info(f"Initializing RAGConnector (RAG_SERVICE_URL={settings.rag_service_url})")
+    return RAGConnector(base_url=settings.rag_service_url)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize connectors
@@ -48,6 +60,10 @@ async def lifespan(app: FastAPI):
         app.state.connector = create_connector()
     if not getattr(app.state, 'news_connector', None):
         app.state.news_connector = create_news_connector()
+    if not getattr(app.state, 'fred_connector', None):
+        app.state.fred_connector = create_fred_connector()
+    if not getattr(app.state, 'rag_connector', None):
+        app.state.rag_connector = create_rag_connector()
 
     # Initialize observability - temporarily disabled for Cloud Build
     # observability_url = os.getenv(
