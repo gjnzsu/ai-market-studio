@@ -277,6 +277,134 @@ TOOL_DEFINITIONS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "collect_market_data",
+            "description": (
+                "Fetch market data from various sources (FX rates, news, FRED economic indicators, research documents). "
+                "Can be called multiple times in parallel for different data types."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data_type": {
+                        "type": "string",
+                        "enum": ["rates", "news", "fred", "rag"],
+                        "description": "Type of data to collect"
+                    },
+                    "pairs": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Currency pairs (e.g., ['EUR/USD', 'GBP/USD'])"
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Number of days of historical data"
+                    },
+                    "series_id": {
+                        "type": "string",
+                        "description": "FRED series ID (e.g., 'DFF', 'DGS10')"
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Search query for news or RAG"
+                    }
+                },
+                "required": ["data_type"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_market_trends",
+            "description": (
+                "Analyze FX market data for trends, volatility, correlations, and trading signals. "
+                "Use after collecting data to perform technical/statistical analysis."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "description": "Market data from Data Collector"
+                    },
+                    "analysis_type": {
+                        "type": "string",
+                        "enum": ["trend", "volatility", "correlation", "signal"],
+                        "description": "Type of analysis to perform"
+                    },
+                    "context": {
+                        "type": "object",
+                        "description": "Additional context (news, economic indicators)"
+                    }
+                },
+                "required": ["data"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_report",
+            "description": (
+                "Generate formatted reports, dashboards, or summaries from market data and analysis. "
+                "Use when user requests formatted output."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "description": "Market data to include in report"
+                    },
+                    "analysis": {
+                        "type": "object",
+                        "description": "Analysis results to include"
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": ["pdf", "dashboard", "summary"],
+                        "description": "Output format"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Report title"
+                    }
+                },
+                "required": ["data", "format"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "synthesize_research",
+            "description": (
+                "Combine multi-source market intelligence (rates, news, economic data, research) into coherent insights. "
+                "Use when user asks for comprehensive insights across sources."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sources": {
+                        "type": "object",
+                        "description": "Data from multiple sources (rates, news, fred, rag)"
+                    },
+                    "focus": {
+                        "type": "string",
+                        "description": "Aspect to emphasize (e.g., 'interest rates', 'technical analysis')"
+                    },
+                    "max_sources": {
+                        "type": "integer",
+                        "description": "Maximum number of sources to include"
+                    }
+                },
+                "required": ["sources"]
+            }
+        }
+    },
 ]
 
 
@@ -448,5 +576,43 @@ async def dispatch_tool(
             "type": "economic_correlation",
             "data": result
         }
+    elif tool_name == "collect_market_data":
+        from backend.agents import collect_market_data
+        return await collect_market_data(
+            data_type=tool_args["data_type"],
+            pairs=tool_args.get("pairs"),
+            days=tool_args.get("days"),
+            series_id=tool_args.get("series_id"),
+            query=tool_args.get("query"),
+            connector=connector,
+            news_connector=news_connector,
+            fred_connector=None,  # Will be created inside collect_market_data
+            rag_connector=None    # Will be created inside collect_market_data
+        )
+
+    elif tool_name == "analyze_market_trends":
+        from backend.agents import analyze_market_trends
+        return await analyze_market_trends(
+            data=tool_args["data"],
+            analysis_type=tool_args.get("analysis_type", "trend"),
+            context=tool_args.get("context")
+        )
+
+    elif tool_name == "generate_report":
+        from backend.agents import generate_report
+        return await generate_report(
+            data=tool_args["data"],
+            analysis=tool_args.get("analysis"),
+            format=tool_args["format"],
+            title=tool_args.get("title")
+        )
+
+    elif tool_name == "synthesize_research":
+        from backend.agents import synthesize_research
+        return await synthesize_research(
+            sources=tool_args["sources"],
+            focus=tool_args.get("focus"),
+            max_sources=tool_args.get("max_sources", 10)
+        )
     else:
         raise AgentError(f"Unknown tool: {tool_name}")
