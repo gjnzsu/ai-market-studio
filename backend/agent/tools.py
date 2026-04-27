@@ -328,7 +328,7 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "data": {
                         "type": "object",
-                        "description": "Market data from Data Collector"
+                        "description": "Market data from Data Collector. Leave empty to use previously collected data."
                     },
                     "analysis_type": {
                         "type": "string",
@@ -340,7 +340,7 @@ TOOL_DEFINITIONS = [
                         "description": "Additional context (news, economic indicators)"
                     }
                 },
-                "required": ["data"]
+                "required": []
             }
         }
     },
@@ -595,7 +595,7 @@ async def dispatch_tool(
     elif tool_name == "analyze_market_trends":
         from backend.agents import analyze_market_trends
         return await analyze_market_trends(
-            data=tool_args["data"],
+            data=tool_args.get("data", {}),
             analysis_type=tool_args.get("analysis_type", "trend"),
             context=tool_args.get("context")
         )
