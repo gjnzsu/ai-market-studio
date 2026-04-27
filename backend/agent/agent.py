@@ -57,8 +57,10 @@ Example: For "market insight on EUR/USD", call in the same round:
 When one agent depends on another's output, call them sequentially.
 Example: For "market insight on EUR/USD", call:
 1. collect_market_data (parallel calls for rates, news, FRED, RAG)
-2. synthesize_research(sources=[<all_collected_data>])
+2. synthesize_research(sources={"rates": <rates_data>, "news": <news_data>, "fred": <fred_data>, "rag": <rag_data>})
 3. Return the synthesis result to user
+
+IMPORTANT: When calling synthesize_research, you MUST pass the sources parameter as an object containing all collected data.
 
 **Legacy Tools (still available):**
 You also have access to legacy tools (get_exchange_rate, get_fx_news, etc.) for backward compatibility.
