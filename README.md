@@ -860,9 +860,11 @@ ai-market-studio/ (Backend API)
 | P1 - Done | Market Intelligence | Market insight summary (Feature 07) and market news (Feature 03) | ✅ Complete |
 | P2 - Done | Output Generation | PDF report generation via Export to PDF button, email delivery pending | ✅ Complete |
 | P3 - Done | Intelligence & Economic Data | RAG research integration (Feature 05), FRED interest rates (Feature 08), economic indicator queries | ✅ Complete |
-| P4 - Done | Data Breadth & Observability | Direct FRED connector, AI Gateway service (OpenAI + DeepSeek), AI SRE Observability (LLM cost tracking), Multi-Agent Orchestration (Feature 11) | ✅ Complete |
-| P5 - Planned | Platform & Simulation | Custom agent creation, OCR/document ingestion for scanned PDFs, paper-trading simulation | 🔄 Planned |
+| P4 - Done | Data Breadth & Observability | Direct FRED connector, AI Gateway service (OpenAI + DeepSeek), AI SRE Observability (LLM cost tracking) | ✅ Complete |
+| P5 - Planned | Platform & Simulation | Custom agent creation (user-facing), OCR/document ingestion for scanned PDFs, paper-trading simulation | 🔄 Planned |
 | P6 - Planned | Execution & Risk | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls | 🔄 Planned |
+
+**Note:** Multi-agent orchestration (Feature 11) is an internal architecture improvement, not a user-facing feature. Custom agent creation (P5) will allow users to create their own specialized agents.
 
 ### Completed in P3/P4 (Phase 2026-04-12)
 
@@ -907,15 +909,12 @@ ai-market-studio/ (Backend API)
 - Average cost per query: ~$0.0072 USD (based on gpt-4o usage patterns)
 - Regression tests: 5 E2E tests with 97% coverage
 
-✅ **P4 - Multi-Agent Orchestration** (2026-04-26)
+✅ **Internal: Multi-Agent Architecture** (2026-04-26)
 - Orchestrator pattern: Main GPT-4o agent coordinates 4 specialized sub-agents
 - Sub-agents: Data Collector, Market Analyst, Report Generator, Research Synthesizer
-- Parallel execution: Independent data fetches run simultaneously
-- Sequential execution: Dependent operations (collect → analyze → report) run in order
 - Performance optimizations: MAX_TOOL_ROUNDS=3, 20s timeout, 2x CPU/memory
-- Backward compatible: Legacy tools still available
-- Architecture: Tool-based dispatch (no separate processes)
-- Deployed: `ai-market-studio:v2026-04-27-obs-fix`
+- Note: This is internal architecture, not a user-facing feature
+- User-facing custom agent creation planned for P5
 
 ✅ **P4 - FRED Integration** (ai-gateway-service, 2026-04-11)
 - Unified OpenAI-compatible API gateway (LiteLLM)
