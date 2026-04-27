@@ -373,7 +373,7 @@ TOOL_DEFINITIONS = [
                         "description": "Report title"
                     }
                 },
-                "required": ["data", "format"]
+                "required": []
             }
         }
     },
@@ -603,9 +603,9 @@ async def dispatch_tool(
     elif tool_name == "generate_report":
         from backend.agents import generate_report
         return await generate_report(
-            data=tool_args["data"],
+            data=tool_args.get("data", {}),
             analysis=tool_args.get("analysis"),
-            format=tool_args["format"],
+            format=tool_args.get("format", "summary"),
             title=tool_args.get("title")
         )
 
