@@ -201,7 +201,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ### Feature 10 - AI SRE Observability (2026-04-23)
 - **Real-time LLM Cost Tracking**: Automatic tracking of token usage and costs for every user query
-- **Prometheus Metrics**: Exposes `llm_requests_total`, `llm_tokens_total`, `llm_cost_usd_total` metrics
+- **Prometheus Metrics**: Exposes `llm_requests_total`, `llm_tokens_total`, `llm_token_cost_usd_total` metrics
 - **Grafana Dashboards**: Pre-built dashboards for LLM Cost & Usage, Service Overview, and Request Tracing
 - **Token Accumulation**: Tracks prompt + completion tokens across multi-round agent conversations
 - **Cost Calculation**: Automatic cost calculation based on model pricing (gpt-4o: $5/$15 per 1M tokens)
@@ -212,6 +212,22 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Metrics Endpoint**: `http://ai-sre-observability:8080/metrics` (Prometheus scrape target)
 - **Grafana URL**: http://136.114.77.0 (external access for dashboards)
 - **Average Cost per Query**: ~$0.0072 USD (based on gpt-4o usage patterns)
+- **Regression Tests**: 5 E2E tests in `backend/tests/e2e/test_observability.py` (97% coverage)
+
+### Feature 11 - Multi-Agent Orchestration (2026-04-26)
+- **Orchestrator Pattern**: Main GPT-4o agent coordinates 4 specialized sub-agents for complex workflows
+- **Sub-Agents**:
+  - **Data Collector** (`collect_market_data`) - Fetches raw data from FX, news, FRED, and RAG sources
+  - **Market Analyst** (`analyze_market_trends`) - Performs trend, volatility, correlation, and signal analysis
+  - **Report Generator** (`generate_report`) - Creates PDFs, dashboards, and summaries
+  - **Research Synthesizer** (`synthesize_research`) - Combines multi-source intelligence into coherent insights
+- **Parallel Execution**: Independent data fetches run in parallel (rates + news + FRED simultaneously)
+- **Sequential Execution**: Dependent operations run sequentially (collect data → analyze → report)
+- **Performance Optimization**: MAX_TOOL_ROUNDS reduced from 5 to 3, 20s request timeout
+- **Resource Allocation**: Backend scaled to 1000m CPU, 1Gi memory for multi-round LLM calls
+- **Backward Compatibility**: Legacy tools (`get_exchange_rate`, `get_fx_news`, etc.) still available
+- **Architecture**: Single orchestrator with tool-based sub-agent dispatch (no separate processes)
+- **Testing**: Sub-agent imports verified in `backend/tests/unit/test_agents_imports.py`
 
 ---
 
@@ -844,7 +860,7 @@ ai-market-studio/ (Backend API)
 | P1 - Done | Market Intelligence | Market insight summary (Feature 07) and market news (Feature 03) | ✅ Complete |
 | P2 - Done | Output Generation | PDF report generation via Export to PDF button, email delivery pending | ✅ Complete |
 | P3 - Done | Intelligence & Economic Data | RAG research integration (Feature 05), FRED interest rates (Feature 08), economic indicator queries | ✅ Complete |
-| P4 - Done | Data Breadth & Observability | Direct FRED connector, AI Gateway service (OpenAI + DeepSeek), AI SRE Observability (LLM cost tracking) | ✅ Complete |
+| P4 - Done | Data Breadth & Observability | Direct FRED connector, AI Gateway service (OpenAI + DeepSeek), AI SRE Observability (LLM cost tracking), Multi-Agent Orchestration (Feature 11) | ✅ Complete |
 | P5 - Planned | Platform & Simulation | Custom agent creation, OCR/document ingestion for scanned PDFs, paper-trading simulation | 🔄 Planned |
 | P6 - Planned | Execution & Risk | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls | 🔄 Planned |
 
@@ -880,7 +896,7 @@ ai-market-studio/ (Backend API)
 - Real-time LLM cost tracking via observability SDK
 - Automatic token usage monitoring (prompt + completion tokens)
 - Cost calculation: gpt-4o pricing ($5/$15 per 1M tokens)
-- Prometheus metrics: `llm_requests_total`, `llm_tokens_total`, `llm_cost_usd_total`
+- Prometheus metrics: `llm_requests_total`, `llm_tokens_total`, `llm_token_cost_usd_total`
 - Grafana dashboards: LLM Cost & Usage, Service Overview, Request Tracing
 - Performance: <10ms overhead, non-blocking async metrics submission
 - Graceful degradation: continues working if observability service unavailable
@@ -889,6 +905,17 @@ ai-market-studio/ (Backend API)
 - Prometheus scraping: 15-second intervals from observability service
 - Verified working: Metrics flowing to Prometheus, dashboards rendering in Grafana
 - Average cost per query: ~$0.0072 USD (based on gpt-4o usage patterns)
+- Regression tests: 5 E2E tests with 97% coverage
+
+✅ **P4 - Multi-Agent Orchestration** (2026-04-26)
+- Orchestrator pattern: Main GPT-4o agent coordinates 4 specialized sub-agents
+- Sub-agents: Data Collector, Market Analyst, Report Generator, Research Synthesizer
+- Parallel execution: Independent data fetches run simultaneously
+- Sequential execution: Dependent operations (collect → analyze → report) run in order
+- Performance optimizations: MAX_TOOL_ROUNDS=3, 20s timeout, 2x CPU/memory
+- Backward compatible: Legacy tools still available
+- Architecture: Tool-based dispatch (no separate processes)
+- Deployed: `ai-market-studio:v2026-04-27-obs-fix`
 
 ✅ **P4 - FRED Integration** (ai-gateway-service, 2026-04-11)
 - Unified OpenAI-compatible API gateway (LiteLLM)
