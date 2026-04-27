@@ -7,8 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import settings
 from backend.router import router
-# Temporarily disabled for Cloud Build deployment
-# from ai_sre_observability import setup_observability
+from ai_sre_observability import setup_observability
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,23 +69,23 @@ async def lifespan(app: FastAPI):
     if not getattr(app.state, 'rag_connector', None):
         app.state.rag_connector = create_rag_connector()
 
-    # Initialize observability - temporarily disabled for Cloud Build
-    # observability_url = os.getenv(
-    #     "OBSERVABILITY_URL",
-    #     "http://ai-sre-observability.default.svc.cluster.local:8080"
-    # )
-    #
-    # try:
-    #     setup_observability(
-    #         service_name="ai-market-studio",
-    #         observability_url=observability_url,
-    #         batch_interval=5.0,
-    #         timeout=5.0
-    #     )
-    #     logger.info(f"Observability initialized: {observability_url}")
-    # except Exception as e:
-    #     logger.warning(f"Failed to initialize observability: {e}")
-    #     # Continue without observability - graceful degradation
+    # Initialize observability
+    observability_url = os.getenv(
+        "OBSERVABILITY_URL",
+        "http://ai-sre-observability.default.svc.cluster.local:8080"
+    )
+
+    try:
+        setup_observability(
+            service_name="ai-market-studio",
+            observability_url=observability_url,
+            batch_interval=5.0,
+            timeout=5.0
+        )
+        logger.info(f"Observability initialized: {observability_url}")
+    except Exception as e:
+        logger.warning(f"Failed to initialize observability: {e}")
+        # Continue without observability - graceful degradation
 
     logger.info("AI Market Studio started.")
     yield

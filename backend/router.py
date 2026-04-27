@@ -23,6 +23,8 @@ router = APIRouter()
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     """Accept a user message and return an AI-generated reply with FX data."""
+    import asyncio
+
     connector = request.app.state.connector
     news_connector = getattr(request.app.state, 'news_connector', None)
     fred_connector = getattr(request.app.state, 'fred_connector', None)
@@ -30,14 +32,20 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     history = [m.model_dump() for m in body.history]
 
     try:
-        result = await run_agent(
-            message=body.message,
-            history=history,
-            connector=connector,
-            news_connector=news_connector,
-            fred_connector=fred_connector,
-            rag_connector=rag_connector,
+        result = await asyncio.wait_for(
+            run_agent(
+                message=body.message,
+                history=history,
+                connector=connector,
+                news_connector=news_connector,
+                fred_connector=fred_connector,
+                rag_connector=rag_connector,
+            ),
+            timeout=20.0  # 20 second timeout to prevent hanging
         )
+    except asyncio.TimeoutError:
+        logger.error("Request timeout after 20s for message: %s", body.message)
+        raise HTTPException(status_code=504, detail="Request timeout - query too complex. Please simplify your question.")
     except ConnectorError as e:
         logger.error("Connector error in /chat: %s", e)
         raise HTTPException(status_code=503, detail="Market data service unavailable.")

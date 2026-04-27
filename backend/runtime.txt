@@ -8,3 +8,4 @@ pydantic-settings==2.5.2
 reportlab>=4.0.0
 pypdf>=4.0.0
 feedparser>=6.0
+git+https://github.com/gjnzsu/ai-sre-observability.git#subdirectory=sdk

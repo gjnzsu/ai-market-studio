@@ -9,7 +9,13 @@ Sub-agents:
 """
 
 from backend.agents.data_collector import collect_market_data
+from backend.agents.market_analyst import analyze_market_trends
+from backend.agents.report_generator import generate_report
+from backend.agents.research_synthesizer import synthesize_research
 
 __all__ = [
     "collect_market_data",
+    "analyze_market_trends",
+    "generate_report",
+    "synthesize_research",
 ]

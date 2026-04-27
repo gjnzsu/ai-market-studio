@@ -3,6 +3,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Install git (required for pip install from GitHub)
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+
 # Install runtime dependencies
 COPY backend/runtime.txt backend/runtime.txt
 RUN pip install --no-cache-dir -r backend/runtime.txt

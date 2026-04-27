@@ -9,8 +9,7 @@ from backend.config import settings
 from backend.connectors.base import MarketDataConnector, ConnectorError
 from backend.connectors.news_connector import NewsConnectorBase
 from backend.agent.tools import TOOL_DEFINITIONS, dispatch_tool, AgentError
-# Temporarily disabled for Cloud Build deployment
-# from ai_sre_observability import get_client
+from ai_sre_observability import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +67,7 @@ Prefer using the new sub-agent tools for better organization and parallel execut
 Be concise, accurate, and helpful. Always cite your data sources.
 """
 
-MAX_TOOL_ROUNDS = 5
+MAX_TOOL_ROUNDS = 3  # Reduced from 5 to prevent long sequential chains
 
 
 def _summarise_tool_result(result: dict) -> dict:
@@ -131,13 +130,12 @@ async def run_agent(
     last_tool_used: Optional[str] = None
     last_tool_data = None
 
-    # Get observability client (graceful degradation) - temporarily disabled
-    obs = None
-    # try:
-    #     obs = get_client()
-    # except RuntimeError:
-    #     obs = None
-    #     logger.warning("Observability not initialized, skipping metrics")
+    # Get observability client (graceful degradation)
+    try:
+        obs = get_client()
+    except RuntimeError:
+        obs = None
+        logger.warning("Observability not initialized, skipping metrics")
 
     # Track token accumulation across all LLM calls
     total_prompt_tokens = 0
