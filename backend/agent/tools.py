@@ -390,7 +390,7 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "sources": {
                         "type": "object",
-                        "description": "Data from multiple sources (rates, news, fred, rag)"
+                        "description": "Data from multiple sources (rates, news, fred, rag). Leave empty to use previously collected data."
                     },
                     "focus": {
                         "type": "string",
@@ -401,7 +401,7 @@ TOOL_DEFINITIONS = [
                         "description": "Maximum number of sources to include"
                     }
                 },
-                "required": ["sources"]
+                "required": []
             }
         }
     },
@@ -612,7 +612,7 @@ async def dispatch_tool(
     elif tool_name == "synthesize_research":
         from backend.agents import synthesize_research
         return await synthesize_research(
-            sources=tool_args["sources"],
+            sources=tool_args.get("sources", {}),
             focus=tool_args.get("focus"),
             max_sources=tool_args.get("max_sources", 10)
         )
