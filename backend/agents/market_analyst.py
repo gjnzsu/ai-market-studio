@@ -1,5 +1,8 @@
 from typing import Any, Dict, Optional, Literal, List
 import statistics
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 async def analyze_market_trends(
