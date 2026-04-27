@@ -38,7 +38,13 @@ async def _analyze_trend(
     rates_data = data.get("data", [])
 
     if not rates_data:
-        raise ValueError("No rate data provided")
+        logger.warning("No rate data provided, returning placeholder")
+        return {
+            "type": "analysis",
+            "analysis_type": "trend",
+            "result": "No data available for trend analysis.",
+            "metadata": {"status": "empty"}
+        }
 
     # Extract rates
     rates = [item["rate"] for item in rates_data if "rate" in item]
