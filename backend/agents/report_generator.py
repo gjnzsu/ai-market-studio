@@ -46,8 +46,17 @@ async def generate_report(
     logger.info(f"Generating {format} report with title: {title}")
 
     if not data:
-        logger.error("Cannot generate report: data is empty")
-        raise ValueError("data parameter cannot be empty")
+        logger.warning("Report data is empty, returning placeholder")
+        return {
+            "type": "report",
+            "format": format,
+            "title": title or DEFAULT_TITLES.get(format, "Report"),
+            "content": "No data available for report generation.",
+            "metadata": {
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "status": "empty"
+            }
+        }
 
     try:
         if format == "pdf":
