@@ -7,7 +7,7 @@ pydantic==2.9.2
 pydantic-settings==2.5.2
 reportlab>=4.0.0
 pypdf>=4.0.0
-ai-sre-observability-sdk @ file:///c:/SourceCode/ai-sre-observability/sdk
+git+https://github.com/gjnzsu/ai-sre-observability.git@main#subdirectory=sdk
 
 # Test dependencies
 pytest==8.3.3
