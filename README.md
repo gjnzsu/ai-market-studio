@@ -4,11 +4,15 @@ Backend API for the AI Market Studio conversational FX market data platform.
 
 ## Architecture
 
+![Architecture Diagram](docs/architecture-diagram.png)
+
 This repository is part of a **microservices architecture** that was split from a monolithic application for better scalability and independent deployment:
 
 - **Backend API**: This repository (FastAPI) - Port 8000
 - **Frontend UI**: [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) (Static HTML/JS) - Port 80
 - **RAG Service**: [ai-rag-service](https://github.com/gjnzsu/ai-rag-service) (Research document query) - Port 8000
+- **AI Gateway**: [ai-gateway-service](https://github.com/gjnzsu/ai-gateway-service) (LiteLLM proxy) - Internal service
+- **AI SRE Observability**: [ai-sre-observability](https://github.com/gjnzsu/ai-sre-observability) (Prometheus + Grafana) - Metrics collection
 
 ### Why Microservices?
 
