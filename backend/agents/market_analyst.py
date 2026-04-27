@@ -50,7 +50,12 @@ async def _analyze_trend(
     rates = [item["rate"] for item in rates_data if "rate" in item]
 
     if len(rates) < 2:
-        raise ValueError("Need at least 2 data points for trend analysis")
+        return {
+            "type": "analysis",
+            "analysis_type": "trend",
+            "result": "Need at least 2 data points for trend analysis.",
+            "metadata": {"status": "insufficient_data"}
+        }
 
     # Calculate trend direction
     first_rate = rates[0]
@@ -111,7 +116,12 @@ async def _analyze_volatility(
     rates = [item["rate"] for item in rates_data if "rate" in item]
 
     if len(rates) < 2:
-        raise ValueError("Need at least 2 data points for volatility analysis")
+        return {
+            "type": "analysis",
+            "analysis_type": "volatility",
+            "result": "Need at least 2 data points for volatility analysis.",
+            "metadata": {"status": "insufficient_data"}
+        }
 
     volatility = statistics.stdev(rates)
     mean_rate = statistics.mean(rates)
