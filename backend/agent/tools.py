@@ -390,7 +390,11 @@ TOOL_DEFINITIONS = [
                 "properties": {
                     "sources": {
                         "type": "object",
-                        "description": "Data from multiple sources (rates, news, fred, rag). Leave empty to use previously collected data."
+                        "description": (
+                            "Data from multiple sources. Pass the full output from collect_market_data calls. "
+                            "Example: {\"rates\": <rates_result>, \"news\": <news_result>, \"fred\": <fred_result>} "
+                            "where each value is the complete dict returned by collect_market_data."
+                        )
                     },
                     "focus": {
                         "type": "string",
@@ -401,7 +405,7 @@ TOOL_DEFINITIONS = [
                         "description": "Maximum number of sources to include"
                     }
                 },
-                "required": []
+                "required": ["sources"]
             }
         }
     },
