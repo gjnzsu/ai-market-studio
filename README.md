@@ -6,7 +6,7 @@ Backend API for the AI Market Studio conversational FX market data platform.
 
 ### Component Diagram
 
-![Component Diagram](docs/ai-market-studio-components.drawio.png)
+![Component Diagram](ai-market-studio-components.drawio.png)
 
 This repository is part of a **microservices architecture** that was split from a monolithic application for better scalability and independent deployment:
 
