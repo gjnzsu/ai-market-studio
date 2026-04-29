@@ -39,7 +39,7 @@ Backend API (this repo) - FastAPI on port 8000
    |
    |-- HTTP (internal) --> AI Gateway Service (LiteLLM proxy)
    |                          |
-   |                          |-- OpenAI (gpt-4o, gpt-4o-mini)
+   |                          |-- OpenAI (gpt-5.4, gpt-4o, gpt-4o-mini)
    |                          `-- DeepSeek (deepseek-chat)
    |
    |-- HTTP (internal) --> AI SRE Observability Service
@@ -101,7 +101,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 | Backend Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio:latest` |
 | Frontend Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio-ui:latest` |
 | LLM Provider | AI Gateway Service (routes to OpenAI/DeepSeek) |
-| LLM Model | `gpt-4o` (configurable: `gpt-4o-mini`, `deepseek-chat`) |
+| LLM Model | `gpt-5.4` (configurable: `gpt-4o`, `gpt-4o-mini`, `deepseek-chat`) |
 | FX Connector | `USE_MOCK_CONNECTOR=true` (set `false` for live exchangerate.host data) |
 | News Connector | `USE_MOCK_NEWS_CONNECTOR=true` (set `false` for live RSS feeds) |
 | RAG Service URL | `http://ai-rag-service:8000` (internal Kubernetes service) |
@@ -111,7 +111,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ### Feature 01 - FX Chat Assistant
 - Natural-language queries: *"What is EUR/USD today?"*, *"Compare USD vs JPY and CHF"*
-- GPT-4o function calling for FX rates, historical rates, dashboards, market news, and internal research
+- GPT-5.4 function calling for FX rates, historical rates, dashboards, market news, and internal research
 - **LLM routing via AI Gateway**: All OpenAI calls route through internal gateway service for centralized key management and multi-provider support
 - Conversation history maintained client-side
 
@@ -123,7 +123,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ### Feature 03 - Market News
 - Ask in natural language: *"What's the latest FX news?"*, *"Any news on EUR/USD?"*
-- GPT-4o calls the `get_fx_news` tool; results render as inline news cards in the chat bubble
+- GPT-5.4 calls the `get_fx_news` tool; results render as inline news cards in the chat bubble
 - Free RSS feeds (BBC Business, Investing.com FX, FXStreet); no paid news API key required
 - Query filtering and item cap; fully decoupled from the rate connector via `USE_MOCK_NEWS_CONNECTOR`
 - Mock news connector used in tests for deterministic output
@@ -138,7 +138,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ### Feature 05 - Research Report RAG Query
 - Ask in natural language: *"Search internal research docs for deployment checklist"*, *"Find internal research about RAG ingestion"*
-- GPT-4o calls the `get_internal_research` tool, which queries the external RAG service configured by `RAG_SERVICE_URL`
+- GPT-5.4 calls the `get_internal_research` tool, which queries the external RAG service configured by `RAG_SERVICE_URL`
 - `RAGConnector` normalizes service responses into `{type: "rag", answer, sources[]}` so the chat UI can render cited source names inline
 - Source names are derived from `title` first, then `document_id`, while preserving source metadata such as `source_type`, `excerpt`, and `score`
 - Research-report/PDF ingestion is handled by the external RAG service; this repo currently provides the query and citation UI layer
@@ -171,7 +171,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ### Feature 07 - Market Insight Summary
 - Ask in natural language: *"Give me a market insight on EUR/USD and GBP/USD"*
-- GPT-4o calls `generate_market_insight` to fetch spot rates and RSS news in one turn
+- GPT-5.4 calls `generate_market_insight` to fetch spot rates and RSS news in one turn
 - Batched API calls: all pairs with a shared target currency are fetched in a single request
 - Renders inline rate chips and news cards inside the chat bubble
 
@@ -179,7 +179,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ### Feature 08 - FRED Interest Rate Queries
 - Ask in natural language: *"What is the current federal funds rate?"*, *"Show me the 10-Year Treasury rate"*, *"30-year mortgage rate"*
-- GPT-4o calls `get_interest_rate` tool to fetch Federal Reserve Economic Data (FRED)
+- GPT-5.4 calls `get_interest_rate` tool to fetch Federal Reserve Economic Data (FRED)
 - Backend directly integrates FRED API via `backend/connectors/fred_connector.py`
 - Common series: DFF (Federal Funds), T10Y2Y (Treasury Spread), DGS10 (10-Year), MORTGAGE30US, DTB3, DGS2, DGS5, T10Y3M
 - Supports both current rates and optional historical date queries
@@ -217,7 +217,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Regression Tests**: 5 E2E tests in `backend/tests/e2e/test_observability.py` (97% coverage)
 
 ### Feature 11 - Multi-Agent Orchestration (2026-04-26)
-- **Orchestrator Pattern**: Main GPT-4o agent coordinates 4 specialized sub-agents for complex workflows
+- **Orchestrator Pattern**: Main GPT-5.4 agent coordinates 4 specialized sub-agents for complex workflows
 - **Sub-Agents**:
   - **Data Collector** (`collect_market_data`) - Fetches raw data from FX, news, FRED, and RAG sources
   - **Market Analyst** (`analyze_market_trends`) - Performs trend, volatility, correlation, and signal analysis
@@ -254,7 +254,7 @@ Backend API (this repo - FastAPI) on port 8000
    v
 AI Gateway Service (LiteLLM) - http://ai-gateway.ai-gateway.svc.cluster.local/v1
    |
-   |-- OpenAI (gpt-4o, gpt-4o-mini)
+   |-- OpenAI (gpt-5.4, gpt-4o, gpt-4o-mini)
    `-- DeepSeek (deepseek-chat)
 
 Backend also connects to:
@@ -287,7 +287,7 @@ Connector Layer
                                  RAG Service (ai-rag-service)
 ```
 
-**GPT-4o tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `get_interest_rate`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`, `get_internal_research`
+**GPT-5.4 tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `get_interest_rate`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`, `get_internal_research`
 
 ---
 
@@ -297,7 +297,7 @@ Connector Layer
 
 **POST** `/api/chat`
 
-Main conversational interface with GPT-4o agent.
+Main conversational interface with GPT-5.4 agent.
 
 **Request:**
 ```json
@@ -433,7 +433,7 @@ Create a `.env` file in the repo root:
 ```env
 OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4o
+OPENAI_MODEL=gpt-5.4
 EXCHANGERATE_API_KEY=your_key_here
 USE_MOCK_CONNECTOR=true
 USE_MOCK_NEWS_CONNECTOR=true
@@ -557,7 +557,7 @@ kubectl get service ai-market-studio -o wide
 |---|---|---|
 | `OPENAI_API_KEY` | required | OpenAI API key (or dummy value if using AI Gateway) |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI API base URL (set to gateway URL in GKE: `http://ai-gateway.ai-gateway.svc.cluster.local/v1`) |
-| `OPENAI_MODEL` | `gpt-4o` | Model used by the agent (options: `gpt-4o`, `gpt-4o-mini`, `deepseek-chat`) |
+| `OPENAI_MODEL` | `gpt-5.4` | Model used by the agent (options: `gpt-5.4`, `gpt-4o`, `gpt-4o-mini`, `deepseek-chat`) |
 | `EXCHANGERATE_API_KEY` | required | exchangerate.host API key |
 | `USE_MOCK_CONNECTOR` | `false` | Use synthetic FX data instead of live exchangerate.host API |
 | `USE_MOCK_NEWS_CONNECTOR` | `false` | Use synthetic news data instead of live RSS feeds |
@@ -606,6 +606,7 @@ Backend (ai-market-studio)
    v
 AI Gateway (ai-gateway.ai-gateway.svc.cluster.local/v1)
    |
+   |-- model=gpt-5.4       --> OpenAI API
    |-- model=gpt-4o       --> OpenAI API
    |-- model=gpt-4o-mini  --> OpenAI API
    `-- model=deepseek-chat --> DeepSeek API
@@ -623,7 +624,7 @@ openai_model: str = "gpt-4o"        # Configurable via ConfigMap
 **Kubernetes ConfigMap** (`k8s/configmap.yaml`):
 ```yaml
 OPENAI_BASE_URL: "http://ai-gateway.ai-gateway.svc.cluster.local/v1"
-OPENAI_MODEL: "gpt-4o"  # Change to gpt-4o-mini or deepseek-chat
+OPENAI_MODEL: "gpt-5.4"  # Change to gpt-4o, gpt-4o-mini, or deepseek-chat
 ```
 
 **Kubernetes Secret** (`k8s/secret.yaml`):
@@ -657,7 +658,8 @@ kubectl rollout status deployment/ai-market-studio
 
 | Model | Provider | Use Case | Cost |
 |-------|----------|----------|------|
-| `gpt-4o` | OpenAI | High-capability general purpose (default) | $$$ |
+| `gpt-5.4` | OpenAI | Latest frontier model with enhanced reasoning and coding (default) | $$$$ |
+| `gpt-4o` | OpenAI | High-capability general purpose | $$$ |
 | `gpt-4o-mini` | OpenAI | Fast, cost-effective tasks | $ |
 | `deepseek-chat` | DeepSeek | Reasoning-heavy workloads, cost savings | $$ |
 
