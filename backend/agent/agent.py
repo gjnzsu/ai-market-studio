@@ -27,7 +27,7 @@ You have access to these tools:
 **Market Data Tools:**
 - get_fx_news: Fetch recent FX and financial news
 - get_interest_rate: Get FRED economic indicators (federal funds rate, treasury rates, etc.)
-- generate_market_insight: Get comprehensive market insight with rates + news for currency pairs
+- generate_market_insight: Get comprehensive market insight with rates, news, AND research reports for currency pairs
 
 **Analysis Tools:**
 - analyze_fx_economic_correlation: Analyze correlation between FX pairs and economic indicators
@@ -36,7 +36,10 @@ You have access to these tools:
 - list_supported_currencies: List all supported currency codes
 
 **When to use generate_market_insight:**
-Use this tool when the user asks for a market overview, briefing, insight, or what's happening with specific currencies. It automatically fetches both rates and news in one call.
+Use this tool when the user asks for a market overview, briefing, insight, or what's happening with specific currencies.
+It automatically fetches rates, news, AND relevant research reports in one call.
+
+When presenting insights, always cite research documents by name (e.g., "According to the Monthly FX Outlook report...").
 
 Be concise, accurate, and helpful. Always cite your data sources.
 """
@@ -55,7 +58,18 @@ def _summarise_tool_result(result: dict) -> dict:
             else:
                 rate_lines.append(f"{r['base']}/{r['target']}: {r['rate']} ({r.get('date', '')})")
         news_titles = [n["title"] for n in result.get("news", [])]
-        return {"rates": rate_lines, "news_headlines": news_titles}
+
+        # Add research summary
+        research_docs = []
+        for r in result.get("research", []):
+            doc_name = r.get("name") or r.get("title", "Unknown")
+            research_docs.append(doc_name)
+
+        return {
+            "rates": rate_lines,
+            "news_headlines": news_titles,
+            "research_documents": research_docs,
+        }
     if rtype == "dashboard":
         return {"panel_type": result.get("panel_type"), "pairs": result.get("targets"), "series_count": len(result.get("series", []))}
     if rtype == "news":

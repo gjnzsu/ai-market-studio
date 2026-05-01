@@ -180,8 +180,7 @@ TOOL_DEFINITIONS = [
         "function": {
             "name": "generate_market_insight",
             "description": (
-                "Gather current spot rates and recent news for a set of currency pairs "
-                "to produce a market insight summary. "
+                "Generate a comprehensive market insight combining FX rates, news, and research reports. "
                 "Use when the user asks for a market overview, briefing, insight, "
                 "or what's happening with specific currencies."
             ),
@@ -201,6 +200,10 @@ TOOL_DEFINITIONS = [
                         "type": "integer",
                         "description": "Maximum number of news items to include. Between 1 and 10. Default is 5.",
                     },
+                    "include_research": {
+                        "type": "boolean",
+                        "description": "Include research reports from RAG service (default true)",
+                    },
                 },
                 "required": ["pairs"],
             },
@@ -210,11 +213,16 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "get_internal_research",
-            "description": "Search internal research documents (PDFs, Jira, Confluence) for market insights.",
+            "description": "Search internal research documents (PDFs, Jira, Confluence) for market insights. Can filter by document type.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "question": {"type": "string", "description": "The specific query to search in internal docs."}
+                    "question": {"type": "string", "description": "The specific query to search in internal docs."},
+                    "document_type": {
+                        "type": "string",
+                        "enum": ["research_report", "rulebook", "general"],
+                        "description": "Optional filter by document type. Use 'research_report' for FX research reports."
+                    }
                 },
                 "required": ["question"]
             }
@@ -535,16 +543,49 @@ async def dispatch_tool(
         news_items = []
         if news_connector is not None:
             news_items = news_connector.get_fx_news(query=news_query, max_items=max_news)
+
+        # Fetch research reports if requested
+        include_research = tool_args.get("include_research", True)
+        research = []
+        if include_research and rag_connector:
+            # Build query from currency pairs
+            currency_keywords = " ".join([pair.replace("/", " ") for pair in pairs])
+            query = f"{currency_keywords} outlook forecast analysis"
+
+            try:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"rag_query_for_insight: pairs={pairs}, query={query}")
+
+                rag_result = await rag_connector.query_research(
+                    question=query,
+                    document_type="research_report"
+                )
+
+                # Extract top 3 most relevant sources
+                if rag_result.get("sources"):
+                    research = rag_result["sources"][:3]
+                    logger.info(f"rag_sources_found: count={len(research)}, pairs={pairs}")
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"rag_query_failed: {str(e)}")
+                # Continue without research - don't fail the entire insight
+
         return {
             "type": "insight",
             "pairs": pairs,
             "rates": rates,
             "news": news_items,
+            "research": research,
         }
     elif tool_name == "get_internal_research":
         from backend.connectors.rag_connector import RAGConnector
         rag = RAGConnector()
-        return await rag.query_research(tool_args.get("question"))
+        return await rag.query_research(
+            question=tool_args.get("question"),
+            document_type=tool_args.get("document_type")
+        )
     elif tool_name == "get_interest_rate":
         if fred_connector is None:
             raise AgentError("FRED connector not available. Please configure FRED_API_KEY.")

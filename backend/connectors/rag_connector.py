@@ -58,12 +58,19 @@ class RAGConnector:
             "error": error,
         }
 
-    async def query_research(self, question: str) -> dict[str, Any]:
+    async def query_research(self, question: str, document_type: str | None = None) -> dict[str, Any]:
         async with httpx.AsyncClient() as client:
             try:
+                payload = {"question": question}
+                # Map document_type to collection name
+                if document_type == "research_report":
+                    payload["collection"] = "research_reports"
+                elif document_type:
+                    payload["document_type"] = document_type
+
                 resp = await client.post(
                     f"{self.url}/query",
-                    json={"question": question},
+                    json=payload,
                     timeout=10.0,
                 )
                 resp.raise_for_status()
