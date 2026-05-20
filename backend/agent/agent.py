@@ -13,7 +13,7 @@ from ai_sre_observability import get_client
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """
+LEGACY_SYSTEM_PROMPT = """
 You are an AI assistant for AI Market Studio, an FX market intelligence platform.
 
 You have access to these tools:
@@ -27,7 +27,6 @@ You have access to these tools:
 **Market Data Tools:**
 - get_fx_news: Fetch recent FX and financial news
 - get_interest_rate: Get FRED economic indicators (federal funds rate, treasury rates, etc.)
-- generate_market_insight: Get comprehensive market insight with rates, news, AND research reports for currency pairs
 
 **Analysis Tools:**
 - analyze_fx_economic_correlation: Analyze correlation between FX pairs and economic indicators
@@ -35,11 +34,19 @@ You have access to these tools:
 **Utility:**
 - list_supported_currencies: List all supported currency codes
 
-**When to use generate_market_insight:**
-Use this tool when the user asks for a market overview, briefing, insight, or what's happening with specific currencies.
-It automatically fetches rates, news, AND relevant research reports in one call.
-
 When presenting insights, always cite research documents by name (e.g., "According to the Monthly FX Outlook report...").
+
+Be concise, accurate, and helpful. Always cite your data sources.
+"""
+
+
+WORKFLOW_SYSTEM_PROMPT = """
+You are an AI assistant for AI Market Studio using intent-level market workflows.
+
+Use collect_market_context for data-only market requests, analyze_market_context
+for trend, volatility, signal, or economic relationship analysis, and
+generate_market_briefing for market insight, overview, briefing, explanation,
+or multi-source synthesis requests.
 
 Be concise, accurate, and helpful. Always cite your data sources.
 """
@@ -70,6 +77,18 @@ def _summarise_tool_result(result: dict) -> dict:
             "rates": rate_lines,
             "news_headlines": news_titles,
             "research_documents": research_docs,
+        }
+    if rtype == "market_briefing":
+        context = result.get("context", {}).get("context", {})
+        news_items = context.get("news", [])
+        research = context.get("research", {})
+        sources = research.get("sources", []) if isinstance(research, dict) else []
+        return {
+            "pairs": result.get("pairs", []),
+            "analysis": result.get("analysis", {}),
+            "news_headlines": [item.get("title") for item in news_items],
+            "research_documents": [source.get("name") for source in sources],
+            "warnings": result.get("warnings", []),
         }
     if rtype == "dashboard":
         return {"panel_type": result.get("panel_type"), "pairs": result.get("targets"), "series_count": len(result.get("series", []))}
@@ -111,7 +130,14 @@ async def run_agent(
         )
 
     messages: list[ChatCompletionMessageParam] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "system",
+            "content": (
+                WORKFLOW_SYSTEM_PROMPT
+                if agent_mode == "workflow"
+                else LEGACY_SYSTEM_PROMPT
+            ),
+        },
     ]
     if history:
         messages.extend(history)
@@ -168,7 +194,7 @@ async def run_agent(
                             last_tool_data = result
                             # For structured UI payloads, send GPT-4o a compact summary
                             # instead of the full JSON so it doesn't echo the raw payload.
-                            if isinstance(result, dict) and result.get("type") in ("insight", "dashboard", "news", "rag"):
+                            if isinstance(result, dict) and result.get("type") in ("insight", "market_briefing", "dashboard", "news", "rag"):
                                 tool_result_content = json.dumps(_summarise_tool_result(result))
                             else:
                                 tool_result_content = json.dumps(result)
@@ -223,7 +249,7 @@ async def run_agent(
                         last_tool_data = result
                         # For structured UI payloads, send GPT-4o a compact summary
                         # instead of the full JSON so it doesn't echo the raw payload.
-                        if isinstance(result, dict) and result.get("type") in ("insight", "dashboard", "news", "rag"):
+                        if isinstance(result, dict) and result.get("type") in ("insight", "market_briefing", "dashboard", "news", "rag"):
                             tool_result_content = json.dumps(_summarise_tool_result(result))
                         else:
                             tool_result_content = json.dumps(result)

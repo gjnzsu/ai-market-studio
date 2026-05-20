@@ -172,3 +172,27 @@ async def test_agent_uses_workflow_tool_set_when_workflow_mode_selected():
         "analyze_market_context",
         "generate_market_briefing",
     ]
+
+
+@pytest.mark.asyncio
+async def test_workflow_mode_can_use_market_briefing_tool_for_insight():
+    connector = MockConnector()
+    tool_response = make_response(
+        tool_calls=[make_tool_call("generate_market_briefing", {"pairs": ["EUR/USD"]})],
+        finish_reason="tool_calls",
+    )
+    final_response = make_response(content="EUR/USD briefing ready.", finish_reason="stop")
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(
+        side_effect=[tool_response, final_response]
+    )
+
+    result = await run_agent(
+        message="Give me a market insight on EUR/USD",
+        connector=connector,
+        client=mock_client,
+        agent_mode="workflow",
+    )
+
+    assert result["tool_used"] == "generate_market_briefing"
+    assert result["data"]["type"] == "market_briefing"

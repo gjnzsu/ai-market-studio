@@ -159,72 +159,6 @@ async def test_dispatch_tool_get_historical_rates():
 
 
 @pytest.mark.asyncio
-async def test_dispatch_generate_market_insight_basic():
-    """generate_market_insight returns type=insight with rates and news."""
-    connector = MockConnector()
-    news = MockNewsConnector()
-    result = await dispatch_tool(
-        "generate_market_insight",
-        {"pairs": ["EUR/USD", "GBP/USD"]},
-        connector,
-        news_connector=news,
-    )
-    assert result["type"] == "insight"
-    assert result["pairs"] == ["EUR/USD", "GBP/USD"]
-    assert len(result["rates"]) == 2
-    assert len(result["news"]) > 0
-    for r in result["rates"]:
-        assert "rate" in r or "error" in r
-
-
-@pytest.mark.asyncio
-async def test_dispatch_generate_market_insight_no_news_connector():
-    """generate_market_insight returns empty news when news_connector is None."""
-    connector = MockConnector()
-    result = await dispatch_tool(
-        "generate_market_insight",
-        {"pairs": ["USD/JPY"]},
-        connector,
-        news_connector=None,
-    )
-    assert result["type"] == "insight"
-    assert result["news"] == []
-    assert len(result["rates"]) == 1
-
-
-@pytest.mark.asyncio
-async def test_dispatch_generate_market_insight_news_query():
-    """generate_market_insight passes news_query to news connector."""
-    connector = MockConnector()
-    news = MockNewsConnector()
-    result = await dispatch_tool(
-        "generate_market_insight",
-        {"pairs": ["EUR/USD"], "news_query": "Fed", "max_news": 3},
-        connector,
-        news_connector=news,
-    )
-    assert result["type"] == "insight"
-    assert len(result["news"]) <= 3
-    for item in result["news"]:
-        text = item["title"].lower() + item["summary"].lower()
-        assert "fed" in text
-
-
-@pytest.mark.asyncio
-async def test_dispatch_generate_market_insight_max_news_capped():
-    """generate_market_insight caps max_news at 10."""
-    connector = MockConnector()
-    news = MockNewsConnector()
-    result = await dispatch_tool(
-        "generate_market_insight",
-        {"pairs": ["EUR/USD"], "max_news": 999},
-        connector,
-        news_connector=news,
-    )
-    assert len(result["news"]) <= 10
-
-
-@pytest.mark.asyncio
 async def test_dispatch_get_interest_rate():
     """get_interest_rate tool dispatches to FREDConnector and returns rate data."""
     result = await dispatch_tool(
@@ -253,21 +187,6 @@ async def test_dispatch_get_interest_rate_missing_series_id():
             MockConnector(),
         )
     assert "series_id is required" in str(exc_info.value)
-
-
-@pytest.mark.asyncio
-async def test_dispatch_generate_market_insight_empty_pairs():
-    """generate_market_insight with empty pairs list returns empty rates."""
-    connector = MockConnector()
-    news = MockNewsConnector()
-    result = await dispatch_tool(
-        "generate_market_insight",
-        {"pairs": []},
-        connector,
-        news_connector=news,
-    )
-    assert result["type"] == "insight"
-    assert result["rates"] == []
 
 
 @pytest.mark.asyncio

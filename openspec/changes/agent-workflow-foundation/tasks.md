@@ -26,10 +26,10 @@
 
 ## 4. Market Insight Replacement
 
-- [ ] 4.1 Route market insight, overview, briefing, and synthesis intents to the market briefing workflow in workflow mode.
-- [ ] 4.2 Remove or deprecate dispatch support for the legacy `generate_market_insight` tool so it is no longer an approved model-facing tool.
-- [ ] 4.3 Update tests that assert old market insight tool behavior to assert the new market briefing workflow behavior.
-- [ ] 4.4 Verify existing chat clients still receive compatible `reply`, `data`, and `tool_used` response fields for market insight requests.
+- [x] 4.1 Route market insight, overview, briefing, and synthesis intents to the market briefing workflow in workflow mode.
+- [x] 4.2 Remove or deprecate dispatch support for the legacy `generate_market_insight` tool so it is no longer an approved model-facing tool.
+- [x] 4.3 Update tests that assert old market insight tool behavior to assert the new market briefing workflow behavior.
+- [x] 4.4 Verify existing chat clients still receive compatible `reply`, `data`, and `tool_used` response fields for market insight requests.
 
 ## 5. Workflow Guardrails
 
