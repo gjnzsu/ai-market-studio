@@ -20,5 +20,8 @@ htmlcov/
 .vscode/
 .idea/
 
+# Local git worktrees
+.worktrees/
+
 # Secrets
 k8s/secret.yaml
