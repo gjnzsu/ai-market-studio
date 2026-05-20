@@ -8,7 +8,7 @@ from openai.types.chat import ChatCompletionMessageParam
 from backend.config import settings
 from backend.connectors.base import MarketDataConnector, ConnectorError
 from backend.connectors.news_connector import NewsConnectorBase
-from backend.agent.tools import TOOL_DEFINITIONS, dispatch_tool, AgentError
+from backend.agent.tools import get_tool_definitions, dispatch_tool, AgentError
 from ai_sre_observability import get_client
 
 logger = logging.getLogger(__name__)
@@ -119,6 +119,7 @@ async def run_agent(
 
     last_tool_used: Optional[str] = None
     last_tool_data = None
+    tool_definitions = get_tool_definitions(agent_mode)
 
     # Get observability client (graceful degradation)
     try:
@@ -142,7 +143,7 @@ async def run_agent(
                 response = await client.chat.completions.create(
                     model=settings.openai_model,
                     messages=messages,
-                    tools=TOOL_DEFINITIONS,
+                    tools=tool_definitions,
                     tool_choice="auto",
                 )
 
@@ -202,7 +203,7 @@ async def run_agent(
             response = await client.chat.completions.create(
                 model=settings.openai_model,
                 messages=messages,
-                tools=TOOL_DEFINITIONS,
+                tools=tool_definitions,
                 tool_choice="auto",
             )
 

@@ -149,3 +149,26 @@ async def test_agent_passes_history_to_llm():
     roles = [m["role"] for m in messages_sent]
     assert "system" in roles
     assert roles.count("user") >= 2
+
+
+@pytest.mark.asyncio
+async def test_agent_uses_workflow_tool_set_when_workflow_mode_selected():
+    connector = MockConnector()
+    final_response = make_response(content="ok", finish_reason="stop")
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=final_response)
+
+    await run_agent(
+        message="Brief EUR/USD",
+        connector=connector,
+        client=mock_client,
+        agent_mode="workflow",
+    )
+
+    tools = mock_client.chat.completions.create.call_args.kwargs["tools"]
+    names = [tool["function"]["name"] for tool in tools]
+    assert names == [
+        "collect_market_context",
+        "analyze_market_context",
+        "generate_market_briefing",
+    ]

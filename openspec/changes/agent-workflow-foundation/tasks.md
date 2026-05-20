@@ -8,12 +8,12 @@
 
 ## 2. Mode-Specific Tool Sets
 
-- [ ] 2.1 Split the current global tool definitions into explicit legacy and workflow tool definition groups.
-- [ ] 2.2 Remove `generate_market_insight` from approved model-facing tool sets.
-- [ ] 2.3 Remove low-level internal agent tools from workflow-mode model-facing tool exposure.
-- [ ] 2.4 Add workflow-mode tool definitions for market context collection, market context analysis, and market briefing.
-- [ ] 2.5 Update the agent runtime to send the tool set that matches the selected orchestration mode.
-- [ ] 2.6 Add tests proving legacy mode does not expose workflow tools and workflow mode does not expose low-level internal agent tools.
+- [x] 2.1 Split the current global tool definitions into explicit legacy and workflow tool definition groups.
+- [x] 2.2 Remove `generate_market_insight` from approved model-facing tool sets.
+- [x] 2.3 Remove low-level internal agent tools from workflow-mode model-facing tool exposure.
+- [x] 2.4 Add workflow-mode tool definitions for market context collection, market context analysis, and market briefing.
+- [x] 2.5 Update the agent runtime to send the tool set that matches the selected orchestration mode.
+- [x] 2.6 Add tests proving legacy mode does not expose workflow tools and workflow mode does not expose low-level internal agent tools.
 
 ## 3. Intent-Level Workflow Layer
 

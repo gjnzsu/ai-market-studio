@@ -6,7 +6,7 @@ from backend.connectors.news_connector import NewsConnectorBase
 # Tool JSON schemas (sent to GPT-4o as function definitions)
 # ---------------------------------------------------------------------------
 
-TOOL_DEFINITIONS = [
+_ALL_TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
@@ -418,6 +418,105 @@ TOOL_DEFINITIONS = [
         }
     },
 ]
+
+
+def _tool_name(tool: dict[str, Any]) -> str:
+    return tool["function"]["name"]
+
+
+_LEGACY_TOOL_NAMES = {
+    "get_exchange_rate",
+    "get_exchange_rates",
+    "get_historical_rates",
+    "list_supported_currencies",
+    "generate_dashboard",
+    "get_fx_news",
+    "get_internal_research",
+    "get_interest_rate",
+    "analyze_fx_economic_correlation",
+}
+
+
+LEGACY_TOOL_DEFINITIONS = [
+    tool for tool in _ALL_TOOL_DEFINITIONS
+    if _tool_name(tool) in _LEGACY_TOOL_NAMES
+]
+
+
+WORKFLOW_TOOL_DEFINITIONS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "collect_market_context",
+            "description": "Collect requested FX rates, news, FRED indicators, and research context without analysis.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pairs": {"type": "array", "items": {"type": "string"}},
+                    "sources": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": ["rates", "news", "fred", "research"],
+                        },
+                    },
+                    "days": {"type": "integer"},
+                    "fred_series_ids": {"type": "array", "items": {"type": "string"}},
+                    "query": {"type": "string"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_market_context",
+            "description": "Analyze collected or supplied FX market context without generating a full briefing.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pairs": {"type": "array", "items": {"type": "string"}},
+                    "analysis_type": {
+                        "type": "string",
+                        "enum": ["trend", "volatility", "economic_relationship", "general"],
+                    },
+                    "days": {"type": "integer"},
+                    "context": {"type": "object"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_market_briefing",
+            "description": "Generate a structured market briefing by coordinating context collection, analysis, and synthesis internally.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pairs": {"type": "array", "items": {"type": "string"}},
+                    "focus": {"type": "string"},
+                    "include_news": {"type": "boolean"},
+                    "include_fred": {"type": "boolean"},
+                    "include_research": {"type": "boolean"},
+                    "fred_series_ids": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["pairs"],
+            },
+        },
+    },
+]
+
+
+TOOL_DEFINITIONS = LEGACY_TOOL_DEFINITIONS
+
+
+def get_tool_definitions(agent_mode: str) -> list[dict[str, Any]]:
+    if agent_mode == "workflow":
+        return WORKFLOW_TOOL_DEFINITIONS
+    return LEGACY_TOOL_DEFINITIONS
 
 
 class AgentError(Exception):

@@ -1,29 +1,54 @@
 import pytest
-from backend.agent.tools import TOOL_DEFINITIONS, dispatch_tool, AgentError
+from backend.agent.tools import (
+    AgentError,
+    LEGACY_TOOL_DEFINITIONS,
+    TOOL_DEFINITIONS,
+    WORKFLOW_TOOL_DEFINITIONS,
+    dispatch_tool,
+    get_tool_definitions,
+)
 from backend.connectors.mock_connector import MockConnector
 from backend.connectors.news_connector import MockNewsConnector
 
 
-def test_tool_definitions_are_valid():
-    assert isinstance(TOOL_DEFINITIONS, list)
-    assert len(TOOL_DEFINITIONS) == 14  # 10 legacy + 4 new sub-agent tools
-    names = [t["function"]["name"] for t in TOOL_DEFINITIONS]
-    # Legacy tools
+def _tool_names(tools):
+    return [tool["function"]["name"] for tool in tools]
+
+
+def test_legacy_tool_definitions_exclude_workflow_and_deprecated_tools():
+    names = _tool_names(LEGACY_TOOL_DEFINITIONS)
     assert "get_exchange_rate" in names
     assert "get_exchange_rates" in names
     assert "get_historical_rates" in names
     assert "list_supported_currencies" in names
     assert "generate_dashboard" in names
     assert "get_fx_news" in names
-    assert "generate_market_insight" in names
+    assert "generate_market_insight" not in names
     assert "get_internal_research" in names
     assert "get_interest_rate" in names
     assert "analyze_fx_economic_correlation" in names
-    # New sub-agent tools
-    assert "collect_market_data" in names
-    assert "analyze_market_trends" in names
-    assert "generate_report" in names
-    assert "synthesize_research" in names
+    assert "collect_market_data" not in names
+    assert "analyze_market_trends" not in names
+    assert "generate_report" not in names
+    assert "synthesize_research" not in names
+    assert "collect_market_context" not in names
+
+
+def test_workflow_tool_definitions_expose_only_intent_tools():
+    assert _tool_names(WORKFLOW_TOOL_DEFINITIONS) == [
+        "collect_market_context",
+        "analyze_market_context",
+        "generate_market_briefing",
+    ]
+
+
+def test_get_tool_definitions_selects_by_agent_mode():
+    assert get_tool_definitions("legacy") == LEGACY_TOOL_DEFINITIONS
+    assert get_tool_definitions("workflow") == WORKFLOW_TOOL_DEFINITIONS
+
+
+def test_tool_definitions_alias_remains_legacy_compatible():
+    assert TOOL_DEFINITIONS == LEGACY_TOOL_DEFINITIONS
 
 
 def test_tool_definitions_have_required_fields():
