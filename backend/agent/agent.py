@@ -146,6 +146,11 @@ async def run_agent(
     last_tool_used: Optional[str] = None
     last_tool_data = None
     tool_definitions = get_tool_definitions(agent_mode)
+    max_rounds = (
+        settings.agent_workflow_max_rounds
+        if agent_mode == "workflow"
+        else MAX_TOOL_ROUNDS
+    )
 
     # Get observability client (graceful degradation)
     try:
@@ -164,8 +169,12 @@ async def run_agent(
             provider="openai",
             model=settings.openai_model
         ) as tracker:
-            for _ in range(MAX_TOOL_ROUNDS):
-                logger.info(f"[Agent] Making request with model: {settings.openai_model}")
+            for _ in range(max_rounds):
+                logger.info(
+                    "[Agent] mode=%s model=%s",
+                    agent_mode,
+                    settings.openai_model,
+                )
                 response = await client.chat.completions.create(
                     model=settings.openai_model,
                     messages=messages,
@@ -186,7 +195,12 @@ async def run_agent(
                     for tool_call in msg.tool_calls:
                         tool_name = tool_call.function.name
                         tool_args = json.loads(tool_call.function.arguments)
-                        logger.info("Tool call: %s args=%s", tool_name, tool_args)
+                        logger.info(
+                            "Tool call: mode=%s tool=%s args=%s",
+                            agent_mode,
+                            tool_name,
+                            tool_args,
+                        )
 
                         try:
                             result = await dispatch_tool(tool_name, tool_args, connector, news_connector, fred_connector, rag_connector)
@@ -224,8 +238,12 @@ async def run_agent(
             tracker.completion_tokens = total_completion_tokens
     else:
         # No observability - run agent normally
-        for _ in range(MAX_TOOL_ROUNDS):
-            logger.info(f"[Agent] Making request with model: {settings.openai_model}")
+        for _ in range(max_rounds):
+            logger.info(
+                "[Agent] mode=%s model=%s",
+                agent_mode,
+                settings.openai_model,
+            )
             response = await client.chat.completions.create(
                 model=settings.openai_model,
                 messages=messages,
@@ -241,7 +259,12 @@ async def run_agent(
                 for tool_call in msg.tool_calls:
                     tool_name = tool_call.function.name
                     tool_args = json.loads(tool_call.function.arguments)
-                    logger.info("Tool call: %s args=%s", tool_name, tool_args)
+                    logger.info(
+                        "Tool call: mode=%s tool=%s args=%s",
+                        agent_mode,
+                        tool_name,
+                        tool_args,
+                    )
 
                     try:
                         result = await dispatch_tool(tool_name, tool_args, connector, news_connector, fred_connector, rag_connector)
@@ -270,6 +293,13 @@ async def run_agent(
             # Final text response
             reply = msg.content or ""
             return {"reply": reply, "data": last_tool_data, "tool_used": last_tool_used}
+
+    if agent_mode == "workflow":
+        return {
+            "reply": "The workflow could not complete within the configured step limit; the request may be too complex or incomplete.",
+            "data": last_tool_data,
+            "tool_used": last_tool_used,
+        }
 
     return {
         "reply": "I was unable to complete your request after several attempts. Please try again.",

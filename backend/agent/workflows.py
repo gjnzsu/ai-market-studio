@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Any, Optional
 
 from backend.agents.market_analyst import analyze_market_trends
@@ -45,17 +46,23 @@ async def collect_market_context(
         if news_connector is None:
             warnings.append({"source": "news", "error": "News connector not available"})
         else:
-            context["news"] = news_connector.get_fx_news(query=query, max_items=5)
+            try:
+                context["news"] = news_connector.get_fx_news(query=query, max_items=5)
+            except Exception as e:
+                warnings.append({"source": "news", "error": str(e)})
 
     if "fred" in selected:
         if fred_connector is None:
             warnings.append({"source": "fred", "error": "FRED connector not available"})
         else:
-            fred_results = []
-            for series_id in fred_series_ids or ["DFF"]:
-                result = await fred_connector.get_current_rate(series_id=series_id)
-                fred_results.append(result.model_dump())
-            context["fred"] = fred_results
+            try:
+                fred_results = []
+                for series_id in fred_series_ids or ["DFF"]:
+                    result = await fred_connector.get_current_rate(series_id=series_id)
+                    fred_results.append(result.model_dump())
+                context["fred"] = fred_results
+            except Exception as e:
+                warnings.append({"source": "fred", "error": str(e)})
 
     if "research" in selected:
         if rag_connector is None:
@@ -63,9 +70,12 @@ async def collect_market_context(
                 {"source": "research", "error": "RAG connector not available"}
             )
         else:
-            context["research"] = await rag_connector.query_research(
-                question=query or "FX market outlook"
-            )
+            try:
+                context["research"] = await rag_connector.query_research(
+                    question=query or "FX market outlook"
+                )
+            except Exception as e:
+                warnings.append({"source": "research", "error": str(e)})
 
     return {
         "type": "market_context",
@@ -121,6 +131,13 @@ async def generate_market_briefing(
     fred_connector=None,
     rag_connector=None,
 ) -> dict[str, Any]:
+    started_at = time.perf_counter()
+    internal_units = ["collect_market_context", "analyze_market_context"]
+    logger.info(
+        "workflow_start mode=workflow name=generate_market_briefing units=%s pairs=%s",
+        internal_units,
+        pairs,
+    )
     sources = ["rates"]
     if include_news:
         sources.append("news")
@@ -129,25 +146,39 @@ async def generate_market_briefing(
     if include_research:
         sources.append("research")
 
-    context = await collect_market_context(
-        pairs=pairs,
-        sources=sources,
-        fred_series_ids=fred_series_ids,
-        query=focus or " ".join(pairs),
-        connector=connector,
-        news_connector=news_connector,
-        fred_connector=fred_connector,
-        rag_connector=rag_connector,
-    )
-    analysis = await analyze_market_context(context=context, analysis_type="trend")
-    return {
-        "type": "market_briefing",
-        "pairs": pairs,
-        "context": context,
-        "analysis": analysis["analysis"],
-        "briefing": {
-            "summary": "Market briefing context collected and analyzed.",
-            "focus": focus,
-        },
-        "warnings": context.get("warnings", []),
-    }
+    try:
+        context = await collect_market_context(
+            pairs=pairs,
+            sources=sources,
+            fred_series_ids=fred_series_ids,
+            query=focus or " ".join(pairs),
+            connector=connector,
+            news_connector=news_connector,
+            fred_connector=fred_connector,
+            rag_connector=rag_connector,
+        )
+        analysis = await analyze_market_context(context=context, analysis_type="trend")
+        result = {
+            "type": "market_briefing",
+            "pairs": pairs,
+            "context": context,
+            "analysis": analysis["analysis"],
+            "briefing": {
+                "summary": "Market briefing context collected and analyzed.",
+                "focus": focus,
+            },
+            "warnings": context.get("warnings", []),
+        }
+        logger.info(
+            "workflow_complete mode=workflow name=generate_market_briefing units=%s latency_ms=%.2f status=success failure_category=none",
+            internal_units,
+            (time.perf_counter() - started_at) * 1000,
+        )
+        return result
+    except Exception:
+        logger.exception(
+            "workflow_complete mode=workflow name=generate_market_briefing units=%s latency_ms=%.2f status=failure failure_category=exception",
+            internal_units,
+            (time.perf_counter() - started_at) * 1000,
+        )
+        raise

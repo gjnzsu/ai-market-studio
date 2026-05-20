@@ -33,17 +33,17 @@
 
 ## 5. Workflow Guardrails
 
-- [ ] 5.1 Enforce a runtime limit for workflow-mode requests.
-- [ ] 5.2 Enforce a bounded orchestration step limit for workflow-mode requests.
-- [ ] 5.3 Return clear workflow timeout and workflow failure responses without silently falling back to legacy orchestration.
-- [ ] 5.4 Represent optional source failures as structured workflow warnings or source-level errors when useful partial results are available.
-- [ ] 5.5 Return clear failures for missing required sources without presenting missing required data as successful context.
-- [ ] 5.6 Add tests for workflow timeout, step limit, no-silent-fallback behavior, optional source failure, and required source failure.
+- [x] 5.1 Enforce a runtime limit for workflow-mode requests.
+- [x] 5.2 Enforce a bounded orchestration step limit for workflow-mode requests.
+- [x] 5.3 Return clear workflow timeout and workflow failure responses without silently falling back to legacy orchestration.
+- [x] 5.4 Represent optional source failures as structured workflow warnings or source-level errors when useful partial results are available.
+- [x] 5.5 Return clear failures for missing required sources without presenting missing required data as successful context.
+- [x] 5.6 Add tests for workflow timeout, step limit, no-silent-fallback behavior, optional source failure, and required source failure.
 
 ## 6. Observability and Regression Coverage
 
-- [ ] 6.1 Add workflow execution logs or metrics for selected mode, workflow name, internal units used, latency, status, and failure category.
-- [ ] 6.2 Add regression tests proving workflow failures do not alter later legacy-mode requests.
+- [x] 6.1 Add workflow execution logs or metrics for selected mode, workflow name, internal units used, latency, status, and failure category.
+- [x] 6.2 Add regression tests proving workflow failures do not alter later legacy-mode requests.
 - [ ] 6.3 Run the targeted agent, tool, and chat test suites.
 - [ ] 6.4 Run OpenSpec validation for `agent-workflow-foundation`.
 - [ ] 6.5 Update README or developer docs if the new mode setting or workflow tools need local usage guidance.
