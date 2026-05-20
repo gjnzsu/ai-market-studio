@@ -44,6 +44,6 @@
 
 - [x] 6.1 Add workflow execution logs or metrics for selected mode, workflow name, internal units used, latency, status, and failure category.
 - [x] 6.2 Add regression tests proving workflow failures do not alter later legacy-mode requests.
-- [ ] 6.3 Run the targeted agent, tool, and chat test suites.
-- [ ] 6.4 Run OpenSpec validation for `agent-workflow-foundation`.
-- [ ] 6.5 Update README or developer docs if the new mode setting or workflow tools need local usage guidance.
+- [x] 6.3 Run the targeted agent, tool, and chat test suites.
+- [x] 6.4 Run OpenSpec validation for `agent-workflow-foundation`.
+- [x] 6.5 Update README or developer docs if the new mode setting or workflow tools need local usage guidance.

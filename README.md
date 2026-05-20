@@ -562,6 +562,9 @@ kubectl get service ai-market-studio -o wide
 | `USE_MOCK_CONNECTOR` | `false` | Use synthetic FX data instead of live exchangerate.host API |
 | `USE_MOCK_NEWS_CONNECTOR` | `false` | Use synthetic news data instead of live RSS feeds |
 | `RAG_SERVICE_URL` | `http://localhost:8000` | Base URL of the external RAG service; `RAGConnector` calls `POST {RAG_SERVICE_URL}/query` |
+| `ENABLE_AGENT_WORKFLOW_MODE` | `false` | Enables opt-in agent workflow mode for `/api/chat` |
+| `AGENT_WORKFLOW_TIMEOUT_SECONDS` | `20.0` | Timeout for workflow-mode chat requests |
+| `AGENT_WORKFLOW_MAX_ROUNDS` | `2` | Maximum LLM/tool rounds for workflow-mode requests |
 | `OBSERVABILITY_URL` | `http://ai-sre-observability.default.svc.cluster.local:8080` | AI SRE Observability service endpoint for LLM metrics collection |
 | `MAX_HISTORICAL_DAYS` | `7` | Max date range per dashboard request |
 | `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
@@ -1217,7 +1220,7 @@ OPENAI_MODEL=gpt-4o  # Use gpt-4o for complex financial analysis
 - **Research-heavy**: Enable RAG service for document insights
 
 #### 3. Performance Optimization
-- **Batch requests**: Use `generate_market_insight` for multi-pair analysis
+- **Batch requests**: Use workflow-mode market briefings for multi-pair analysis when `ENABLE_AGENT_WORKFLOW_MODE=true`
 - **Cache results**: Historical data is cached for 5 minutes (TTL=300s)
 - **Parallel calls**: Agent automatically parallelizes independent tool calls
 
