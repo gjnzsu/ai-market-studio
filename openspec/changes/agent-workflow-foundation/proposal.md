@@ -7,11 +7,12 @@ AI Market Studio already has a multi-agent/sub-agent architecture in the codebas
 - Review and redesign the existing sub-agent model instead of re-enabling the previous four-agent choreography as-is.
 - Add explicit opt-in access for the redesigned agent workflow mode, while keeping legacy tool orchestration as the default.
 - Replace direct exposure of overlapping low-level sub-agent tools with stable intent-level workflow tools where appropriate.
+- Replace the existing legacy `generate_market_insight` tool with the new market briefing workflow instead of keeping both long-term paths.
 - Keep internal agent units focused and reusable, such as data collection, market analysis, research synthesis, and output assembly, without requiring the LLM to manually chain every step.
 - Support simple customer intents, such as data collection, without forcing them through a full briefing or report workflow.
 - Add acceptance requirements for bounded execution, timeout behavior, observability, and mode-specific tool exposure.
 - Keep separated multi-agent runtime behavior out of scope for this change; this proposal creates the foundation for that future work.
-- No breaking API changes: existing chat requests continue to work without specifying an agent mode.
+- No breaking request/response schema changes: existing chat requests continue to work without specifying an agent mode, though market insight handling may move to the new workflow implementation.
 
 ## Capabilities
 
@@ -32,4 +33,4 @@ AI Market Studio already has a multi-agent/sub-agent architecture in the codebas
 - Affected tool layer: `backend/agent/tools.py` may need mode-aware tool grouping and new intent-level workflow tools.
 - Affected internal agents: `backend/agents/*` may be consolidated, renamed, or narrowed to remove boundary overlap.
 - Affected configuration: add a disabled-by-default setting for agent workflow availability.
-- Affected tests: add coverage for default legacy behavior, opt-in workflow behavior, data-only workflows, disabled-mode handling, timeout boundaries, and internal agent regressions.
+- Affected tests: add coverage for default legacy behavior, opt-in workflow behavior, market insight replacement behavior, data-only workflows, disabled-mode handling, timeout boundaries, and internal agent regressions.
