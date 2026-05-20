@@ -17,12 +17,12 @@
 
 ## 3. Intent-Level Workflow Layer
 
-- [ ] 3.1 Create workflow implementation units for `collect_market_context`, `analyze_market_context`, and `generate_market_briefing`.
-- [ ] 3.2 Implement market context collection so it collects requested market context without running analysis or synthesis.
-- [ ] 3.3 Implement market context analysis so it returns analysis grounded in collected or supplied context without generating a full briefing.
-- [ ] 3.4 Implement market briefing so market insight, overview, briefing, and multi-source synthesis intents use the new workflow path.
-- [ ] 3.5 Reuse, narrow, or consolidate existing `backend/agents/*` internals behind the workflow layer where their current boundaries overlap.
-- [ ] 3.6 Add tests for data-only workflow behavior, analysis-only workflow behavior, and briefing workflow behavior.
+- [x] 3.1 Create workflow implementation units for `collect_market_context`, `analyze_market_context`, and `generate_market_briefing`.
+- [x] 3.2 Implement market context collection so it collects requested market context without running analysis or synthesis.
+- [x] 3.3 Implement market context analysis so it returns analysis grounded in collected or supplied context without generating a full briefing.
+- [x] 3.4 Implement market briefing so market insight, overview, briefing, and multi-source synthesis intents use the new workflow path.
+- [x] 3.5 Reuse, narrow, or consolidate existing `backend/agents/*` internals behind the workflow layer where their current boundaries overlap.
+- [x] 3.6 Add tests for data-only workflow behavior, analysis-only workflow behavior, and briefing workflow behavior.
 
 ## 4. Market Insight Replacement
 

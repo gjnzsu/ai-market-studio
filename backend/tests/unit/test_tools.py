@@ -268,3 +268,57 @@ async def test_dispatch_generate_market_insight_empty_pairs():
     )
     assert result["type"] == "insight"
     assert result["rates"] == []
+
+
+@pytest.mark.asyncio
+async def test_dispatch_collect_market_context():
+    connector = MockConnector()
+
+    result = await dispatch_tool(
+        "collect_market_context",
+        {"pairs": ["EUR/USD"], "sources": ["rates"]},
+        connector,
+    )
+
+    assert result["type"] == "market_context"
+    assert result["context"]["rates"][0]["base"] == "EUR"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_analyze_market_context():
+    connector = MockConnector()
+    context = {
+        "type": "market_context",
+        "context": {
+            "rates": [
+                {"date": "2026-05-19", "rate": 1.07},
+                {"date": "2026-05-20", "rate": 1.08},
+            ]
+        },
+        "warnings": [],
+    }
+
+    result = await dispatch_tool(
+        "analyze_market_context",
+        {"context": context, "analysis_type": "trend"},
+        connector,
+    )
+
+    assert result["type"] == "market_analysis"
+    assert "analysis" in result
+
+
+@pytest.mark.asyncio
+async def test_dispatch_generate_market_briefing():
+    connector = MockConnector()
+    news = MockNewsConnector()
+
+    result = await dispatch_tool(
+        "generate_market_briefing",
+        {"pairs": ["EUR/USD"], "include_research": False},
+        connector,
+        news_connector=news,
+    )
+
+    assert result["type"] == "market_briefing"
+    assert result["pairs"] == ["EUR/USD"]

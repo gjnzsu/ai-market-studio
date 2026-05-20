@@ -760,5 +760,44 @@ async def dispatch_tool(
             focus=tool_args.get("focus"),
             max_sources=tool_args.get("max_sources", 10)
         )
+    elif tool_name == "collect_market_context":
+        from backend.agent.workflows import collect_market_context
+        return await collect_market_context(
+            pairs=tool_args.get("pairs"),
+            sources=tool_args.get("sources"),
+            days=tool_args.get("days"),
+            fred_series_ids=tool_args.get("fred_series_ids"),
+            query=tool_args.get("query"),
+            connector=connector,
+            news_connector=news_connector,
+            fred_connector=fred_connector,
+            rag_connector=rag_connector,
+        )
+    elif tool_name == "analyze_market_context":
+        from backend.agent.workflows import analyze_market_context
+        return await analyze_market_context(
+            context=tool_args.get("context"),
+            pairs=tool_args.get("pairs"),
+            analysis_type=tool_args.get("analysis_type", "general"),
+            days=tool_args.get("days"),
+            connector=connector,
+            news_connector=news_connector,
+            fred_connector=fred_connector,
+            rag_connector=rag_connector,
+        )
+    elif tool_name == "generate_market_briefing":
+        from backend.agent.workflows import generate_market_briefing
+        return await generate_market_briefing(
+            pairs=tool_args.get("pairs") or [],
+            focus=tool_args.get("focus"),
+            include_news=tool_args.get("include_news", True),
+            include_fred=tool_args.get("include_fred", False),
+            include_research=tool_args.get("include_research", True),
+            fred_series_ids=tool_args.get("fred_series_ids"),
+            connector=connector,
+            news_connector=news_connector,
+            fred_connector=fred_connector,
+            rag_connector=rag_connector,
+        )
     else:
         raise AgentError(f"Unknown tool: {tool_name}")
