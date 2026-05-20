@@ -79,6 +79,77 @@ def test_chat_with_history(client_with_mock_llm):
     assert "reply" in resp.json()
 
 
+def test_chat_workflow_mode_disabled_is_rejected(app_client, monkeypatch):
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", False)
+
+    resp = app_client.post(
+        "/api/chat",
+        json={"message": "Brief EUR/USD", "agent_mode": "workflow"},
+    )
+
+    assert resp.is_error
+    assert "workflow" in resp.text.lower()
+
+
+def test_chat_default_mode_passes_legacy_to_run_agent(app_client, monkeypatch):
+    captured = {}
+
+    async def fake_run_agent(**kwargs):
+        captured.update(kwargs)
+        return {"reply": "ok", "data": None, "tool_used": None}
+
+    monkeypatch.setattr("backend.router.run_agent", fake_run_agent)
+
+    resp = app_client.post("/api/chat", json={"message": "What is EUR/USD?"})
+
+    assert resp.status_code == 200
+    assert captured["agent_mode"] == "legacy"
+    assert set(resp.json().keys()) == {"reply", "data", "tool_used"}
+
+
+def test_chat_explicit_legacy_mode_passes_legacy_to_run_agent(app_client, monkeypatch):
+    captured = {}
+
+    async def fake_run_agent(**kwargs):
+        captured.update(kwargs)
+        return {"reply": "ok", "data": None, "tool_used": None}
+
+    monkeypatch.setattr("backend.router.run_agent", fake_run_agent)
+
+    resp = app_client.post(
+        "/api/chat",
+        json={"message": "What is EUR/USD?", "agent_mode": "legacy"},
+    )
+
+    assert resp.status_code == 200
+    assert captured["agent_mode"] == "legacy"
+    assert set(resp.json().keys()) == {"reply", "data", "tool_used"}
+
+
+def test_chat_workflow_mode_keeps_response_shape_when_enabled(app_client, monkeypatch):
+    captured = {}
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
+
+    async def fake_run_agent(**kwargs):
+        captured.update(kwargs)
+        return {
+            "reply": "workflow ok",
+            "data": {"type": "market_briefing"},
+            "tool_used": "generate_market_briefing",
+        }
+
+    monkeypatch.setattr("backend.router.run_agent", fake_run_agent)
+
+    resp = app_client.post(
+        "/api/chat",
+        json={"message": "Brief EUR/USD", "agent_mode": "workflow"},
+    )
+
+    assert resp.status_code == 200
+    assert captured["agent_mode"] == "workflow"
+    assert set(resp.json().keys()) == {"reply", "data", "tool_used"}
+
+
 def test_chat_malformed_json_returns_422(app_client):
     resp = app_client.post(
         "/api/chat",

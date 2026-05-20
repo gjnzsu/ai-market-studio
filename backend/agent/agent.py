@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Optional
+from typing import Literal, Optional
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
@@ -45,6 +45,7 @@ Be concise, accurate, and helpful. Always cite your data sources.
 """
 
 MAX_TOOL_ROUNDS = 3  # Reduced from 5 to prevent long sequential chains
+AgentMode = Literal["legacy", "workflow"]
 
 
 def _summarise_tool_result(result: dict) -> dict:
@@ -88,6 +89,7 @@ async def run_agent(
     news_connector: Optional[NewsConnectorBase] = None,
     fred_connector = None,
     rag_connector = None,
+    agent_mode: AgentMode = "legacy",
 ) -> dict:
     """Run the GPT-4o function-calling agent loop.
 

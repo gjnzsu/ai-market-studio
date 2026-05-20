@@ -1,10 +1,10 @@
 ## 1. Mode Selection Foundation
 
-- [ ] 1.1 Add a disabled-by-default configuration setting for agent workflow availability.
-- [ ] 1.2 Extend the chat request model with an optional orchestration mode field that defaults to legacy behavior when omitted.
-- [ ] 1.3 Update the chat route to reject workflow mode with a clear client-facing error when workflow mode is disabled.
-- [ ] 1.4 Pass the selected orchestration mode from the chat route into the agent runtime.
-- [ ] 1.5 Add tests proving existing chat requests without a mode still use legacy orchestration and keep the existing response shape.
+- [x] 1.1 Add a disabled-by-default configuration setting for agent workflow availability.
+- [x] 1.2 Extend the chat request model with an optional orchestration mode field that defaults to legacy behavior when omitted.
+- [x] 1.3 Update the chat route to reject workflow mode with a clear client-facing error when workflow mode is disabled.
+- [x] 1.4 Pass the selected orchestration mode from the chat route into the agent runtime.
+- [x] 1.5 Add tests proving existing chat requests without a mode still use legacy orchestration and keep the existing response shape.
 
 ## 2. Mode-Specific Tool Sets
 
