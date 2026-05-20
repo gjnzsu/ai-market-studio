@@ -34,6 +34,21 @@
 - Workflow model-facing tools are only `collect_market_context`, `analyze_market_context`, and `generate_market_briefing`.
 - The unrelated untracked `ingest_research_reports.py` file must remain untouched.
 
+## Known Baseline Issue
+
+- Targeted baseline command:
+
+```powershell
+$env:PYTHONPATH='.'; uv run pytest backend\tests\unit\test_schemas.py backend\tests\unit\test_tools.py backend\tests\agent\test_agent.py backend\tests\e2e\test_chat_api.py -q
+```
+
+- Current baseline result before implementation: `44 passed, 2 failed`.
+- Failing tests:
+  - `backend\tests\unit\test_tools.py::test_dispatch_get_interest_rate`
+  - `backend\tests\unit\test_tools.py::test_dispatch_get_interest_rate_missing_series_id`
+- Root cause: these direct unit tests call `dispatch_tool("get_interest_rate", ...)` without passing a `fred_connector`, so they bypass the real app path where `main.py` creates `app.state.fred_connector` from `FRED_API_KEY` and `router.py` passes it into `run_agent`.
+- Scope decision: proceed with `agent-workflow-foundation` implementation while treating these as known stale baseline tests. After this change, add a follow-up cleanup to fix the FRED unit tests by injecting a mock FRED connector and asserting missing `series_id` validation independently from connector availability.
+
 ## File Structure
 
 - Modify `backend/config.py`: workflow enablement, timeout, and step-limit settings.
