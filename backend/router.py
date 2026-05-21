@@ -1,8 +1,9 @@
 import logging
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import Response
 
+from backend.config import settings
 from backend.models import (
     ChatRequest, ChatResponse,
     HistoricalRatesRequest, HistoricalRatesResponse, DailyRates,
@@ -25,6 +26,12 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     """Accept a user message and return an AI-generated reply with FX data."""
     import asyncio
 
+    def _workflow_mode_disabled_error() -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Agent workflow mode is disabled.",
+        )
+
     connector = request.app.state.connector
     news_connector = getattr(request.app.state, 'news_connector', None)
     fred_connector = getattr(request.app.state, 'fred_connector', None)
@@ -32,6 +39,15 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     history = [m.model_dump() for m in body.history]
 
     try:
+        if body.agent_mode == "workflow" and not settings.enable_agent_workflow_mode:
+            raise _workflow_mode_disabled_error()
+
+        timeout_seconds = (
+            settings.agent_workflow_timeout_seconds
+            if body.agent_mode == "workflow"
+            else 20.0
+        )
+
         result = await asyncio.wait_for(
             run_agent(
                 message=body.message,
@@ -40,12 +56,15 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
                 news_connector=news_connector,
                 fred_connector=fred_connector,
                 rag_connector=rag_connector,
+                agent_mode=body.agent_mode,
             ),
-            timeout=20.0  # 20 second timeout to prevent hanging
+            timeout=timeout_seconds,
         )
     except asyncio.TimeoutError:
         logger.error("Request timeout after 20s for message: %s", body.message)
         raise HTTPException(status_code=504, detail="Request timeout - query too complex. Please simplify your question.")
+    except HTTPException:
+        raise
     except ConnectorError as e:
         logger.error("Connector error in /chat: %s", e)
         raise HTTPException(status_code=503, detail="Market data service unavailable.")

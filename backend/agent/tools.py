@@ -6,7 +6,7 @@ from backend.connectors.news_connector import NewsConnectorBase
 # Tool JSON schemas (sent to GPT-4o as function definitions)
 # ---------------------------------------------------------------------------
 
-TOOL_DEFINITIONS = [
+_ALL_TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
@@ -172,40 +172,6 @@ TOOL_DEFINITIONS = [
                     },
                 },
                 "required": [],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "generate_market_insight",
-            "description": (
-                "Generate a comprehensive market insight combining FX rates, news, and research reports. "
-                "Use when the user asks for a market overview, briefing, insight, "
-                "or what's happening with specific currencies."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "pairs": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Currency pairs to include, e.g. ['EUR/USD', 'GBP/USD']. Each pair is BASE/TARGET.",
-                    },
-                    "news_query": {
-                        "type": "string",
-                        "description": "Optional keyword to filter news (e.g. 'EUR', 'Fed', 'inflation'). Omit for general FX news.",
-                    },
-                    "max_news": {
-                        "type": "integer",
-                        "description": "Maximum number of news items to include. Between 1 and 10. Default is 5.",
-                    },
-                    "include_research": {
-                        "type": "boolean",
-                        "description": "Include research reports from RAG service (default true)",
-                    },
-                },
-                "required": ["pairs"],
             },
         },
     },
@@ -420,6 +386,105 @@ TOOL_DEFINITIONS = [
 ]
 
 
+def _tool_name(tool: dict[str, Any]) -> str:
+    return tool["function"]["name"]
+
+
+_LEGACY_TOOL_NAMES = {
+    "get_exchange_rate",
+    "get_exchange_rates",
+    "get_historical_rates",
+    "list_supported_currencies",
+    "generate_dashboard",
+    "get_fx_news",
+    "get_internal_research",
+    "get_interest_rate",
+    "analyze_fx_economic_correlation",
+}
+
+
+LEGACY_TOOL_DEFINITIONS = [
+    tool for tool in _ALL_TOOL_DEFINITIONS
+    if _tool_name(tool) in _LEGACY_TOOL_NAMES
+]
+
+
+WORKFLOW_TOOL_DEFINITIONS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "collect_market_context",
+            "description": "Collect requested FX rates, news, FRED indicators, and research context without analysis.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pairs": {"type": "array", "items": {"type": "string"}},
+                    "sources": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": ["rates", "news", "fred", "research"],
+                        },
+                    },
+                    "days": {"type": "integer"},
+                    "fred_series_ids": {"type": "array", "items": {"type": "string"}},
+                    "query": {"type": "string"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_market_context",
+            "description": "Analyze collected or supplied FX market context without generating a full briefing.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pairs": {"type": "array", "items": {"type": "string"}},
+                    "analysis_type": {
+                        "type": "string",
+                        "enum": ["trend", "volatility", "economic_relationship", "general"],
+                    },
+                    "days": {"type": "integer"},
+                    "context": {"type": "object"},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "generate_market_briefing",
+            "description": "Generate a structured market briefing by coordinating context collection, analysis, and synthesis internally.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pairs": {"type": "array", "items": {"type": "string"}},
+                    "focus": {"type": "string"},
+                    "include_news": {"type": "boolean"},
+                    "include_fred": {"type": "boolean"},
+                    "include_research": {"type": "boolean"},
+                    "fred_series_ids": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["pairs"],
+            },
+        },
+    },
+]
+
+
+TOOL_DEFINITIONS = LEGACY_TOOL_DEFINITIONS
+
+
+def get_tool_definitions(agent_mode: str) -> list[dict[str, Any]]:
+    if agent_mode == "workflow":
+        return WORKFLOW_TOOL_DEFINITIONS
+    return LEGACY_TOOL_DEFINITIONS
+
+
 class AgentError(Exception):
     """Raised when the agent cannot complete a request."""
 
@@ -491,94 +556,6 @@ async def dispatch_tool(
             return {"type": "news", "query": query, "items": [], "error": "News connector not available"}
         items = news_connector.get_fx_news(query=query, max_items=max_items)
         return {"type": "news", "query": query, "items": items}
-    elif tool_name == "generate_market_insight":
-        pairs = tool_args.get("pairs", [])
-        news_query = tool_args.get("news_query")
-        max_news = min(int(tool_args.get("max_news", 5)), 10)
-        # Batch fetch: group targets by base to minimise API calls.
-        # Special case: pairs sharing the same target are fetched in one call
-        # by using that target as base and inverting (avoids per-pair HTTP hits).
-        from collections import defaultdict
-        base_to_targets: dict = defaultdict(list)
-        target_to_bases: dict = defaultdict(list)
-        valid_pairs: list = []
-        for pair in pairs:
-            parts = pair.upper().replace("-", "/").split("/")
-            if len(parts) == 2:
-                base, target = parts
-                valid_pairs.append((base, target))
-                target_to_bases[target].append(base)
-
-        rates = []
-        fetched: dict = {}  # (base, target) -> rate_data
-
-        # For each unique target that has multiple bases, fetch all bases at once
-        # using that target as the connector base (one API call instead of N).
-        for common_target, bases in target_to_bases.items():
-            if len(bases) >= 1:
-                try:
-                    batch = await connector.get_exchange_rates(base=common_target, targets=bases)
-                    for item in batch:
-                        # item is common_target→base; we want base→common_target = 1/rate
-                        b, t = item["base"], item["target"]
-                        # b == common_target, t == original base
-                        inverted = {
-                            "base": t,
-                            "target": b,
-                            "rate": round(1.0 / item["rate"], 6) if item.get("rate") else None,
-                            "date": item.get("date"),
-                            "source": item.get("source"),
-                        }
-                        fetched[(t, b)] = inverted
-                except ConnectorError as e:
-                    for base in bases:
-                        fetched[(base, common_target)] = {"base": base, "target": common_target, "error": str(e)}
-
-        for base, target in valid_pairs:
-            if (base, target) in fetched:
-                rates.append(fetched[(base, target)])
-            else:
-                rates.append({"base": base, "target": target, "error": "Rate not fetched"})
-        # Fetch news
-        news_items = []
-        if news_connector is not None:
-            news_items = news_connector.get_fx_news(query=news_query, max_items=max_news)
-
-        # Fetch research reports if requested
-        include_research = tool_args.get("include_research", True)
-        research = []
-        if include_research and rag_connector:
-            # Build query from currency pairs
-            currency_keywords = " ".join([pair.replace("/", " ") for pair in pairs])
-            query = f"{currency_keywords} outlook forecast analysis"
-
-            try:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.info(f"rag_query_for_insight: pairs={pairs}, query={query}")
-
-                rag_result = await rag_connector.query_research(
-                    question=query,
-                    document_type="research_report"
-                )
-
-                # Extract top 3 most relevant sources
-                if rag_result.get("sources"):
-                    research = rag_result["sources"][:3]
-                    logger.info(f"rag_sources_found: count={len(research)}, pairs={pairs}")
-            except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"rag_query_failed: {str(e)}")
-                # Continue without research - don't fail the entire insight
-
-        return {
-            "type": "insight",
-            "pairs": pairs,
-            "rates": rates,
-            "news": news_items,
-            "research": research,
-        }
     elif tool_name == "get_internal_research":
         from backend.connectors.rag_connector import RAGConnector
         rag = RAGConnector()
@@ -587,12 +564,12 @@ async def dispatch_tool(
             document_type=tool_args.get("document_type")
         )
     elif tool_name == "get_interest_rate":
-        if fred_connector is None:
-            raise AgentError("FRED connector not available. Please configure FRED_API_KEY.")
         series_id = tool_args.get("series_id")
         date = tool_args.get("date")
         if not series_id:
             raise AgentError("series_id is required for get_interest_rate")
+        if fred_connector is None:
+            raise AgentError("FRED connector not available. Please configure FRED_API_KEY.")
         result = await fred_connector.get_current_rate(series_id=series_id, date=date)
         return result.model_dump()
     elif tool_name == "analyze_fx_economic_correlation":
@@ -660,6 +637,45 @@ async def dispatch_tool(
             sources=tool_args.get("sources", {}),
             focus=tool_args.get("focus"),
             max_sources=tool_args.get("max_sources", 10)
+        )
+    elif tool_name == "collect_market_context":
+        from backend.agent.workflows import collect_market_context
+        return await collect_market_context(
+            pairs=tool_args.get("pairs"),
+            sources=tool_args.get("sources"),
+            days=tool_args.get("days"),
+            fred_series_ids=tool_args.get("fred_series_ids"),
+            query=tool_args.get("query"),
+            connector=connector,
+            news_connector=news_connector,
+            fred_connector=fred_connector,
+            rag_connector=rag_connector,
+        )
+    elif tool_name == "analyze_market_context":
+        from backend.agent.workflows import analyze_market_context
+        return await analyze_market_context(
+            context=tool_args.get("context"),
+            pairs=tool_args.get("pairs"),
+            analysis_type=tool_args.get("analysis_type", "general"),
+            days=tool_args.get("days"),
+            connector=connector,
+            news_connector=news_connector,
+            fred_connector=fred_connector,
+            rag_connector=rag_connector,
+        )
+    elif tool_name == "generate_market_briefing":
+        from backend.agent.workflows import generate_market_briefing
+        return await generate_market_briefing(
+            pairs=tool_args.get("pairs") or [],
+            focus=tool_args.get("focus"),
+            include_news=tool_args.get("include_news", True),
+            include_fred=tool_args.get("include_fred", False),
+            include_research=tool_args.get("include_research", True),
+            fred_series_ids=tool_args.get("fred_series_ids"),
+            connector=connector,
+            news_connector=news_connector,
+            fred_connector=fred_connector,
+            rag_connector=rag_connector,
         )
     else:
         raise AgentError(f"Unknown tool: {tool_name}")

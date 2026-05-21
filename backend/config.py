@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
     max_historical_days: int = 7
     rag_service_url: str = "http://localhost:8000"
+    enable_agent_workflow_mode: bool = False
+    agent_workflow_timeout_seconds: float = 20.0
+    agent_workflow_max_rounds: int = 2
 
     @property
     def cors_origins_list(self) -> list[str]:

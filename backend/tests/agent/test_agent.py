@@ -149,3 +149,132 @@ async def test_agent_passes_history_to_llm():
     roles = [m["role"] for m in messages_sent]
     assert "system" in roles
     assert roles.count("user") >= 2
+
+
+@pytest.mark.asyncio
+async def test_agent_uses_workflow_tool_set_when_workflow_mode_selected():
+    connector = MockConnector()
+    final_response = make_response(content="ok", finish_reason="stop")
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=final_response)
+
+    await run_agent(
+        message="Brief EUR/USD",
+        connector=connector,
+        client=mock_client,
+        agent_mode="workflow",
+    )
+
+    tools = mock_client.chat.completions.create.call_args.kwargs["tools"]
+    names = [tool["function"]["name"] for tool in tools]
+    assert names == [
+        "collect_market_context",
+        "analyze_market_context",
+        "generate_market_briefing",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_workflow_mode_can_use_market_briefing_tool_for_insight():
+    connector = MockConnector()
+    tool_response = make_response(
+        tool_calls=[make_tool_call("generate_market_briefing", {"pairs": ["EUR/USD"]})],
+        finish_reason="tool_calls",
+    )
+    final_response = make_response(content="EUR/USD briefing ready.", finish_reason="stop")
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(
+        side_effect=[tool_response, final_response]
+    )
+
+    result = await run_agent(
+        message="Give me a market insight on EUR/USD",
+        connector=connector,
+        client=mock_client,
+        agent_mode="workflow",
+    )
+
+    assert result["tool_used"] == "generate_market_briefing"
+    assert result["data"]["type"] == "market_briefing"
+
+
+@pytest.mark.asyncio
+async def test_workflow_mode_unknown_tool_does_not_fallback_to_legacy():
+    connector = MockConnector()
+    tool_response = make_response(
+        tool_calls=[make_tool_call("unknown_workflow_tool", {})],
+        finish_reason="tool_calls",
+    )
+    final_response = make_response(
+        content="Could not complete workflow.",
+        finish_reason="stop",
+    )
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(
+        side_effect=[tool_response, final_response]
+    )
+
+    result = await run_agent(
+        message="Brief EUR/USD",
+        connector=connector,
+        client=mock_client,
+        agent_mode="workflow",
+    )
+
+    assert result["tool_used"] is None
+
+
+@pytest.mark.asyncio
+async def test_workflow_mode_stops_at_configured_step_limit(monkeypatch):
+    connector = MockConnector()
+    monkeypatch.setattr("backend.agent.agent.settings.agent_workflow_max_rounds", 1)
+    tool_response = make_response(
+        tool_calls=[make_tool_call("collect_market_context", {"pairs": ["EUR/USD"]})],
+        finish_reason="tool_calls",
+    )
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=tool_response)
+
+    result = await run_agent(
+        message="Keep working on EUR/USD until complete",
+        connector=connector,
+        client=mock_client,
+        agent_mode="workflow",
+    )
+
+    reply = result["reply"].lower()
+    assert "too complex" in reply or "incomplete" in reply
+    assert result["tool_used"] == "collect_market_context"
+
+
+@pytest.mark.asyncio
+async def test_previous_workflow_failure_does_not_alter_later_legacy_tool_set():
+    connector = MockConnector()
+    workflow_tool_response = make_response(
+        tool_calls=[make_tool_call("unknown_workflow_tool", {})],
+        finish_reason="tool_calls",
+    )
+    workflow_final_response = make_response(content="Workflow failed.", finish_reason="stop")
+    legacy_final_response = make_response(content="Legacy ok.", finish_reason="stop")
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(
+        side_effect=[workflow_tool_response, workflow_final_response, legacy_final_response]
+    )
+
+    await run_agent(
+        message="Brief EUR/USD",
+        connector=connector,
+        client=mock_client,
+        agent_mode="workflow",
+    )
+    await run_agent(
+        message="What is EUR/USD?",
+        connector=connector,
+        client=mock_client,
+        agent_mode="legacy",
+    )
+
+    legacy_tools = mock_client.chat.completions.create.call_args.kwargs["tools"]
+    legacy_names = [tool["function"]["name"] for tool in legacy_tools]
+    assert "get_exchange_rate" in legacy_names
+    assert "collect_market_context" not in legacy_names

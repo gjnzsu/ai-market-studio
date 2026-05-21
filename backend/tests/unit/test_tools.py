@@ -1,29 +1,67 @@
 import pytest
-from backend.agent.tools import TOOL_DEFINITIONS, dispatch_tool, AgentError
+from backend.connectors.fred_connector import InterestRateData
+from backend.agent.tools import (
+    AgentError,
+    LEGACY_TOOL_DEFINITIONS,
+    TOOL_DEFINITIONS,
+    WORKFLOW_TOOL_DEFINITIONS,
+    dispatch_tool,
+    get_tool_definitions,
+)
 from backend.connectors.mock_connector import MockConnector
 from backend.connectors.news_connector import MockNewsConnector
 
 
-def test_tool_definitions_are_valid():
-    assert isinstance(TOOL_DEFINITIONS, list)
-    assert len(TOOL_DEFINITIONS) == 14  # 10 legacy + 4 new sub-agent tools
-    names = [t["function"]["name"] for t in TOOL_DEFINITIONS]
-    # Legacy tools
+def _tool_names(tools):
+    return [tool["function"]["name"] for tool in tools]
+
+
+class MockFredConnector:
+    async def get_current_rate(self, series_id: str, date: str | None = None):
+        return InterestRateData(
+            series_id=series_id,
+            series_name="Effective Federal Funds Rate (daily)",
+            date=date or "2026-05-20",
+            value=4.33,
+            unit="percent",
+            source="FRED (Federal Reserve Economic Data)",
+        )
+
+
+def test_legacy_tool_definitions_exclude_workflow_and_deprecated_tools():
+    names = _tool_names(LEGACY_TOOL_DEFINITIONS)
     assert "get_exchange_rate" in names
     assert "get_exchange_rates" in names
     assert "get_historical_rates" in names
     assert "list_supported_currencies" in names
     assert "generate_dashboard" in names
     assert "get_fx_news" in names
-    assert "generate_market_insight" in names
+    assert "generate_market_insight" not in names
     assert "get_internal_research" in names
     assert "get_interest_rate" in names
     assert "analyze_fx_economic_correlation" in names
-    # New sub-agent tools
-    assert "collect_market_data" in names
-    assert "analyze_market_trends" in names
-    assert "generate_report" in names
-    assert "synthesize_research" in names
+    assert "collect_market_data" not in names
+    assert "analyze_market_trends" not in names
+    assert "generate_report" not in names
+    assert "synthesize_research" not in names
+    assert "collect_market_context" not in names
+
+
+def test_workflow_tool_definitions_expose_only_intent_tools():
+    assert _tool_names(WORKFLOW_TOOL_DEFINITIONS) == [
+        "collect_market_context",
+        "analyze_market_context",
+        "generate_market_briefing",
+    ]
+
+
+def test_get_tool_definitions_selects_by_agent_mode():
+    assert get_tool_definitions("legacy") == LEGACY_TOOL_DEFINITIONS
+    assert get_tool_definitions("workflow") == WORKFLOW_TOOL_DEFINITIONS
+
+
+def test_tool_definitions_alias_remains_legacy_compatible():
+    assert TOOL_DEFINITIONS == LEGACY_TOOL_DEFINITIONS
 
 
 def test_tool_definitions_have_required_fields():
@@ -134,78 +172,13 @@ async def test_dispatch_tool_get_historical_rates():
 
 
 @pytest.mark.asyncio
-async def test_dispatch_generate_market_insight_basic():
-    """generate_market_insight returns type=insight with rates and news."""
-    connector = MockConnector()
-    news = MockNewsConnector()
-    result = await dispatch_tool(
-        "generate_market_insight",
-        {"pairs": ["EUR/USD", "GBP/USD"]},
-        connector,
-        news_connector=news,
-    )
-    assert result["type"] == "insight"
-    assert result["pairs"] == ["EUR/USD", "GBP/USD"]
-    assert len(result["rates"]) == 2
-    assert len(result["news"]) > 0
-    for r in result["rates"]:
-        assert "rate" in r or "error" in r
-
-
-@pytest.mark.asyncio
-async def test_dispatch_generate_market_insight_no_news_connector():
-    """generate_market_insight returns empty news when news_connector is None."""
-    connector = MockConnector()
-    result = await dispatch_tool(
-        "generate_market_insight",
-        {"pairs": ["USD/JPY"]},
-        connector,
-        news_connector=None,
-    )
-    assert result["type"] == "insight"
-    assert result["news"] == []
-    assert len(result["rates"]) == 1
-
-
-@pytest.mark.asyncio
-async def test_dispatch_generate_market_insight_news_query():
-    """generate_market_insight passes news_query to news connector."""
-    connector = MockConnector()
-    news = MockNewsConnector()
-    result = await dispatch_tool(
-        "generate_market_insight",
-        {"pairs": ["EUR/USD"], "news_query": "Fed", "max_news": 3},
-        connector,
-        news_connector=news,
-    )
-    assert result["type"] == "insight"
-    assert len(result["news"]) <= 3
-    for item in result["news"]:
-        text = item["title"].lower() + item["summary"].lower()
-        assert "fed" in text
-
-
-@pytest.mark.asyncio
-async def test_dispatch_generate_market_insight_max_news_capped():
-    """generate_market_insight caps max_news at 10."""
-    connector = MockConnector()
-    news = MockNewsConnector()
-    result = await dispatch_tool(
-        "generate_market_insight",
-        {"pairs": ["EUR/USD"], "max_news": 999},
-        connector,
-        news_connector=news,
-    )
-    assert len(result["news"]) <= 10
-
-
-@pytest.mark.asyncio
 async def test_dispatch_get_interest_rate():
     """get_interest_rate tool dispatches to FREDConnector and returns rate data."""
     result = await dispatch_tool(
         "get_interest_rate",
         {"series_id": "DFF"},
         MockConnector(),
+        fred_connector=MockFredConnector(),
     )
     assert isinstance(result, dict)
     assert "series_id" in result
@@ -231,15 +204,54 @@ async def test_dispatch_get_interest_rate_missing_series_id():
 
 
 @pytest.mark.asyncio
-async def test_dispatch_generate_market_insight_empty_pairs():
-    """generate_market_insight with empty pairs list returns empty rates."""
+async def test_dispatch_collect_market_context():
+    connector = MockConnector()
+
+    result = await dispatch_tool(
+        "collect_market_context",
+        {"pairs": ["EUR/USD"], "sources": ["rates"]},
+        connector,
+    )
+
+    assert result["type"] == "market_context"
+    assert result["context"]["rates"][0]["base"] == "EUR"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_analyze_market_context():
+    connector = MockConnector()
+    context = {
+        "type": "market_context",
+        "context": {
+            "rates": [
+                {"date": "2026-05-19", "rate": 1.07},
+                {"date": "2026-05-20", "rate": 1.08},
+            ]
+        },
+        "warnings": [],
+    }
+
+    result = await dispatch_tool(
+        "analyze_market_context",
+        {"context": context, "analysis_type": "trend"},
+        connector,
+    )
+
+    assert result["type"] == "market_analysis"
+    assert "analysis" in result
+
+
+@pytest.mark.asyncio
+async def test_dispatch_generate_market_briefing():
     connector = MockConnector()
     news = MockNewsConnector()
+
     result = await dispatch_tool(
-        "generate_market_insight",
-        {"pairs": []},
+        "generate_market_briefing",
+        {"pairs": ["EUR/USD"], "include_research": False},
         connector,
         news_connector=news,
     )
-    assert result["type"] == "insight"
-    assert result["rates"] == []
+
+    assert result["type"] == "market_briefing"
+    assert result["pairs"] == ["EUR/USD"]
