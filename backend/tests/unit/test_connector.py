@@ -1,5 +1,4 @@
 import pytest
-import respx
 import httpx
 from backend.connectors.exchangerate_host import ExchangeRateHostConnector
 from backend.connectors.mock_connector import MockConnector

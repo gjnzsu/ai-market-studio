@@ -2,7 +2,7 @@
 
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 from backend.connectors.correlation_connector import CorrelationConnector
 from backend.connectors.base import ConnectorError

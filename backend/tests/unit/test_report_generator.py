@@ -1,5 +1,4 @@
 import pytest
-from unittest.mock import AsyncMock, patch
 from backend.agents.report_generator import generate_report
 
 

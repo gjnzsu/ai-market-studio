@@ -3,8 +3,6 @@ import json
 import os
 from unittest.mock import AsyncMock, MagicMock
 
-import httpx
-import respx
 
 
 def make_tool_call(name: str, args: dict, call_id: str = "call_gateway_001"):

@@ -1,5 +1,5 @@
 from typing import Any, Optional
-from backend.connectors.base import MarketDataConnector, ConnectorError
+from backend.connectors.base import MarketDataConnector
 from backend.connectors.news_connector import NewsConnectorBase
 
 # ---------------------------------------------------------------------------

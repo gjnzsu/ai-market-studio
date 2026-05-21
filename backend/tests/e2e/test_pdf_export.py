@@ -14,7 +14,6 @@ Verifies that:
 3. PDF content is valid (can be parsed)
 4. Different data types are handled correctly
 """
-import pytest
 from io import BytesIO
 from pypdf import PdfReader
 

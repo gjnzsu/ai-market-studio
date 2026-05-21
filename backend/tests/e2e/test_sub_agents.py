@@ -1,7 +1,6 @@
 """E2E tests for sub-agent orchestration."""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.mark.asyncio

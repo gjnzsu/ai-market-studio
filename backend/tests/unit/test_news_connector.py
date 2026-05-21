@@ -1,6 +1,5 @@
 """Unit tests for MockNewsConnector and RSSNewsConnector."""
 
-import pytest
 from backend.connectors.news_connector import MockNewsConnector, RSSNewsConnector
 
 
@@ -115,7 +114,6 @@ class TestRSSNewsConnector:
             parsed = feedparser.parse(xml)
             source_name = parsed.get("feed", {}).get("title") or url
             items = []
-            from datetime import datetime, timezone
             for entry in parsed.get("entries", []):
                 title = connector._clean_text(entry.get("title", ""))
                 summary = connector._clean_text(
@@ -186,7 +184,6 @@ class TestRSSNewsConnector:
         def fake_fetch(url):
             call_count["n"] += 1
             import feedparser
-            from datetime import datetime, timezone
             parsed = feedparser.parse(FAKE_RSS_XML)
             source_name = "Test Feed"
             items = []

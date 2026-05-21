@@ -1,9 +1,8 @@
 import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from backend.agent.agent import run_agent
 from backend.connectors.mock_connector import MockConnector
-from backend.connectors.base import RateFetchError
 
 
 def make_tool_call(name: str, args: dict, call_id: str = "call_001"):

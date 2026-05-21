@@ -18,7 +18,6 @@ from reportlab.platypus import (
     TableStyle,
     HRFlowable,
 )
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 
 
 BRAND_PRIMARY = colors.HexColor("#1A3A5C")   # deep navy

@@ -1,8 +1,7 @@
 """E2E tests for observability integration."""
 
 import pytest
-import httpx
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 
 @pytest.mark.asyncio

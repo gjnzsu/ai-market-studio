@@ -1,5 +1,4 @@
 import time
-import pytest
 from backend.cache import RateCache
 
 

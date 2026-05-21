@@ -1,8 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock
-import json
-from backend.connectors.mock_connector import MockConnector
 from backend.connectors.base import RateFetchError
 
 

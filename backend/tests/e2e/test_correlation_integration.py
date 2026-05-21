@@ -1,7 +1,5 @@
 """End-to-end integration test for correlation analysis through chat endpoint."""
 
-import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.main import app

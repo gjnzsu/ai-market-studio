@@ -1,9 +1,7 @@
 import pytest
 from pydantic import ValidationError
 from backend.models import (
-    ChatRequest, ChatResponse, Message,
-    HistoricalRatesRequest, DailyRates, HistoricalRatesResponse,
-    DashboardPanelConfig, DashboardConfig,
+    ChatRequest, ChatResponse, HistoricalRatesRequest, DashboardPanelConfig, DashboardConfig,
 )
 
 

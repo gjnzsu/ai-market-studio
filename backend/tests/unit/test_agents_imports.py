@@ -1,6 +1,5 @@
 """Test that all agent functions are properly exported."""
 
-import pytest
 
 
 def test_all_agents_importable():
