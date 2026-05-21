@@ -564,12 +564,12 @@ async def dispatch_tool(
             document_type=tool_args.get("document_type")
         )
     elif tool_name == "get_interest_rate":
-        if fred_connector is None:
-            raise AgentError("FRED connector not available. Please configure FRED_API_KEY.")
         series_id = tool_args.get("series_id")
         date = tool_args.get("date")
         if not series_id:
             raise AgentError("series_id is required for get_interest_rate")
+        if fred_connector is None:
+            raise AgentError("FRED connector not available. Please configure FRED_API_KEY.")
         result = await fred_connector.get_current_rate(series_id=series_id, date=date)
         return result.model_dump()
     elif tool_name == "analyze_fx_economic_correlation":

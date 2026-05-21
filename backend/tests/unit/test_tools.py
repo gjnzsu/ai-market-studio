@@ -1,4 +1,5 @@
 import pytest
+from backend.connectors.fred_connector import InterestRateData
 from backend.agent.tools import (
     AgentError,
     LEGACY_TOOL_DEFINITIONS,
@@ -13,6 +14,18 @@ from backend.connectors.news_connector import MockNewsConnector
 
 def _tool_names(tools):
     return [tool["function"]["name"] for tool in tools]
+
+
+class MockFredConnector:
+    async def get_current_rate(self, series_id: str, date: str | None = None):
+        return InterestRateData(
+            series_id=series_id,
+            series_name="Effective Federal Funds Rate (daily)",
+            date=date or "2026-05-20",
+            value=4.33,
+            unit="percent",
+            source="FRED (Federal Reserve Economic Data)",
+        )
 
 
 def test_legacy_tool_definitions_exclude_workflow_and_deprecated_tools():
@@ -165,6 +178,7 @@ async def test_dispatch_get_interest_rate():
         "get_interest_rate",
         {"series_id": "DFF"},
         MockConnector(),
+        fred_connector=MockFredConnector(),
     )
     assert isinstance(result, dict)
     assert "series_id" in result
