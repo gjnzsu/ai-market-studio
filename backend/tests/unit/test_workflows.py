@@ -55,6 +55,28 @@ async def test_analyze_market_context_returns_analysis_not_briefing():
 
 
 @pytest.mark.asyncio
+async def test_analyze_market_context_general_uses_trend_analysis():
+    context = {
+        "type": "market_context",
+        "context": {
+            "rates": [
+                {"date": "2026-05-19", "rate": 1.07},
+                {"date": "2026-05-20", "rate": 1.08},
+            ]
+        },
+        "warnings": [],
+    }
+
+    result = await analyze_market_context(
+        context=context,
+        analysis_type="general",
+    )
+
+    assert result["type"] == "market_analysis"
+    assert result["analysis"]["analysis_type"] == "trend"
+
+
+@pytest.mark.asyncio
 async def test_generate_market_briefing_coordinates_context_and_analysis():
     connector = AsyncMock()
     connector.get_exchange_rate.return_value = {

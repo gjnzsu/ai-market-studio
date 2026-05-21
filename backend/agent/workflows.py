@@ -107,6 +107,8 @@ async def analyze_market_context(
     internal_analysis_type = (
         "correlation" if analysis_type == "economic_relationship" else analysis_type
     )
+    if internal_analysis_type == "general":
+        internal_analysis_type = "trend"
     analysis = await analyze_market_trends(
         data=analysis_input,
         analysis_type=internal_analysis_type,
