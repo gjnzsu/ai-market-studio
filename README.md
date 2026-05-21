@@ -158,8 +158,8 @@ The application is deployed on Google Kubernetes Engine (GKE):
   ```json
   {
     "reply": "EUR/USD is trading at 1.0850...",
-    "data": { "type": "insight", "rates": [...], "news": [...] },
-    "tool_used": "generate_market_insight"
+    "data": { "type": "market_briefing", "pairs": ["EUR/USD"], "context": {...} },
+    "tool_used": "generate_market_briefing"
   }
   ```
 - **Response:** Binary PDF file (`application/pdf`) with `Content-Disposition: attachment; filename="fx-insight-YYYYMMDD_HHMM.pdf"`
@@ -171,9 +171,10 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ### Feature 07 - Market Insight Summary
 - Ask in natural language: *"Give me a market insight on EUR/USD and GBP/USD"*
-- GPT-5.4 calls `generate_market_insight` to fetch spot rates and RSS news in one turn
-- Batched API calls: all pairs with a shared target currency are fetched in a single request
-- Renders inline rate chips and news cards inside the chat bubble
+- Legacy mode answers market insight requests through the approved low-level market data tools.
+- Workflow mode replaces the deprecated `generate_market_insight` tool with `generate_market_briefing`.
+- Market briefings coordinate FX rates, news, FRED indicators, and internal research behind one intent-level workflow result.
+- Responses keep the existing `reply`, `data`, and `tool_used` shape for frontend compatibility.
 
 ![Market Insight Summary](docs/screenshots/shot_f7_live.png)
 
@@ -216,20 +217,14 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Average Cost per Query**: ~$0.0072 USD (based on gpt-4o usage patterns)
 - **Regression Tests**: 5 E2E tests in `backend/tests/e2e/test_observability.py` (97% coverage)
 
-### Feature 11 - Multi-Agent Orchestration (2026-04-26)
-- **Orchestrator Pattern**: Main GPT-5.4 agent coordinates 4 specialized sub-agents for complex workflows
-- **Sub-Agents**:
-  - **Data Collector** (`collect_market_data`) - Fetches raw data from FX, news, FRED, and RAG sources
-  - **Market Analyst** (`analyze_market_trends`) - Performs trend, volatility, correlation, and signal analysis
-  - **Report Generator** (`generate_report`) - Creates PDFs, dashboards, and summaries
-  - **Research Synthesizer** (`synthesize_research`) - Combines multi-source intelligence into coherent insights
-- **Parallel Execution**: Independent data fetches run in parallel (rates + news + FRED simultaneously)
-- **Sequential Execution**: Dependent operations run sequentially (collect data → analyze → report)
-- **Performance Optimization**: MAX_TOOL_ROUNDS reduced from 5 to 3, 20s request timeout
-- **Resource Allocation**: Backend scaled to 1000m CPU, 1Gi memory for multi-round LLM calls
-- **Backward Compatibility**: Legacy tools (`get_exchange_rate`, `get_fx_news`, etc.) still available
-- **Architecture**: Single orchestrator with tool-based sub-agent dispatch (no separate processes)
-- **Testing**: Sub-agent imports verified in `backend/tests/unit/test_agents_imports.py`
+### Feature 11 - Agent Workflow Foundation (2026-05-21)
+- **Mode selection**: `/api/chat` defaults to `agent_mode: "legacy"` and accepts `agent_mode: "workflow"` only when `ENABLE_AGENT_WORKFLOW_MODE=true`.
+- **Intent-level tools**: Workflow mode exposes `collect_market_context`, `analyze_market_context`, and `generate_market_briefing` instead of low-level internal agent tools.
+- **Market insight replacement**: `generate_market_insight` is no longer an approved model-facing tool; market insight, overview, briefing, and synthesis requests use `generate_market_briefing` in workflow mode.
+- **Guardrails**: Workflow requests have bounded runtime (`AGENT_WORKFLOW_TIMEOUT_SECONDS`) and bounded model/tool rounds (`AGENT_WORKFLOW_MAX_ROUNDS`).
+- **Failure behavior**: Workflow failures return clear timeout or failure responses and do not silently fall back to legacy orchestration.
+- **Observability**: Workflow logs include selected mode, workflow name, internal units, latency, status, and failure category.
+- **Backward compatibility**: Existing clients can omit `agent_mode` and still receive the same `reply`, `data`, and `tool_used` response shape.
 
 ---
 
@@ -246,7 +241,7 @@ Frontend (ai-market-studio-ui) - nginx on port 80
    v
 Backend API (this repo - FastAPI) on port 8000
    |
-   |-- /api/chat              -> GPT-4o agent loop
+   |-- /api/chat              -> configurable GPT agent loop
    |-- /api/rates/historical  -> daily FX rates, LRU cached
    |-- /api/dashboard         -> batch panel fetch
    |-- /api/export/pdf        -> PDF report generation (reportlab via skills/pdf/pdf_skill.py)
@@ -287,7 +282,9 @@ Connector Layer
                                  RAG Service (ai-rag-service)
 ```
 
-**GPT-5.4 tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `get_interest_rate`, `generate_dashboard`, `get_fx_news`, `generate_market_insight`, `get_internal_research`
+**Legacy-mode GPT-5.4 tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `list_supported_currencies`, `get_interest_rate`, `analyze_fx_economic_correlation`, `generate_dashboard`, `get_fx_news`, `get_internal_research`
+
+**Workflow-mode GPT-5.4 tools:** `collect_market_context`, `analyze_market_context`, `generate_market_briefing`
 
 ---
 
@@ -297,13 +294,14 @@ Connector Layer
 
 **POST** `/api/chat`
 
-Main conversational interface with GPT-5.4 agent.
+Main conversational interface with GPT-5.4 agent. Requests use legacy orchestration by default. To opt in to intent-level workflows, set `agent_mode` to `"workflow"` and enable `ENABLE_AGENT_WORKFLOW_MODE=true`.
 
 **Request:**
 ```json
 {
   "message": "What is the EUR/USD rate?",
-  "history": []
+  "history": [],
+  "agent_mode": "legacy"
 }
 ```
 
@@ -321,6 +319,17 @@ Main conversational interface with GPT-5.4 agent.
   "tool_used": "get_exchange_rate"
 }
 ```
+
+**Workflow-mode request:**
+```json
+{
+  "message": "Brief EUR/USD with news and research context",
+  "history": [],
+  "agent_mode": "workflow"
+}
+```
+
+Workflow mode returns the same top-level response fields. A successful market briefing reports `tool_used` as `generate_market_briefing` and carries structured workflow data inside `data`.
 
 ### Historical Rates Endpoint
 
@@ -369,11 +378,14 @@ Render a chat response as a downloadable PDF. Accepts the current reply text and
 {
   "reply": "EUR/USD is trading at 1.0850, up 0.3% on the day.",
   "data": {
-    "type": "insight",
-    "rates": [{"base": "EUR", "target": "USD", "rate": 1.085}],
-    "news": [{"title": "Fed signals pause", "source": "FXStreet"}]
+    "type": "market_briefing",
+    "pairs": ["EUR/USD"],
+    "context": {
+      "rates": [{"base": "EUR", "target": "USD", "rate": 1.085}],
+      "news": [{"title": "Fed signals pause", "source": "FXStreet"}]
+    }
   },
-  "tool_used": "generate_market_insight"
+  "tool_used": "generate_market_briefing"
 }
 ```
 
@@ -562,7 +574,7 @@ kubectl get service ai-market-studio -o wide
 | `USE_MOCK_CONNECTOR` | `false` | Use synthetic FX data instead of live exchangerate.host API |
 | `USE_MOCK_NEWS_CONNECTOR` | `false` | Use synthetic news data instead of live RSS feeds |
 | `RAG_SERVICE_URL` | `http://localhost:8000` | Base URL of the external RAG service; `RAGConnector` calls `POST {RAG_SERVICE_URL}/query` |
-| `ENABLE_AGENT_WORKFLOW_MODE` | `false` | Enables opt-in agent workflow mode for `/api/chat` |
+| `ENABLE_AGENT_WORKFLOW_MODE` | `false` | Enables opt-in intent-level workflow mode for `/api/chat`; omitted `agent_mode` still uses legacy mode |
 | `AGENT_WORKFLOW_TIMEOUT_SECONDS` | `20.0` | Timeout for workflow-mode chat requests |
 | `AGENT_WORKFLOW_MAX_ROUNDS` | `2` | Maximum LLM/tool rounds for workflow-mode requests |
 | `OBSERVABILITY_URL` | `http://ai-sre-observability.default.svc.cluster.local:8080` | AI SRE Observability service endpoint for LLM metrics collection |
@@ -868,10 +880,11 @@ ai-market-studio/ (Backend API)
 | P2 - Done | Output Generation | PDF report generation via Export to PDF button, email delivery pending | ✅ Complete |
 | P3 - Done | Intelligence & Economic Data | RAG research integration (Feature 05), FRED interest rates (Feature 08), economic indicator queries | ✅ Complete |
 | P4 - Done | Data Breadth & Observability | Direct FRED connector, AI Gateway service (OpenAI + DeepSeek), AI SRE Observability (LLM cost tracking) | ✅ Complete |
-| P5 - Planned | Platform & Simulation | Custom agent creation (user-facing), OCR/document ingestion for scanned PDFs, paper-trading simulation | 🔄 Planned |
-| P6 - Planned | Execution & Risk | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls | 🔄 Planned |
+| P5 - Done | Agent Workflow Foundation | Opt-in workflow mode, intent-level market workflows, workflow guardrails, archived OpenSpec specs | ✅ Complete |
+| P6 - Planned | Platform & Simulation | Custom agent creation (user-facing), OCR/document ingestion for scanned PDFs, paper-trading simulation | 🔄 Planned |
+| P7 - Planned | Execution & Risk | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls | 🔄 Planned |
 
-**Note:** Multi-agent orchestration (Feature 11) is an internal architecture improvement, not a user-facing feature. Custom agent creation (P5) will allow users to create their own specialized agents.
+**Note:** Feature 11 is an internal workflow foundation, not user-facing custom agent creation. Future custom agent work should build on the opt-in workflow mode rather than exposing low-level internal agent tools directly.
 
 ### Completed in P3/P4 (Phase 2026-04-12)
 
@@ -916,12 +929,13 @@ ai-market-studio/ (Backend API)
 - Average cost per query: ~$0.0072 USD (based on gpt-4o usage patterns)
 - Regression tests: 5 E2E tests with 97% coverage
 
-✅ **Internal: Multi-Agent Architecture** (2026-04-26)
-- Orchestrator pattern: Main GPT-4o agent coordinates 4 specialized sub-agents
-- Sub-agents: Data Collector, Market Analyst, Report Generator, Research Synthesizer
-- Performance optimizations: MAX_TOOL_ROUNDS=3, 20s timeout, 2x CPU/memory
-- Note: This is internal architecture, not a user-facing feature
-- User-facing custom agent creation planned for P5
+✅ **Internal: Agent Workflow Foundation** (2026-05-21)
+- Added explicit `/api/chat` mode selection with `legacy` as the default and `workflow` as a gated opt-in mode.
+- Split model-facing tool exposure into legacy and workflow tool sets.
+- Added intent-level workflow tools: `collect_market_context`, `analyze_market_context`, and `generate_market_briefing`.
+- Removed deprecated `generate_market_insight` from approved model-facing tool sets.
+- Added workflow timeout, step-limit, no-silent-fallback, source warning, and legacy isolation coverage.
+- Archived OpenSpec change: `openspec/changes/archive/2026-05-21-agent-workflow-foundation`.
 
 ✅ **P4 - FRED Integration** (ai-gateway-service, 2026-04-11)
 - Unified OpenAI-compatible API gateway (LiteLLM)
@@ -1222,7 +1236,7 @@ OPENAI_MODEL=gpt-4o  # Use gpt-4o for complex financial analysis
 #### 3. Performance Optimization
 - **Batch requests**: Use workflow-mode market briefings for multi-pair analysis when `ENABLE_AGENT_WORKFLOW_MODE=true`
 - **Cache results**: Historical data is cached for 5 minutes (TTL=300s)
-- **Parallel calls**: Agent automatically parallelizes independent tool calls
+- **Bound workflows**: Workflow mode uses a shorter, intent-level tool set with configurable timeout and round limits
 
 #### 4. Cost Management
 - **Model selection**: Switch to `deepseek-chat` for cost-effective analysis
