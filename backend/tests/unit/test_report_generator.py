@@ -93,16 +93,26 @@ async def test_generate_report_invalid_format():
 
 @pytest.mark.asyncio
 async def test_generate_report_empty_data():
-    """Test error handling for empty data."""
-    with pytest.raises(ValueError, match="data parameter cannot be empty"):
-        await generate_report(data={}, format="summary")
+    """Test graceful placeholder response for empty data."""
+    result = await generate_report(data={}, format="summary")
+
+    assert result["type"] == "report"
+    assert result["format"] == "summary"
+    assert result["title"] == "Market Summary"
+    assert result["content"] == "No data available for report generation."
+    assert result["metadata"]["status"] == "empty"
 
 
 @pytest.mark.asyncio
 async def test_generate_report_none_data():
-    """Test error handling for None data."""
-    with pytest.raises(ValueError, match="data parameter cannot be empty"):
-        await generate_report(data=None, format="summary")
+    """Test graceful placeholder response for None data."""
+    result = await generate_report(data=None, format="summary")
+
+    assert result["type"] == "report"
+    assert result["format"] == "summary"
+    assert result["title"] == "Market Summary"
+    assert result["content"] == "No data available for report generation."
+    assert result["metadata"]["status"] == "empty"
 
 
 @pytest.mark.asyncio
@@ -176,4 +186,3 @@ async def test_generate_report_uses_default_titles():
 
     summary_result = await generate_report(data=data, format="summary")
     assert summary_result["title"] == "Market Summary"
-
