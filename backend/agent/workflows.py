@@ -3,6 +3,7 @@ import time
 from typing import Any, Optional
 
 from backend.agents.market_analyst import analyze_market_trends
+from backend.agent.financial_playbooks import select_playbook
 from backend.connectors.base import MarketDataConnector
 from backend.connectors.news_connector import NewsConnectorBase
 
@@ -123,6 +124,7 @@ async def analyze_market_context(
 
 async def generate_market_briefing(
     pairs: list[str],
+    playbook: Optional[str] = None,
     focus: Optional[str] = None,
     include_news: bool = True,
     include_fred: bool = False,
@@ -135,6 +137,7 @@ async def generate_market_briefing(
 ) -> dict[str, Any]:
     started_at = time.perf_counter()
     internal_units = ["collect_market_context", "analyze_market_context"]
+    selected_playbook = select_playbook(explicit=playbook, focus=focus)
     logger.info(
         "workflow_start mode=workflow name=generate_market_briefing units=%s pairs=%s",
         internal_units,
@@ -160,14 +163,51 @@ async def generate_market_briefing(
             rag_connector=rag_connector,
         )
         analysis = await analyze_market_context(context=context, analysis_type="trend")
+        available_sources = list(context.get("context", {}).keys())
+        playbook_sources = list(
+            dict.fromkeys(
+                list(selected_playbook.required_sources)
+                + list(selected_playbook.optional_sources)
+            )
+        )
         result = {
             "type": "market_briefing",
             "pairs": pairs,
+            "playbook": {
+                "id": selected_playbook.id,
+                "display_name": selected_playbook.display_name,
+                "required_sources": list(selected_playbook.required_sources),
+                "optional_sources": list(selected_playbook.optional_sources),
+                "output_sections": list(selected_playbook.output_sections),
+                "research_only": selected_playbook.research_only,
+            },
+            "data_gaps": [
+                {
+                    "source": source,
+                    "reason": "Specialist data is not available from current AI Market Studio connectors.",
+                }
+                for source in selected_playbook.data_gap_sources
+            ],
+            "source_grounding": {
+                "available_sources": available_sources,
+                "requested_sources": playbook_sources,
+                "missing_required_sources": [
+                    source
+                    for source in selected_playbook.required_sources
+                    if source not in available_sources
+                ],
+                "missing_optional_sources": [
+                    source
+                    for source in selected_playbook.optional_sources
+                    if source not in available_sources
+                ],
+            },
             "context": context,
             "analysis": analysis["analysis"],
             "briefing": {
                 "summary": "Market briefing context collected and analyzed.",
                 "focus": focus,
+                "stance": "Research-only market briefing support; not live trading execution advice.",
             },
             "warnings": context.get("warnings", []),
         }

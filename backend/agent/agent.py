@@ -85,9 +85,12 @@ def _summarise_tool_result(result: dict) -> dict:
         sources = research.get("sources", []) if isinstance(research, dict) else []
         return {
             "pairs": result.get("pairs", []),
+            "playbook": result.get("playbook"),
             "analysis": result.get("analysis", {}),
             "news_headlines": [item.get("title") for item in news_items],
             "research_documents": [source.get("name") for source in sources],
+            "data_gaps": result.get("data_gaps", []),
+            "source_grounding": result.get("source_grounding", {}),
             "warnings": result.get("warnings", []),
         }
     if rtype == "dashboard":

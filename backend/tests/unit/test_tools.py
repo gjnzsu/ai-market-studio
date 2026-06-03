@@ -55,6 +55,24 @@ def test_workflow_tool_definitions_expose_only_intent_tools():
     ]
 
 
+def test_generate_market_briefing_tool_accepts_optional_playbook():
+    briefing_tool = next(
+        tool
+        for tool in WORKFLOW_TOOL_DEFINITIONS
+        if tool["function"]["name"] == "generate_market_briefing"
+    )
+
+    properties = briefing_tool["function"]["parameters"]["properties"]
+    assert "playbook" in properties
+    assert properties["playbook"]["enum"] == [
+        "general",
+        "fx_carry",
+        "macro_rates",
+        "morning_note",
+        "catalyst_calendar",
+    ]
+
+
 def test_get_tool_definitions_selects_by_agent_mode():
     assert get_tool_definitions("legacy") == LEGACY_TOOL_DEFINITIONS
     assert get_tool_definitions("workflow") == WORKFLOW_TOOL_DEFINITIONS
@@ -255,3 +273,23 @@ async def test_dispatch_generate_market_briefing():
 
     assert result["type"] == "market_briefing"
     assert result["pairs"] == ["EUR/USD"]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_generate_market_briefing_passes_playbook():
+    connector = MockConnector()
+    news = MockNewsConnector()
+
+    result = await dispatch_tool(
+        "generate_market_briefing",
+        {
+            "pairs": ["EUR/USD"],
+            "playbook": "fx_carry",
+            "include_research": False,
+        },
+        connector,
+        news_connector=news,
+    )
+
+    assert result["type"] == "market_briefing"
+    assert result["playbook"]["id"] == "fx_carry"

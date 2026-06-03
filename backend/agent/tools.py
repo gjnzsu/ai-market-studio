@@ -463,6 +463,16 @@ WORKFLOW_TOOL_DEFINITIONS = [
                 "type": "object",
                 "properties": {
                     "pairs": {"type": "array", "items": {"type": "string"}},
+                    "playbook": {
+                        "type": "string",
+                        "enum": [
+                            "general",
+                            "fx_carry",
+                            "macro_rates",
+                            "morning_note",
+                            "catalyst_calendar",
+                        ],
+                    },
                     "focus": {"type": "string"},
                     "include_news": {"type": "boolean"},
                     "include_fred": {"type": "boolean"},
@@ -574,11 +584,13 @@ async def dispatch_tool(
         return result.model_dump()
     elif tool_name == "analyze_fx_economic_correlation":
         from backend.connectors.correlation_connector import CorrelationConnector
-        from backend.connectors.fred_connector import FREDConnector
+
+        if fred_connector is None:
+            raise AgentError("FRED connector not available. Please configure FRED_API_KEY.")
 
         correlation_connector = CorrelationConnector(
             market_connector=connector,
-            fred_connector=FREDConnector()
+            fred_connector=fred_connector,
         )
 
         pair = tool_args.get("pair")
@@ -667,6 +679,7 @@ async def dispatch_tool(
         from backend.agent.workflows import generate_market_briefing
         return await generate_market_briefing(
             pairs=tool_args.get("pairs") or [],
+            playbook=tool_args.get("playbook"),
             focus=tool_args.get("focus"),
             include_news=tool_args.get("include_news", True),
             include_fred=tool_args.get("include_fred", False),

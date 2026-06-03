@@ -1,0 +1,166 @@
+<mxfile host="app.diagrams.net" modified="2026-06-03T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="workflow-playbook-sequence" name="Workflow Mode Playbook UML Sequence">
+    <mxGraphModel dx="1700" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Workflow Mode + Financial Playbook - UML Sequence" style="text;html=1;strokeColor=none;fillColor=none;fontSize=32;fontStyle=1;fontColor=#0f172a;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="250" y="35" width="1200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="Time flows downward. This sequence shows one workflow-mode FX carry briefing with source grounding and data gaps." style="text;html=1;strokeColor=none;fillColor=none;fontSize=18;fontColor=#475569;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="260" y="85" width="1180" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_user" value="User / UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
+          <mxGeometry x="40" y="145" width="150" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_api" value="Backend API&lt;br/&gt;/api/chat" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fdf4;strokeColor=#16a34a;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
+          <mxGeometry x="265" y="145" width="170" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_agent" value="Agent Loop" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffbeb;strokeColor=#d97706;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
+          <mxGeometry x="510" y="145" width="165" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_llm" value="AI Gateway&lt;br/&gt;/ LLM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef2ff;strokeColor=#4f46e5;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
+          <mxGeometry x="745" y="145" width="165" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_workflow" value="Workflow&lt;br/&gt;Runtime" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
+          <mxGeometry x="980" y="145" width="165" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_playbook" value="Playbook&lt;br/&gt;Registry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f3ff;strokeColor=#7c3aed;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1215" y="145" width="165" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_data" value="Connectors&lt;br/&gt;+ Data" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfdf5;strokeColor=#059669;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="145" width="165" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="l_user" value="" style="shape=line;html=1;strokeColor=#94a3b8;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="115" y="203" width="1" height="975" as="geometry"/>
+        </mxCell>
+        <mxCell id="l_api" value="" style="shape=line;html=1;strokeColor=#94a3b8;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="350" y="203" width="1" height="975" as="geometry"/>
+        </mxCell>
+        <mxCell id="l_agent" value="" style="shape=line;html=1;strokeColor=#94a3b8;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="592" y="203" width="1" height="975" as="geometry"/>
+        </mxCell>
+        <mxCell id="l_llm" value="" style="shape=line;html=1;strokeColor=#94a3b8;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="827" y="203" width="1" height="975" as="geometry"/>
+        </mxCell>
+        <mxCell id="l_workflow" value="" style="shape=line;html=1;strokeColor=#94a3b8;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1062" y="203" width="1" height="975" as="geometry"/>
+        </mxCell>
+        <mxCell id="l_playbook" value="" style="shape=line;html=1;strokeColor=#94a3b8;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1297" y="203" width="1" height="975" as="geometry"/>
+        </mxCell>
+        <mxCell id="l_data" value="" style="shape=line;html=1;strokeColor=#94a3b8;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1542" y="203" width="1" height="975" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_api" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;" vertex="1" parent="1">
+          <mxGeometry x="341" y="260" width="18" height="880" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_agent" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;" vertex="1" parent="1">
+          <mxGeometry x="583" y="335" width="18" height="785" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_llm" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e7ff;strokeColor=#4f46e5;" vertex="1" parent="1">
+          <mxGeometry x="818" y="405" width="18" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_workflow" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef9c3;strokeColor=#d97706;" vertex="1" parent="1">
+          <mxGeometry x="1053" y="610" width="18" height="360" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_playbook" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#7c3aed;" vertex="1" parent="1">
+          <mxGeometry x="1288" y="680" width="18" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_data" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#059669;" vertex="1" parent="1">
+          <mxGeometry x="1533" y="820" width="18" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="m1" value="1. POST /api/chat&lt;br/&gt;agent_mode=workflow" style="html=1;strokeColor=#2563eb;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="115" y="280" as="sourcePoint"/>
+            <mxPoint x="341" y="280" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m2" value="2. run_agent(workflow)" style="html=1;strokeColor=#16a34a;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="359" y="355" as="sourcePoint"/>
+            <mxPoint x="583" y="355" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m3" value="3. model call with workflow tools" style="html=1;strokeColor=#4f46e5;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="601" y="430" as="sourcePoint"/>
+            <mxPoint x="818" y="430" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m4" value="4. tool call: generate_market_briefing" style="html=1;strokeColor=#4f46e5;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="818" y="520" as="sourcePoint"/>
+            <mxPoint x="601" y="520" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m5" value="5. dispatch workflow tool" style="html=1;strokeColor=#d97706;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="601" y="630" as="sourcePoint"/>
+            <mxPoint x="1053" y="630" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m6" value="6. select_playbook(fx_carry)" style="html=1;strokeColor=#7c3aed;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1071" y="700" as="sourcePoint"/>
+            <mxPoint x="1288" y="700" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m7" value="7. playbook definition" style="html=1;strokeColor=#7c3aed;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1288" y="760" as="sourcePoint"/>
+            <mxPoint x="1071" y="760" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m8" value="8. collect_market_context" style="html=1;strokeColor=#059669;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1071" y="840" as="sourcePoint"/>
+            <mxPoint x="1533" y="840" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m9" value="9. rates, news, FRED, research" style="html=1;strokeColor=#059669;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1533" y="920" as="sourcePoint"/>
+            <mxPoint x="1071" y="920" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m10" value="10. structured briefing" style="html=1;strokeColor=#d97706;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1053" y="990" as="sourcePoint"/>
+            <mxPoint x="601" y="990" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m11" value="11. compact summary for final answer" style="html=1;strokeColor=#4f46e5;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="601" y="1015" as="sourcePoint"/>
+            <mxPoint x="818" y="1015" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m12" value="12. final research-only answer" style="html=1;strokeColor=#4f46e5;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="818" y="1065" as="sourcePoint"/>
+            <mxPoint x="601" y="1065" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m13" value="13. ChatResponse" style="html=1;strokeColor=#16a34a;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="583" y="1115" as="sourcePoint"/>
+            <mxPoint x="359" y="1115" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m14" value="14. render reply + structured data" style="html=1;strokeColor=#2563eb;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="341" y="1138" as="sourcePoint"/>
+            <mxPoint x="115" y="1138" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="note1" value="Tool arguments&lt;br/&gt;pairs: EUR/USD&lt;br/&gt;playbook: fx_carry&lt;br/&gt;include_fred: true&lt;br/&gt;fred_series_ids: DFF, DGS10" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=16;fontColor=#0f172a;align=left;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="930" y="405" width="250" height="145" as="geometry"/>
+        </mxCell>
+        <mxCell id="note2" value="Playbook output&lt;br/&gt;required: rates + FRED&lt;br/&gt;optional gaps: forward_curve, implied_volatility&lt;br/&gt;research_only: true" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=16;fontColor=#0f172a;align=left;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="1185" y="955" width="300" height="145" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

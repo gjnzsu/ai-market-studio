@@ -6,7 +6,11 @@ Backend API for the AI Market Studio conversational FX market data platform.
 
 ### Component Diagram
 
-![Component Diagram](ai-market-studio-components.drawio.png)
+![Component Diagram](docs/diagrams/ai-market-studio-component.drawio.png)
+
+### Workflow Mode Playbook Sequence
+
+![Workflow Mode Playbook Sequence](docs/diagrams/ai-market-studio-workflow-playbook-sequence.drawio.png)
 
 This repository is part of a **microservices architecture** that was split from a monolithic application for better scalability and independent deployment:
 
@@ -67,7 +71,7 @@ Observability Stack:
 **Key Points:**
 - Frontend → Backend: Uses external LoadBalancer IP (browser cannot access internal DNS)
 - Backend → AI Gateway: Uses internal Kubernetes DNS (`http://ai-gateway.ai-gateway.svc.cluster.local/v1`)
-- Backend → RAG Service: Uses internal Kubernetes DNS (`http://ai-rag-service:8000`)
+- Backend → RAG Service: Uses the configured `RAG_SERVICE_URL` (`http://34.10.130.210` in the current ConfigMap; internal service DNS can be used when the RAG service is deployed in the same cluster/namespace)
 - AI Gateway routes LLM requests to OpenAI or DeepSeek based on model name
 
 > **Vision:** AI-native market intelligence platform for natural language-driven data retrieval, automated dashboard generation, and context-aware insights.
@@ -86,7 +90,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 | **Backend API** | http://35.224.3.54 | ✓ Running | 1 |
 | **API Docs** | http://35.224.3.54/docs | ✓ Available | - |
 | **AI Gateway** | `http://ai-gateway.ai-gateway.svc.cluster.local/v1` (internal) | ✓ Running | 2 |
-| **RAG Service** | `http://ai-rag-service:8000` (internal) | ✓ Running | 1 |
+| **RAG Service** | `http://34.10.130.210` (`RAG_SERVICE_URL`) | ✓ Running | 1 |
 | **AI SRE Observability** | `http://ai-sre-observability:8080` (internal) | ✓ Running | 1 |
 | **Prometheus** | http://136.113.33.154:9090 | ✓ Running | 1 |
 | **Grafana** | http://136.114.77.0 | ✓ Running | 1 |
@@ -103,8 +107,9 @@ The application is deployed on Google Kubernetes Engine (GKE):
 | LLM Provider | AI Gateway Service (routes to OpenAI/DeepSeek) |
 | LLM Model | `gpt-5.4` (configurable: `gpt-4o`, `gpt-4o-mini`, `deepseek-chat`) |
 | FX Connector | `USE_MOCK_CONNECTOR=true` (set `false` for live exchangerate.host data) |
-| News Connector | `USE_MOCK_NEWS_CONNECTOR=true` (set `false` for live RSS feeds) |
-| RAG Service URL | `http://ai-rag-service:8000` (internal Kubernetes service) |
+| News Connector | `USE_MOCK_NEWS_CONNECTOR=false` (live RSS feeds) |
+| RAG Service URL | `http://34.10.130.210` (external deployed RAG endpoint) |
+| Workflow Mode | `ENABLE_AGENT_WORKFLOW_MODE=true` |
 | CORS Origins | `http://136.116.205.168` (frontend URL) |
 
 ## Features
@@ -186,15 +191,15 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - Supports both current rates and optional historical date queries
 - Error handling: timeout, missing data, and API errors all caught and reported
 - Renders inline rate cards with source attribution (Federal Reserve Economic Data)
-- **Live Deployment Status:** ✅ Deployed 2026-04-12, verified working on GKE (35.224.3.54)
-- **Test Result:** Query "What is the current federal funds rate?" → Returns 3.64% as of 2026-04-09
+- **Live Deployment Status:** Deployed since 2026-04-12; FRED is configured through `FRED_API_KEY` in the backend Kubernetes Secret or local `.env`
+- **Recent local E2E result:** Workflow-mode FX carry briefing fetched `DFF=3.62` and `DGS10=4.47` from FRED, both dated 2026-06-01
 
 ### Feature 09 - AI Gateway Integration (2026-04-13)
 - **Centralized LLM Management**: All OpenAI API calls route through internal AI Gateway service
 - **Multi-Provider Support**: Seamless routing to OpenAI (gpt-4o, gpt-4o-mini) or DeepSeek (deepseek-chat)
 - **Dynamic Model Selection**: Switch models via ConfigMap without code changes
 - **Cost Optimization**: Route queries to cost-effective models (gpt-4o-mini, deepseek-chat) based on complexity
-- **Centralized Key Management**: API keys managed only in gateway, not in backend
+- **Centralized LLM Key Management**: OpenAI/DeepSeek provider keys are managed by the gateway; non-LLM connector keys such as FRED stay with the backend
 - **Single Observability Point**: All LLM requests logged and monitored at gateway level
 - **Architecture**: Backend → AI Gateway (ClusterIP) → OpenAI/DeepSeek
 - **Gateway Endpoint**: `http://ai-gateway.ai-gateway.svc.cluster.local/v1` (internal)
@@ -226,6 +231,13 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Observability**: Workflow logs include selected mode, workflow name, internal units, latency, status, and failure category.
 - **Backward compatibility**: Existing clients can omit `agent_mode` and still receive the same `reply`, `data`, and `tool_used` response shape.
 
+### Feature 12 - Financial Analysis Playbooks (2026-06-02)
+- **Runtime playbooks**: Workflow-mode market briefings can apply professional analysis frames for `general`, `fx_carry`, `macro_rates`, `morning_note`, and `catalyst_calendar`.
+- **Explicit or inferred selection**: `generate_market_briefing` accepts an optional `playbook` field and can infer a playbook from briefing focus text when omitted.
+- **Source grounding**: Briefing data includes selected playbook metadata, available/requested sources, missing required/optional sources, and specialist `data_gaps`.
+- **Current data surface**: Playbooks ground themselves in existing FX rates, FRED indicators, market news, and internal research/RAG sources.
+- **Research-only boundary**: Playbook outputs support market research and desk briefing workflows; they do not provide live execution instructions, broker routing, or automated trading advice.
+
 ---
 
 ## Architecture
@@ -244,7 +256,7 @@ Backend API (this repo - FastAPI) on port 8000
    |-- /api/chat              -> configurable GPT agent loop
    |-- /api/rates/historical  -> daily FX rates, LRU cached
    |-- /api/dashboard         -> batch panel fetch
-   |-- /api/export/pdf        -> PDF report generation (reportlab via skills/pdf/pdf_skill.py)
+   |-- /api/export/pdf        -> PDF report generation (reportlab via backend/exporters/pdf_exporter.py)
    |
    v
 AI Gateway Service (LiteLLM) - http://ai-gateway.ai-gateway.svc.cluster.local/v1
@@ -277,7 +289,7 @@ Connector Layer
    |-- FREDConnector             -> Federal Reserve interest rates (direct FRED API)
    `-- RAGConnector              -> external RAG service
                                     |
-                                    | HTTP (internal: http://ai-rag-service:8000)
+                                    | HTTP (configured by RAG_SERVICE_URL)
                                     v
                                  RAG Service (ai-rag-service)
 ```
@@ -285,6 +297,8 @@ Connector Layer
 **Legacy-mode GPT-5.4 tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `list_supported_currencies`, `get_interest_rate`, `analyze_fx_economic_correlation`, `generate_dashboard`, `get_fx_news`, `get_internal_research`
 
 **Workflow-mode GPT-5.4 tools:** `collect_market_context`, `analyze_market_context`, `generate_market_briefing`
+
+`generate_market_briefing` supports optional financial analysis playbooks: `general`, `fx_carry`, `macro_rates`, `morning_note`, and `catalyst_calendar`.
 
 ---
 
@@ -401,21 +415,14 @@ OpenAPI documentation and health check endpoint.
 
 ---
 
-## Live Deployment
+## Deployment Snapshot
 
-The backend API is deployed on Google Kubernetes Engine (GKE):
+The live GKE deployment is summarized near the top of this README. Current backend configuration is driven by:
 
-**Backend API:** Internal service (accessed via frontend)
-**Frontend UI:** http://35.224.3.54/
+- `k8s/configmap.yaml` for non-secret runtime settings such as connector mode, AI Gateway URL, RAG URL, and workflow flags.
+- `k8s/secret.yaml.template` for required secret names; do not commit real API keys.
 
-| Detail | Value |
-|---|---|
-| Cluster | `helloworld-cluster` (us-central1) |
-| GCP Project | `gen-lang-client-0896070179` |
-| Backend Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio:latest` |
-| Frontend Image | `gcr.io/gen-lang-client-0896070179/ai-market-studio-ui:latest` |
-| FX Connector | `USE_MOCK_CONNECTOR=true` in the current ConfigMap; set `false` for live exchangerate.host data |
-| RAG Service | `http://ai-rag-service:8000` (internal Kubernetes service) |
+At the time of this README update, the backend service is externally reachable at `http://35.224.3.54`, the frontend at `http://136.116.205.168`, and workflow mode is enabled in the ConfigMap.
 
 ---
 
@@ -425,6 +432,7 @@ The backend API is deployed on Google Kubernetes Engine (GKE):
 - Python 3.12+
 - An [OpenAI API key](https://platform.openai.com/)
 - An [exchangerate.host API key](https://exchangerate.host/) if you want live FX data
+- A [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html) if you want FRED interest-rate data
 - Access to a deployed RAG service that supports `POST /query` with `{"question": "..."}`
 
 ### 1. Clone and install
@@ -443,13 +451,17 @@ pip install -r backend/runtime.txt
 Create a `.env` file in the repo root:
 
 ```env
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=<your-openai-api-key>
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-5.4
 EXCHANGERATE_API_KEY=your_key_here
+FRED_API_KEY=your_fred_api_key
 USE_MOCK_CONNECTOR=true
-USE_MOCK_NEWS_CONNECTOR=true
+USE_MOCK_NEWS_CONNECTOR=false
 RAG_SERVICE_URL=http://34.10.130.210
+ENABLE_AGENT_WORKFLOW_MODE=true
+AGENT_WORKFLOW_TIMEOUT_SECONDS=60
+AGENT_WORKFLOW_MAX_ROUNDS=2
 ```
 
 > **Note:** In GKE deployment, `OPENAI_BASE_URL` points to the AI Gateway service (`http://ai-gateway.ai-gateway.svc.cluster.local/v1`). For local development, use the default OpenAI endpoint or run the gateway locally.
@@ -479,7 +491,7 @@ Open [http://localhost:8080](http://localhost:8080) in your browser.
 
 > **Note:** The frontend UI is in a separate repository. See [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) for frontend setup and deployment instructions.
 
-### 4. Test RAG from the UI
+### 5. Test RAG from the UI
 
 Try prompts such as:
 
@@ -534,8 +546,12 @@ gcloud container clusters get-credentials <CLUSTER_NAME> --region <REGION> --pro
 ```bash
 kubectl create secret generic ai-market-studio-secrets \
   --from-literal=OPENAI_API_KEY=<your-openai-key> \
-  --from-literal=EXCHANGERATE_API_KEY=<your-key-or-dummy>
+  --from-literal=EXCHANGERATE_API_KEY=<your-key-or-dummy> \
+  --from-literal=FRED_API_KEY=<your-fred-api-key> \
+  --dry-run=client -o yaml | kubectl apply -f -
 ```
+
+When the backend uses AI Gateway, `OPENAI_API_KEY` in `ai-market-studio-secrets` may be a dummy value because the gateway owns the real LLM provider keys. `FRED_API_KEY` and `EXCHANGERATE_API_KEY` are consumed directly by this backend service.
 
 ### 4. Configure RAG endpoint
 
@@ -567,10 +583,11 @@ kubectl get service ai-market-studio -o wide
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | required | OpenAI API key (or dummy value if using AI Gateway) |
+| `OPENAI_API_KEY` | required | OpenAI API key for direct OpenAI use, or a dummy value when routing through AI Gateway |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI API base URL (set to gateway URL in GKE: `http://ai-gateway.ai-gateway.svc.cluster.local/v1`) |
 | `OPENAI_MODEL` | `gpt-5.4` | Model used by the agent (options: `gpt-5.4`, `gpt-4o`, `gpt-4o-mini`, `deepseek-chat`) |
 | `EXCHANGERATE_API_KEY` | required | exchangerate.host API key |
+| `FRED_API_KEY` | optional | FRED API key. Required for `get_interest_rate`, FRED-backed market briefings, and FX carry/macro playbooks that require FRED data |
 | `USE_MOCK_CONNECTOR` | `false` | Use synthetic FX data instead of live exchangerate.host API |
 | `USE_MOCK_NEWS_CONNECTOR` | `false` | Use synthetic news data instead of live RSS feeds |
 | `RAG_SERVICE_URL` | `http://localhost:8000` | Base URL of the external RAG service; `RAGConnector` calls `POST {RAG_SERVICE_URL}/query` |
@@ -608,7 +625,7 @@ All LLM requests from the backend now route through the **AI Gateway Service**, 
 
 - **Unified API**: OpenAI-compatible `/v1/chat/completions` endpoint
 - **Multi-provider routing**: Automatic routing to OpenAI or DeepSeek based on model name
-- **Centralized key management**: API keys stored only in gateway, not in backend
+- **Centralized LLM key management**: OpenAI/DeepSeek provider keys are stored in gateway secrets; this backend still owns non-LLM connector keys such as FRED and exchangerate.host
 - **Cost optimization**: Easy switching between models (gpt-4o, gpt-4o-mini, deepseek-chat)
 - **Single observability point**: All LLM requests logged at gateway level
 
@@ -644,7 +661,7 @@ OPENAI_MODEL: "gpt-5.4"  # Change to gpt-4o, gpt-4o-mini, or deepseek-chat
 
 **Kubernetes Secret** (`k8s/secret.yaml`):
 ```yaml
-OPENAI_API_KEY: "dummy"  # Real keys managed by AI Gateway
+OPENAI_API_KEY: "dummy"  # Real LLM provider keys are managed by AI Gateway
 ```
 
 ### Switching Models
@@ -689,7 +706,7 @@ kubectl patch configmap ai-market-studio-config \
 
 # Update Secret with real OpenAI API key
 kubectl patch secret ai-market-studio-secrets \
-  --patch '{"stringData":{"OPENAI_API_KEY":"sk-real-key-here"}}'
+  --patch '{"stringData":{"OPENAI_API_KEY":"<your-openai-api-key>"}}'
 
 # Rolling restart
 kubectl rollout restart deployment/ai-market-studio
@@ -784,7 +801,7 @@ FREDConnector.list_fred_series() → dict[str, str]
 import asyncio
 from backend.connectors.fred_connector import FREDConnector
 
-connector = FREDConnector(api_key="49902bd505135a5970742c278a2584a7")
+connector = FREDConnector(api_key="<your-fred-api-key>")
 
 # Current federal funds rate
 rate = await connector.get_current_rate("DFF")
@@ -807,15 +824,15 @@ curl -X POST http://localhost:8000/api/chat \
   -d '{"message": "What is the current federal funds rate?", "history": []}'
 ```
 
-GPT-4o will call `get_interest_rates`, which invokes the FRED connector and returns formatted rate data.
+The agent will call `get_interest_rate`, which invokes the FRED connector and returns formatted rate data.
 
 ### Deployment Checklist
 
 - [x] FRED connector implemented and tested locally
-- [x] FRED API Key stored in ConfigMap (K8s secret)
+- [x] FRED API key injected through `ai-market-studio-secrets` (Kubernetes Secret)
 - [x] Router endpoints wired to connector
-- [x] Agent tools updated to call `get_interest_rates`
-- [ ] E2E test with live FRED API (optional, quota-limited)
+- [x] Agent tools updated to call `get_interest_rate`
+- [x] E2E chat workflow verified with live FRED API (`DFF` and `DGS10`)
 - [ ] Add FRED rates to dashboard panels (future feature)
 
 ### Future: MCP Server Integration
@@ -846,21 +863,27 @@ ai-market-studio/ (Backend API)
 |   |-- requirements.txt       # all dependencies (dev + test + runtime)
 |   |-- agent/
 |   |   |-- agent.py
-|   |   `-- tools.py
+|   |   |-- tools.py
+|   |   |-- workflows.py
+|   |   `-- financial_playbooks.py
+|   |-- agents/                # sub-agent helpers for collection, analysis, synthesis, reports
 |   |-- connectors/
 |   |   |-- base.py
+|   |   |-- correlation_connector.py
 |   |   |-- exchangerate_host.py
+|   |   |-- fred_connector.py
 |   |   |-- mock_connector.py
 |   |   |-- news_connector.py
 |   |   `-- rag_connector.py
-|   |-- skills/
-|   |   `-- pdf/
-|   |       `-- pdf_skill.py   # PDF generation skill (reportlab Platypus)
+|   |-- exporters/
+|   |   `-- pdf_exporter.py     # PDF generation via reportlab
 |   `-- tests/
 |       |-- unit/
+|       |-- agent/
 |       `-- e2e/
 |-- docs/
 |-- k8s/
+|-- openspec/
 |-- Dockerfile              # multi-stage build (builder + production stages)
 `-- .env
 ```
@@ -881,7 +904,7 @@ ai-market-studio/ (Backend API)
 | P3 - Done | Intelligence & Economic Data | RAG research integration (Feature 05), FRED interest rates (Feature 08), economic indicator queries | ✅ Complete |
 | P4 - Done | Data Breadth & Observability | Direct FRED connector, AI Gateway service (OpenAI + DeepSeek), AI SRE Observability (LLM cost tracking) | ✅ Complete |
 | P5 - Done | Agent Workflow Foundation | Opt-in workflow mode, intent-level market workflows, workflow guardrails, archived OpenSpec specs | ✅ Complete |
-| P6 - Planned | Platform & Simulation | Custom agent creation (user-facing), OCR/document ingestion for scanned PDFs, paper-trading simulation | 🔄 Planned |
+| P6 - In Progress | Platform & Simulation | Financial analysis playbooks implemented for workflow-mode briefings; custom agent creation, OCR/document ingestion for scanned PDFs, and paper-trading simulation remain future work | 🔄 In Progress |
 | P7 - Planned | Execution & Risk | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls | 🔄 Planned |
 
 **Note:** Feature 11 is an internal workflow foundation, not user-facing custom agent creation. Future custom agent work should build on the opt-in workflow mode rather than exposing low-level internal agent tools directly.
@@ -895,7 +918,7 @@ ai-market-studio/ (Backend API)
 - Dispatch handler: `backend/agent/tools.py` lines 381-389
 - Agent awareness: SYSTEM_PROMPT updated with FRED guidance (backend/agent/agent.py line 29)
 - Testing: 2 unit tests added (test_dispatch_get_interest_rate + error handling), 0 regressions
-- GKE Live: `POST http://35.224.3.54/api/chat` with message "What is the current federal funds rate?" → Returns 3.64% as of 2026-04-09 ✅
+- Recent local E2E: workflow-mode `/api/chat` FX carry briefing fetched `DFF=3.62` and `DGS10=4.47` from FRED, both dated 2026-06-01
 
 ✅ **P3 - RAG Integration** (Feature 05, 2026-04-04)
 - External RAG service integration via `RAGConnector`
@@ -906,7 +929,7 @@ ai-market-studio/ (Backend API)
 - Centralized LLM management via AI Gateway service
 - Multi-provider routing: OpenAI (gpt-4o, gpt-4o-mini) and DeepSeek (deepseek-chat)
 - Dynamic model selection via ConfigMap without code changes
-- Centralized API key management (keys only in gateway)
+- Centralized LLM key management through the gateway; backend-owned data connector keys remain in backend secrets
 - Single observability point for all LLM requests
 - Cost optimization through model selection
 - GKE deployment: `ai-gateway` namespace, 2 replicas
@@ -937,11 +960,12 @@ ai-market-studio/ (Backend API)
 - Added workflow timeout, step-limit, no-silent-fallback, source warning, and legacy isolation coverage.
 - Archived OpenSpec change: `openspec/changes/archive/2026-05-21-agent-workflow-foundation`.
 
-✅ **P4 - FRED Integration** (ai-gateway-service, 2026-04-11)
-- Unified OpenAI-compatible API gateway (LiteLLM)
-- Model routing: `gpt-4o` → OpenAI, `deepseek-chat` → DeepSeek
-- GKE deployment: `ai-gateway` namespace
-- Ready for future multi-LLM feature toggle
+✅ **Internal: Financial Analysis Playbooks** (2026-06-02)
+- Added runtime playbooks for `general`, `fx_carry`, `macro_rates`, `morning_note`, and `catalyst_calendar`.
+- Extended `generate_market_briefing` with optional explicit playbook selection and conservative intent inference.
+- Added source grounding and `data_gaps` for unavailable specialist inputs such as forward curves and implied volatility.
+- Verified `/api/chat` workflow e2e with `fx_carry`, OpenAI tool calling, and live FRED data (`DFF`, `DGS10`).
+- OpenSpec change is implemented and validated; archive it after final review.
 
 > Recommendation: keep P5 simulation-only. Add live FX execution in P6 only after authentication, RBAC, audit logging, and pre-trade risk controls are in place.
 
@@ -1026,284 +1050,113 @@ ai-market-studio/ (Backend API)
 
 ### Overview
 
-AI Market Studio integrates with Claude Code's financial analyst skills to provide advanced FX market analysis capabilities. This integration enables:
+AI Market Studio now uses backend runtime playbooks for professional FX/macro briefing structure. The playbooks were distilled from analyst-style skills, but the application does not load Codex or Claude `SKILL.md` files at runtime.
 
-- **Trend Analysis**: Analyze FX rate trends based on historical data and market news
-- **Technical Analysis**: Apply financial ratios and indicators to currency pairs
-- **Market Intelligence**: Combine FRED economic data with FX rates for comprehensive analysis
-- **Research Integration**: Query internal research documents via RAG for market insights
+This keeps runtime behavior deterministic and small:
 
-### Available Financial Analysis Skills
+- The model selects the intent-level workflow tool `generate_market_briefing`.
+- The workflow applies a compact playbook definition from `backend/agent/financial_playbooks.py`.
+- The response keeps the existing top-level shape: `reply`, `data`, and `tool_used`.
+- Specialist missing inputs are exposed as `data_gaps` instead of being hidden.
+- Outputs are research-only and do not provide live execution, broker routing, or automated trading advice.
 
-The following Claude Code skills can be used with AI Market Studio:
+### Runtime Playbooks
 
-| Skill | Description | Use Case |
-|-------|-------------|----------|
-| `financial-analyst` | Financial ratio analysis, DCF valuation, budget variance | Analyze FX market fundamentals, economic indicators |
-| `saas-metrics-coach` | SaaS financial health metrics (ARR, MRR, churn, LTV, CAC) | Not directly applicable to FX markets |
-| `business-investment-advisor` | Investment analysis, ROI, NPV, IRR calculations | Evaluate FX trading strategies, capital allocation |
+| Playbook | Use Case | Required Sources | Common Data Gaps |
+|---|---|---|---|
+| `general` | Default market briefing | `rates` | Optional news, FRED, or research if not requested |
+| `fx_carry` | FX carry/rate-differential briefing | `rates`, `fred` | `forward_curve`, `implied_volatility` |
+| `macro_rates` | Macro/rates monitor | `fred`, `news` | Central-bank calendar, fuller inflation/labor data |
+| `morning_note` | Desk-style morning note | `rates`, `news` | Research context or catalyst calendar |
+| `catalyst_calendar` | Upcoming event/catalyst framing | `news` | Economic calendar or central-bank calendar |
 
-### How to Use Financial Analysis Skills
-
-#### 1. Basic FX Trend Analysis
-
-**Query the AI Market Studio API with financial context:**
+### Example Workflow Request
 
 ```bash
-curl -X POST http://35.224.3.54/api/chat \
+curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "Analyze the EUR/USD trend over the last 30 days using the latest market news and FRED economic indicators",
-    "history": []
+    "message": "Use the financial analysis playbook for an FX carry briefing on EUR/USD. Include FRED macro rate data and keep it research-only.",
+    "history": [],
+    "agent_mode": "workflow"
   }'
 ```
 
-**What happens:**
-1. GPT-4o calls `get_historical_rates` to fetch EUR/USD data
-2. GPT-4o calls `get_fx_news` to fetch recent market news
-3. GPT-4o calls `get_interest_rate` to fetch relevant FRED data (e.g., DFF, T10Y2Y)
-4. The agent synthesizes all data into a comprehensive trend analysis
+Expected structured response highlights:
 
-#### 2. Multi-Currency Comparison with Economic Context
-
-**Example query:**
-```
-Compare EUR/USD, GBP/USD, and USD/JPY trends for the last 7 days.
-Include Federal Funds Rate and 10-Year Treasury data for context.
-```
-
-**Backend flow:**
-```python
-# The agent automatically orchestrates multiple tool calls:
-1. get_historical_rates(base="EUR", target="USD", days=7)
-2. get_historical_rates(base="GBP", target="USD", days=7)
-3. get_historical_rates(base="USD", target="JPY", days=7)
-4. get_interest_rate(series_id="DFF")  # Federal Funds Rate
-5. get_interest_rate(series_id="DGS10")  # 10-Year Treasury
-6. get_fx_news(query="EUR USD GBP JPY")
-```
-
-#### 3. Research-Backed Analysis
-
-**Query internal research documents:**
-```
-Search internal research for FX market outlook reports,
-then analyze EUR/USD based on those insights.
-```
-
-**Backend flow:**
-```python
-1. get_internal_research(question="FX market outlook EUR/USD")
-   # Returns: RAG results with source citations
-2. get_historical_rates(base="EUR", target="USD", days=30)
-3. get_fx_news(query="EUR USD")
-# Agent synthesizes research findings with live data
-```
-
-#### 4. Using Claude Code Skills Directly
-
-**In Claude Code CLI:**
-
-```bash
-# Invoke financial-analyst skill for FX analysis
-/financial-analyst
-
-# Then provide context:
-"I need to analyze EUR/USD trend based on:
-- Historical rates from ai-market-studio API (http://35.224.3.54/api/rates/historical)
-- Latest market news from RSS feeds
-- FRED economic indicators (Federal Funds Rate, Treasury yields)
-
-Please perform a comprehensive financial analysis including:
-1. Trend direction and momentum
-2. Key support/resistance levels
-3. Economic factors influencing the pair
-4. Risk assessment and outlook"
-```
-
-**The skill will:**
-1. Fetch data from ai-market-studio API endpoints
-2. Apply financial analysis frameworks
-3. Generate structured analysis report
-4. Provide actionable insights
-
-### Integration Architecture
-
-```text
-User Query
-   |
-   v
-AI Market Studio Frontend (http://136.116.205.168)
-   |
-   | POST /api/chat
-   v
-AI Market Studio Backend (http://35.224.3.54)
-   |
-   |-- GPT-4o Agent (via AI Gateway)
-   |     |
-   |     |-- get_historical_rates() → FX data
-   |     |-- get_interest_rate() → FRED data
-   |     |-- get_fx_news() → Market news
-   |     `-- get_internal_research() → RAG insights
-   |
-   v
-Claude Code Financial Analyst Skills (optional enhancement)
-   |
-   |-- Financial ratio analysis
-   |-- Trend analysis frameworks
-   |-- Risk assessment models
-   `-- Investment recommendations
-```
-
-### Example: Complete FX Analysis Workflow
-
-**Step 1: Gather Data**
-```bash
-# Query AI Market Studio
-curl -X POST http://35.224.3.54/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Get EUR/USD rates for last 30 days, current Federal Funds Rate, and latest FX news",
-    "history": []
-  }'
-```
-
-**Step 2: Analyze with Financial Skills**
-```bash
-# In Claude Code
-/financial-analyst
-
-# Provide the data from Step 1 and request analysis:
-"Based on this EUR/USD data:
-- 30-day trend: 1.0850 → 1.0920 (+0.65%)
-- Federal Funds Rate: 3.64%
-- Latest news: ECB signals rate hold, Fed dovish pivot
-
-Perform financial analysis:
-1. Calculate volatility and momentum indicators
-2. Assess interest rate differential impact
-3. Identify key technical levels
-4. Provide 7-day outlook with confidence intervals"
-```
-
-**Step 3: Export Results**
-```bash
-# Export analysis to PDF via AI Market Studio
-curl -X POST http://35.224.3.54/api/export/pdf \
-  -H "Content-Type: application/json" \
-  -d '{
-    "reply": "[Financial analysis results from Step 2]",
-    "data": {
-      "type": "insight",
-      "rates": [...],
-      "news": [...]
+```json
+{
+  "tool_used": "generate_market_briefing",
+  "data": {
+    "type": "market_briefing",
+    "playbook": {
+      "id": "fx_carry",
+      "research_only": true
     },
-    "tool_used": "financial_analysis"
-  }' \
-  --output fx-analysis-report.pdf
+    "source_grounding": {
+      "available_sources": ["rates", "news", "fred", "research"],
+      "missing_required_sources": [],
+      "missing_optional_sources": ["forward_curve", "implied_volatility"]
+    },
+    "data_gaps": [
+      {"source": "forward_curve"},
+      {"source": "implied_volatility"}
+    ]
+  }
+}
 ```
 
-### Configuration for Financial Analysis
+Recent local e2e verification fetched live FRED values for `DFF` and `DGS10` during an `fx_carry` workflow-mode briefing.
 
-**Environment Variables:**
+### Configuration for Playbooks
 
 ```env
-# Enable all data sources for comprehensive analysis
-USE_MOCK_CONNECTOR=false          # Use live FX data
-USE_MOCK_NEWS_CONNECTOR=false     # Use live market news
-RAG_SERVICE_URL=http://ai-rag-service:8000  # Enable research queries
+ENABLE_AGENT_WORKFLOW_MODE=true
+AGENT_WORKFLOW_TIMEOUT_SECONDS=60
+AGENT_WORKFLOW_MAX_ROUNDS=2
 
-# FRED API for economic indicators
 FRED_API_KEY=your_fred_api_key
+USE_MOCK_CONNECTOR=true
+USE_MOCK_NEWS_CONNECTOR=false
+RAG_SERVICE_URL=http://34.10.130.210
 
-# AI Gateway for LLM routing
 OPENAI_BASE_URL=http://ai-gateway.ai-gateway.svc.cluster.local/v1
-OPENAI_MODEL=gpt-4o  # Use gpt-4o for complex financial analysis
+OPENAI_MODEL=gpt-5.4
 ```
 
-### Best Practices
-
-#### 1. Data Quality
-- **Use live data** for production analysis (`USE_MOCK_CONNECTOR=false`)
-- **Verify FRED data** is current (check observation dates)
-- **Cross-reference** multiple news sources
-
-#### 2. Analysis Depth
-- **Simple queries**: Use gpt-4o-mini for cost efficiency
-- **Complex analysis**: Use gpt-4o for better reasoning
-- **Research-heavy**: Enable RAG service for document insights
-
-#### 3. Performance Optimization
-- **Batch requests**: Use workflow-mode market briefings for multi-pair analysis when `ENABLE_AGENT_WORKFLOW_MODE=true`
-- **Cache results**: Historical data is cached for 5 minutes (TTL=300s)
-- **Bound workflows**: Workflow mode uses a shorter, intent-level tool set with configurable timeout and round limits
-
-#### 4. Cost Management
-- **Model selection**: Switch to `deepseek-chat` for cost-effective analysis
-- **Token tracking**: Monitor costs via AI SRE Observability dashboards
-- **Query optimization**: Be specific to reduce token usage
-
-### Monitoring Financial Analysis
-
-**Grafana Dashboards** (http://136.114.77.0):
-
-1. **LLM Cost & Usage**
-   - Track cost per financial analysis query
-   - Monitor token consumption patterns
-   - Identify expensive queries
-
-2. **Service Overview**
-   - Request latency for financial queries
-   - Success rate of tool calls
-   - Error patterns
-
-3. **Request Tracing**
-   - End-to-end trace of analysis workflow
-   - Tool call sequence visualization
-   - Performance bottlenecks
+For local development, `OPENAI_BASE_URL` can remain `https://api.openai.com/v1`. In GKE, it points to the AI Gateway service.
 
 ### Troubleshooting
 
-#### Issue: Analysis lacks depth
-**Solution:** Switch to gpt-4o model for better reasoning
+#### Workflow request returns disabled error
+
+Set `ENABLE_AGENT_WORKFLOW_MODE=true` and restart the backend. Legacy chat still works without this flag, but playbook briefings require workflow mode.
+
+#### FX carry briefing reports missing FRED
+
+Verify `FRED_API_KEY` is present in the backend environment or Kubernetes Secret:
+
 ```bash
-kubectl patch configmap ai-market-studio-config \
-  --patch '{"data":{"OPENAI_MODEL":"gpt-4o"}}'
-kubectl rollout restart deployment/ai-market-studio
+kubectl get secret ai-market-studio-secrets -o jsonpath='{.data.FRED_API_KEY}' | base64 -d | head -c 8
 ```
 
-#### Issue: Missing economic context
-**Solution:** Verify FRED API key is configured
-```bash
-kubectl get configmap ai-market-studio-config -o yaml | grep FRED_API_KEY
-```
+#### Optional sources are listed as data gaps
 
-#### Issue: No research insights
-**Solution:** Check RAG service connectivity
-```bash
-kubectl get svc ai-rag-service
-curl http://ai-rag-service:8000/health
-```
+This is expected for sources such as forward curves and implied volatility. The current MVP has spot FX, FRED rates, RSS news, and RAG research; specialist FX derivatives data is not yet connected.
 
 ### Future Enhancements
 
-**Planned for P5:**
-- **Custom financial indicators**: Add RSI, MACD, Bollinger Bands
-- **Backtesting framework**: Test strategies against historical data
-- **Portfolio analysis**: Multi-currency portfolio optimization
-- **Risk metrics**: VaR, Sharpe ratio, maximum drawdown
-
-**Planned for P6:**
-- **Real-time alerts**: Notify on significant rate movements
-- **Automated trading signals**: Generate buy/sell recommendations
-- **Compliance checks**: Pre-trade risk validation
-- **Audit trail**: Full logging of analysis and decisions
+- Add forward curve and implied-volatility connectors or mock data for richer carry analysis.
+- Expose playbook selection in the UI as a dropdown, saved briefing profile, or natural-language-only selection.
+- Add central-bank/economic calendar data for catalyst workflows.
+- Keep broker connectivity and execution workflows out of scope until authentication, RBAC, audit logging, and pre-trade risk controls exist.
 
 ### Related Documentation
 
-- **FRED Integration**: See Feature 08 above for FRED API details
-- **RAG Integration**: See Feature 05 for research document queries
-- **AI Gateway**: See Feature 09 for LLM routing configuration
-- **Observability**: See Feature 10 for cost tracking and monitoring
+- **FRED Integration**: See Feature 08 above for FRED API details.
+- **Agent Workflow Foundation**: See Feature 11 above for workflow-mode guardrails.
+- **Financial Analysis Playbooks**: See Feature 12 above for runtime playbook behavior.
+- **AI Gateway**: See Feature 09 for LLM routing configuration.
+- **Observability**: See Feature 10 for cost tracking and monitoring.
 
 ---

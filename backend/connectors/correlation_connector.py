@@ -6,7 +6,6 @@ directional alignment between FX rate changes and economic indicator changes.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
 from statistics import mean
 
 from backend.connectors.base import ConnectorError, MarketDataConnector
@@ -27,16 +26,16 @@ class CorrelationConnector:
     def __init__(
         self,
         market_connector: MarketDataConnector,
-        fred_connector: Optional[FREDConnector] = None,
+        fred_connector: FREDConnector,
     ):
         """Initialize correlation connector.
 
         Args:
             market_connector: Connector for FX rate data
-            fred_connector: Connector for FRED economic data (creates new if None)
+            fred_connector: Connector for FRED economic data
         """
         self.market_connector = market_connector
-        self.fred_connector = fred_connector or FREDConnector()
+        self.fred_connector = fred_connector
 
     async def analyze_correlation(
         self,

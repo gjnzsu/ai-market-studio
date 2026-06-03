@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-FRED_API_KEY = "49902bd505135a5970742c278a2584a7"
 FRED_BASE_URL = "https://api.stlouisfed.org/fred"
 
 COMMON_SERIES = {
@@ -66,7 +65,7 @@ class FREDConnector:
     including federal funds rate, treasury spreads, and mortgage rates.
     """
 
-    def __init__(self, api_key: str = FRED_API_KEY, timeout: float = 10.0):
+    def __init__(self, api_key: str, timeout: float = 10.0):
         self.api_key = api_key
         self.timeout = timeout
         self.base_url = FRED_BASE_URL
