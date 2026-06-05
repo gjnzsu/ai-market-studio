@@ -24,4 +24,22 @@ python scripts/screenshots/shot_06_capture.py
 python scripts/test_dashboard.py
 ```
 
+## RAG Ingestion Scripts
+
+- `ingest_research_reports.py` - Upload local PDF research reports to an external ai-rag-service instance.
+
+**Dry run:**
+```bash
+python scripts/ingest_research_reports.py "C:\path\to\research-reports" --dry-run
+```
+
+**Upload PDFs:**
+```bash
+$env:RAG_SERVICE_URL="http://localhost:8000"
+python scripts/ingest_research_reports.py "C:\path\to\research-reports" --recursive
+```
+
+The script reads `RAG_SERVICE_URL` by default and also accepts `--rag-service-url`.
+It does not store service credentials or personal filesystem paths.
+
 **Note:** For comprehensive test suites, see `backend/tests/` directory.

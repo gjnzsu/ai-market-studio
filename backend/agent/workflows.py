@@ -4,6 +4,11 @@ from typing import Any, Optional
 
 from backend.agents.market_analyst import analyze_market_trends
 from backend.agent.financial_playbooks import select_playbook
+from backend.agent.synthetic_specialist_data import (
+    build_fx_carry_metrics,
+    get_synthetic_forward_curve,
+    get_synthetic_implied_volatility,
+)
 from backend.connectors.base import MarketDataConnector
 from backend.connectors.news_connector import NewsConnectorBase
 
@@ -164,12 +169,53 @@ async def generate_market_briefing(
         )
         analysis = await analyze_market_context(context=context, analysis_type="trend")
         available_sources = list(context.get("context", {}).keys())
+        specialist_data = None
+        carry_metrics = None
+        synthetic_sources: list[str] = []
+        if selected_playbook.id == "fx_carry":
+            rate_context = context.get("context", {}).get("rates", [])
+            if rate_context:
+                primary_rate = rate_context[0]
+                pair = f"{primary_rate['base']}/{primary_rate['target']}"
+                spot_rate = float(primary_rate["rate"])
+                as_of = primary_rate.get("date")
+                forward_curve = get_synthetic_forward_curve(
+                    pair=pair,
+                    spot_rate=spot_rate,
+                    as_of=as_of,
+                )
+                implied_volatility = get_synthetic_implied_volatility(
+                    pair=pair,
+                    as_of=as_of,
+                )
+                specialist_data = {
+                    "source": "synthetic",
+                    "provenance": (
+                        "Deterministic AI Market Studio demo assumptions; "
+                        "not live market quotes."
+                    ),
+                    "forward_curve": forward_curve,
+                    "implied_volatility": implied_volatility,
+                }
+                synthetic_sources = ["forward_curve", "implied_volatility"]
+                carry_metrics = build_fx_carry_metrics(
+                    pair=pair,
+                    spot_rate=spot_rate,
+                    fred_rates=context.get("context", {}).get("fred", []),
+                    forward_curve=forward_curve,
+                    implied_volatility=implied_volatility,
+                )
         playbook_sources = list(
             dict.fromkeys(
                 list(selected_playbook.required_sources)
                 + list(selected_playbook.optional_sources)
             )
         )
+        missing_gap_sources = [
+            source
+            for source in selected_playbook.data_gap_sources
+            if source not in synthetic_sources
+        ]
         result = {
             "type": "market_briefing",
             "pairs": pairs,
@@ -186,10 +232,11 @@ async def generate_market_briefing(
                     "source": source,
                     "reason": "Specialist data is not available from current AI Market Studio connectors.",
                 }
-                for source in selected_playbook.data_gap_sources
+                for source in missing_gap_sources
             ],
             "source_grounding": {
                 "available_sources": available_sources,
+                "synthetic_sources": synthetic_sources,
                 "requested_sources": playbook_sources,
                 "missing_required_sources": [
                     source
@@ -200,6 +247,7 @@ async def generate_market_briefing(
                     source
                     for source in selected_playbook.optional_sources
                     if source not in available_sources
+                    and source not in synthetic_sources
                 ],
             },
             "context": context,
@@ -211,6 +259,10 @@ async def generate_market_briefing(
             },
             "warnings": context.get("warnings", []),
         }
+        if specialist_data is not None:
+            result["specialist_data"] = specialist_data
+        if carry_metrics is not None:
+            result["carry_metrics"] = carry_metrics
         logger.info(
             "workflow_complete mode=workflow name=generate_market_briefing units=%s latency_ms=%.2f status=success failure_category=none",
             internal_units,

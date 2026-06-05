@@ -91,6 +91,8 @@ def _summarise_tool_result(result: dict) -> dict:
             "research_documents": [source.get("name") for source in sources],
             "data_gaps": result.get("data_gaps", []),
             "source_grounding": result.get("source_grounding", {}),
+            "specialist_data": result.get("specialist_data"),
+            "carry_metrics": result.get("carry_metrics"),
             "warnings": result.get("warnings", []),
         }
     if rtype == "dashboard":

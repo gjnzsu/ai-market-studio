@@ -1,33 +1,4 @@
-# financial-analysis-playbooks Specification
-
-## Purpose
-Define runtime financial analysis playbooks that structure workflow-mode market briefings with source requirements, output sections, data-gap discipline, and research-only boundaries.
-
-## Requirements
-### Requirement: Runtime financial analysis playbooks are available
-The system SHALL provide runtime financial analysis playbook definitions for workflow-mode market analysis.
-
-#### Scenario: Playbook registry includes initial playbooks
-- **WHEN** the system initializes the financial analysis playbook registry
-- **THEN** the registry includes playbooks for FX carry, macro-rates monitoring, FX morning notes, and FX/macro catalyst calendars
-- **THEN** each playbook includes an identifier, display name, intent triggers, required sources, optional sources, and output sections
-
-### Requirement: Playbooks are selected from request intent
-The system SHALL select a financial analysis playbook from explicit request parameters or inferred user intent.
-
-#### Scenario: Explicit playbook is requested
-- **WHEN** a workflow market briefing request includes a supported playbook identifier
-- **THEN** the system uses that playbook for the briefing result
-
-#### Scenario: Playbook is inferred from focus text
-- **WHEN** a workflow market briefing request does not include a playbook identifier
-- **AND** the request focus matches a playbook intent trigger
-- **THEN** the system uses the matching playbook for the briefing result
-
-#### Scenario: No playbook matches
-- **WHEN** a workflow market briefing request does not include a playbook identifier
-- **AND** no playbook intent trigger matches the request
-- **THEN** the system uses a general market briefing playbook
+## MODIFIED Requirements
 
 ### Requirement: Playbook results are source-grounded
 The system SHALL represent selected playbook metadata, source grounding, synthetic specialist data usage, and missing data gaps in workflow results.
@@ -60,6 +31,8 @@ The system SHALL frame playbook outputs as research and briefing support rather 
 - **WHEN** the FX carry playbook includes synthetic specialist data and carry metrics
 - **THEN** the workflow result identifies the metrics as research-only demo support
 - **THEN** the workflow result does not imply that synthetic metrics are live trading signals
+
+## ADDED Requirements
 
 ### Requirement: FX carry playbook produces deterministic demo metrics
 The system SHALL enrich FX carry playbook results with deterministic demo metrics when synthetic specialist data is available.

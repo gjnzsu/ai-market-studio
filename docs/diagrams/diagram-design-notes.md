@@ -9,6 +9,7 @@ Use these notes when creating or updating AI Market Studio architecture diagrams
 - Put equivalent concepts on the same visual layer. For example, FX data, news data, FRED API, and RAG service are all external data sources and should sit on the same row.
 - Use fan-out patterns for one-to-many relationships. A connector layer should branch once into a horizontal bus, then split evenly to each data source.
 - Keep platform services such as AI Gateway, observability, and runtime config visually separate from the main product/data flow.
+- Keep synthetic specialist data visually separate from external market data sources. It supports workflow/playbook runtime and should not sit on the same row as FX Data, News Data, FRED API, or RAG Service.
 - Avoid long edge labels. Prefer short labels or no labels, and place explanatory details in a nearby note box.
 - Use large text and fewer nodes so the PNG remains readable when embedded in README.
 - If a diagram needs a reading tip, add it explicitly rather than relying on layout alone.
@@ -18,5 +19,5 @@ Use these notes when creating or updating AI Market Studio architecture diagrams
 - For README-facing diagrams, prefer a user-readable phase flow over a dense technical lifeline diagram.
 - Use phases such as Request, Tool Choice, Runtime, Data Collection, and Response.
 - Keep arrow labels short. Put payload examples and detailed fields in side notes or bottom summary boxes.
-- Highlight user-visible outputs: `tool_used`, `playbook`, `source_grounding`, `data_gaps`, and research-only stance.
+- Highlight user-visible outputs: `tool_used`, `playbook`, `source_grounding`, `synthetic_sources`, `specialist_data`, `carry_metrics`, `data_gaps`, and research-only stance.
 - Generate a scaled preview before finishing. If it is not readable at roughly 900-1000px wide, simplify the design.

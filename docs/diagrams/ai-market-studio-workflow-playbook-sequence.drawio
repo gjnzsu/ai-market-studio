@@ -7,7 +7,7 @@
         <mxCell id="title" value="Workflow Mode + Financial Playbook - UML Sequence" style="text;html=1;strokeColor=none;fillColor=none;fontSize=32;fontStyle=1;fontColor=#0f172a;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="250" y="35" width="1200" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="subtitle" value="Time flows downward. This sequence shows one workflow-mode FX carry briefing with source grounding and data gaps." style="text;html=1;strokeColor=none;fillColor=none;fontSize=18;fontColor=#475569;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="subtitle" value="Time flows downward. This sequence shows one workflow-mode FX carry briefing with source grounding, synthetic specialist data, and research-only output." style="text;html=1;strokeColor=none;fillColor=none;fontSize=18;fontColor=#475569;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="260" y="85" width="1180" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="p_user" value="User / UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
@@ -124,41 +124,53 @@
             <mxPoint x="1071" y="920" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
+        <mxCell id="m9a" value="9a. build synthetic forward curve, vol, carry metrics" style="html=1;strokeColor=#9333ea;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1071" y="960" as="sourcePoint"/>
+            <mxPoint x="1533" y="960" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="m9b" value="9b. synthetic specialist data" style="html=1;strokeColor=#9333ea;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1533" y="1000" as="sourcePoint"/>
+            <mxPoint x="1071" y="1000" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
         <mxCell id="m10" value="10. structured briefing" style="html=1;strokeColor=#d97706;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="1053" y="990" as="sourcePoint"/>
-            <mxPoint x="601" y="990" as="targetPoint"/>
+            <mxPoint x="1053" y="1040" as="sourcePoint"/>
+            <mxPoint x="601" y="1040" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="m11" value="11. compact summary for final answer" style="html=1;strokeColor=#4f46e5;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="601" y="1015" as="sourcePoint"/>
-            <mxPoint x="818" y="1015" as="targetPoint"/>
+            <mxPoint x="601" y="1075" as="sourcePoint"/>
+            <mxPoint x="818" y="1075" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="m12" value="12. final research-only answer" style="html=1;strokeColor=#4f46e5;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="818" y="1065" as="sourcePoint"/>
-            <mxPoint x="601" y="1065" as="targetPoint"/>
+            <mxPoint x="818" y="1115" as="sourcePoint"/>
+            <mxPoint x="601" y="1115" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="m13" value="13. ChatResponse" style="html=1;strokeColor=#16a34a;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="583" y="1115" as="sourcePoint"/>
-            <mxPoint x="359" y="1115" as="targetPoint"/>
+            <mxPoint x="583" y="1145" as="sourcePoint"/>
+            <mxPoint x="359" y="1145" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="m14" value="14. render reply + structured data" style="html=1;strokeColor=#2563eb;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="341" y="1138" as="sourcePoint"/>
-            <mxPoint x="115" y="1138" as="targetPoint"/>
+            <mxPoint x="341" y="1168" as="sourcePoint"/>
+            <mxPoint x="115" y="1168" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="note1" value="Tool arguments&lt;br/&gt;pairs: EUR/USD&lt;br/&gt;playbook: fx_carry&lt;br/&gt;include_fred: true&lt;br/&gt;fred_series_ids: DFF, DGS10" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=16;fontColor=#0f172a;align=left;spacing=12;" vertex="1" parent="1">
           <mxGeometry x="930" y="405" width="250" height="145" as="geometry"/>
         </mxCell>
-        <mxCell id="note2" value="Playbook output&lt;br/&gt;required: rates + FRED&lt;br/&gt;optional gaps: forward_curve, implied_volatility&lt;br/&gt;research_only: true" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=16;fontColor=#0f172a;align=left;spacing=12;" vertex="1" parent="1">
-          <mxGeometry x="1185" y="955" width="300" height="145" as="geometry"/>
+        <mxCell id="note2" value="Structured output&lt;br/&gt;source_grounding.synthetic_sources&lt;br/&gt;specialist_data.source: synthetic&lt;br/&gt;carry_metrics: demo metrics&lt;br/&gt;data_gaps: real missing inputs only&lt;br/&gt;research_only: true" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=16;fontColor=#0f172a;align=left;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="1185" y="1025" width="330" height="165" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>

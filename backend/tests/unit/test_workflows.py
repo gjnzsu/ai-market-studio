@@ -141,6 +141,94 @@ async def test_generate_market_briefing_represents_playbook_data_gaps():
 
     result = await generate_market_briefing(
         pairs=["EUR/USD"],
+        playbook="macro_rates",
+        connector=connector,
+        include_news=False,
+        include_fred=False,
+        include_research=False,
+    )
+
+    gap_sources = {gap["source"] for gap in result["data_gaps"]}
+    assert {"breakevens", "swap_curve"} <= gap_sources
+    assert all("not available" in gap["reason"] for gap in result["data_gaps"])
+
+
+@pytest.mark.asyncio
+async def test_fx_carry_briefing_includes_synthetic_specialist_data_and_metrics():
+    connector = AsyncMock()
+    connector.get_exchange_rate.return_value = {
+        "base": "EUR",
+        "target": "USD",
+        "rate": 1.08,
+        "date": "2026-05-20",
+        "source": "mock",
+    }
+    fred_connector = AsyncMock()
+    dff = MagicMock()
+    dff.model_dump.return_value = {"series_id": "DFF", "value": 3.62}
+    dgs10 = MagicMock()
+    dgs10.model_dump.return_value = {"series_id": "DGS10", "value": 4.47}
+    fred_connector.get_current_rate.side_effect = [dff, dgs10]
+
+    result = await generate_market_briefing(
+        pairs=["EUR/USD"],
+        playbook="fx_carry",
+        connector=connector,
+        include_news=False,
+        include_fred=True,
+        fred_series_ids=["DFF", "DGS10"],
+        fred_connector=fred_connector,
+        include_research=False,
+    )
+
+    assert result["specialist_data"]["source"] == "synthetic"
+    assert result["specialist_data"]["forward_curve"]["source"] == "synthetic"
+    assert result["specialist_data"]["implied_volatility"]["source"] == "synthetic"
+    assert result["carry_metrics"]["source"] == "synthetic"
+    assert result["carry_metrics"]["rate_differential_proxy"] == 0.85
+    assert result["carry_metrics"]["carry_to_vol"] == 0.12
+
+
+@pytest.mark.asyncio
+async def test_fx_carry_briefing_reports_synthetic_sources_separately():
+    connector = AsyncMock()
+    connector.get_exchange_rate.return_value = {
+        "base": "EUR",
+        "target": "USD",
+        "rate": 1.08,
+        "date": "2026-05-20",
+        "source": "mock",
+    }
+
+    result = await generate_market_briefing(
+        pairs=["EUR/USD"],
+        playbook="fx_carry",
+        connector=connector,
+        include_news=False,
+        include_fred=False,
+        include_research=False,
+    )
+
+    assert result["source_grounding"]["available_sources"] == ["rates"]
+    assert result["source_grounding"]["synthetic_sources"] == [
+        "forward_curve",
+        "implied_volatility",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_fx_carry_briefing_does_not_gap_synthetic_specialist_data():
+    connector = AsyncMock()
+    connector.get_exchange_rate.return_value = {
+        "base": "EUR",
+        "target": "USD",
+        "rate": 1.08,
+        "date": "2026-05-20",
+        "source": "mock",
+    }
+
+    result = await generate_market_briefing(
+        pairs=["EUR/USD"],
         playbook="fx_carry",
         connector=connector,
         include_news=False,
@@ -149,8 +237,8 @@ async def test_generate_market_briefing_represents_playbook_data_gaps():
     )
 
     gap_sources = {gap["source"] for gap in result["data_gaps"]}
-    assert {"forward_curve", "implied_volatility"} <= gap_sources
-    assert all("not available" in gap["reason"] for gap in result["data_gaps"])
+    assert "forward_curve" not in gap_sources
+    assert "implied_volatility" not in gap_sources
 
 
 @pytest.mark.asyncio

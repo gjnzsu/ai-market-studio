@@ -224,10 +224,13 @@ async def test_workflow_mode_can_use_market_briefing_with_explicit_playbook():
 
     assert result["tool_used"] == "generate_market_briefing"
     assert result["data"]["playbook"]["id"] == "fx_carry"
-    assert {gap["source"] for gap in result["data"]["data_gaps"]} >= {
+    assert result["data"]["source_grounding"]["synthetic_sources"] == [
         "forward_curve",
         "implied_volatility",
-    }
+    ]
+    assert result["data"]["data_gaps"] == []
+    assert result["data"]["specialist_data"]["source"] == "synthetic"
+    assert result["data"]["carry_metrics"]["source"] == "synthetic"
 
 
 @pytest.mark.asyncio
@@ -264,6 +267,45 @@ async def test_workflow_market_briefing_summary_includes_playbook_details():
     assert tool_summary["playbook"]["id"] == "macro_rates"
     assert "data_gaps" in tool_summary
     assert "source_grounding" in tool_summary
+
+
+@pytest.mark.asyncio
+async def test_workflow_market_briefing_summary_includes_synthetic_carry_details():
+    connector = MockConnector()
+    tool_response = make_response(
+        tool_calls=[
+            make_tool_call(
+                "generate_market_briefing",
+                {"pairs": ["EUR/USD"], "playbook": "fx_carry", "include_research": False},
+            )
+        ],
+        finish_reason="tool_calls",
+    )
+    final_response = make_response(content="EUR/USD carry briefing ready.", finish_reason="stop")
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(
+        side_effect=[tool_response, final_response]
+    )
+
+    await run_agent(
+        message="Give me an FX carry view on EUR/USD",
+        connector=connector,
+        client=mock_client,
+        agent_mode="workflow",
+    )
+
+    second_call_messages = mock_client.chat.completions.create.call_args_list[1].kwargs[
+        "messages"
+    ]
+    tool_message = next(message for message in second_call_messages if message["role"] == "tool")
+    tool_summary = json.loads(tool_message["content"])
+
+    assert tool_summary["source_grounding"]["synthetic_sources"] == [
+        "forward_curve",
+        "implied_volatility",
+    ]
+    assert tool_summary["specialist_data"]["source"] == "synthetic"
+    assert tool_summary["carry_metrics"]["source"] == "synthetic"
 
 
 @pytest.mark.asyncio

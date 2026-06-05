@@ -235,6 +235,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Runtime playbooks**: Workflow-mode market briefings can apply professional analysis frames for `general`, `fx_carry`, `macro_rates`, `morning_note`, and `catalyst_calendar`.
 - **Explicit or inferred selection**: `generate_market_briefing` accepts an optional `playbook` field and can infer a playbook from briefing focus text when omitted.
 - **Source grounding**: Briefing data includes selected playbook metadata, available/requested sources, missing required/optional sources, and specialist `data_gaps`.
+- **Synthetic FX carry demo metrics**: The `fx_carry` playbook includes deterministic synthetic forward curve and implied-volatility assumptions for demo/test carry metrics; these are labeled as synthetic and are not live market quotes.
 - **Current data surface**: Playbooks ground themselves in existing FX rates, FRED indicators, market news, and internal research/RAG sources.
 - **Research-only boundary**: Playbook outputs support market research and desk briefing workflows; they do not provide live execution instructions, broker routing, or automated trading advice.
 
@@ -516,7 +517,13 @@ If the RAG tool is selected, the assistant response should include a **Sources**
 ### Research report ingestion
 - Ingest PDFs/research reports into the external RAG service before querying from AI Market Studio.
 - In the current GCP setup, the app points to the deployed RAG endpoint at `http://34.10.130.210`.
-- First-party PDF upload/ingestion endpoints and UI are not yet exposed in this repository; ingestion is owned by the external RAG service.
+- Use `scripts/ingest_research_reports.py` for local batch upload of PDF research reports to `POST {RAG_SERVICE_URL}/ingest/pdf`.
+- First-party PDF upload/ingestion UI is not yet exposed in this repository; ingestion storage and indexing are still owned by the external RAG service.
+
+```powershell
+$env:RAG_SERVICE_URL="http://localhost:8000"
+python scripts/ingest_research_reports.py "C:\path\to\research-reports" --recursive --dry-run
+```
 
 ---
 
@@ -963,7 +970,8 @@ ai-market-studio/ (Backend API)
 ✅ **Internal: Financial Analysis Playbooks** (2026-06-02)
 - Added runtime playbooks for `general`, `fx_carry`, `macro_rates`, `morning_note`, and `catalyst_calendar`.
 - Extended `generate_market_briefing` with optional explicit playbook selection and conservative intent inference.
-- Added source grounding and `data_gaps` for unavailable specialist inputs such as forward curves and implied volatility.
+- Added source grounding and `data_gaps` for unavailable specialist inputs.
+- Added deterministic synthetic forward curve and implied-volatility assumptions for `fx_carry` demo metrics.
 - Verified `/api/chat` workflow e2e with `fx_carry`, OpenAI tool calling, and live FRED data (`DFF`, `DGS10`).
 - OpenSpec change is implemented and validated; archive it after final review.
 
@@ -1058,6 +1066,7 @@ This keeps runtime behavior deterministic and small:
 - The workflow applies a compact playbook definition from `backend/agent/financial_playbooks.py`.
 - The response keeps the existing top-level shape: `reply`, `data`, and `tool_used`.
 - Specialist missing inputs are exposed as `data_gaps` instead of being hidden.
+- FX carry demo metrics can use deterministic synthetic forward curve and implied-volatility assumptions. These values are labeled separately from connector-backed data and are not live market quotes.
 - Outputs are research-only and do not provide live execution, broker routing, or automated trading advice.
 
 ### Runtime Playbooks
@@ -1065,7 +1074,7 @@ This keeps runtime behavior deterministic and small:
 | Playbook | Use Case | Required Sources | Common Data Gaps |
 |---|---|---|---|
 | `general` | Default market briefing | `rates` | Optional news, FRED, or research if not requested |
-| `fx_carry` | FX carry/rate-differential briefing | `rates`, `fred` | `forward_curve`, `implied_volatility` |
+| `fx_carry` | FX carry/rate-differential briefing | `rates`, `fred` | Uses synthetic `forward_curve` and `implied_volatility` for demo metrics; real derivatives feeds remain out of scope |
 | `macro_rates` | Macro/rates monitor | `fred`, `news` | Central-bank calendar, fuller inflation/labor data |
 | `morning_note` | Desk-style morning note | `rates`, `news` | Research context or catalyst calendar |
 | `catalyst_calendar` | Upcoming event/catalyst framing | `news` | Economic calendar or central-bank calendar |
@@ -1095,18 +1104,27 @@ Expected structured response highlights:
     },
     "source_grounding": {
       "available_sources": ["rates", "news", "fred", "research"],
+      "synthetic_sources": ["forward_curve", "implied_volatility"],
       "missing_required_sources": [],
-      "missing_optional_sources": ["forward_curve", "implied_volatility"]
+      "missing_optional_sources": []
     },
-    "data_gaps": [
-      {"source": "forward_curve"},
-      {"source": "implied_volatility"}
-    ]
+    "specialist_data": {
+      "source": "synthetic",
+      "forward_curve": {"source": "synthetic"},
+      "implied_volatility": {"source": "synthetic"}
+    },
+    "carry_metrics": {
+      "source": "synthetic",
+      "rate_differential_proxy": 0.85,
+      "carry_to_vol": 0.12
+    },
+    "data_gaps": []
   }
 }
 ```
 
 Recent local e2e verification fetched live FRED values for `DFF` and `DGS10` during an `fx_carry` workflow-mode briefing.
+The forward curve, implied volatility, and carry metrics in FX carry examples are deterministic synthetic assumptions for demo and test coverage, not live derivatives market data.
 
 ### Configuration for Playbooks
 
@@ -1142,11 +1160,11 @@ kubectl get secret ai-market-studio-secrets -o jsonpath='{.data.FRED_API_KEY}' |
 
 #### Optional sources are listed as data gaps
 
-This is expected for sources such as forward curves and implied volatility. The current MVP has spot FX, FRED rates, RSS news, and RAG research; specialist FX derivatives data is not yet connected.
+This is expected for optional specialist sources that are neither connector-backed nor covered by the synthetic specialist layer. For FX carry, forward curve and implied volatility are available as deterministic synthetic demo assumptions and appear under `synthetic_sources`, not as live market quotes.
 
 ### Future Enhancements
 
-- Add forward curve and implied-volatility connectors or mock data for richer carry analysis.
+- Add real forward curve and implied-volatility connectors when a licensed market data source is available.
 - Expose playbook selection in the UI as a dropdown, saved briefing profile, or natural-language-only selection.
 - Add central-bank/economic calendar data for catalyst workflows.
 - Keep broker connectivity and execution workflows out of scope until authentication, RBAC, audit logging, and pre-trade risk controls exist.
