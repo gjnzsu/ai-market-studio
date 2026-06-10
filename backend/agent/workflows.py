@@ -3,7 +3,11 @@ import time
 from typing import Any, Optional
 
 from backend.agents.market_analyst import analyze_market_trends
-from backend.agent.financial_playbooks import select_playbook
+from backend.agent.financial_playbooks import (
+    has_runtime_profile,
+    select_playbook,
+    synthetic_sources_for_playbook,
+)
 from backend.agent.synthetic_specialist_data import (
     build_fx_carry_metrics,
     get_synthetic_forward_curve,
@@ -172,7 +176,7 @@ async def generate_market_briefing(
         specialist_data = None
         carry_metrics = None
         synthetic_sources: list[str] = []
-        if selected_playbook.id == "fx_carry":
+        if has_runtime_profile(selected_playbook, "demo_synthetic_fx"):
             rate_context = context.get("context", {}).get("rates", [])
             if rate_context:
                 primary_rate = rate_context[0]
@@ -197,7 +201,7 @@ async def generate_market_briefing(
                     "forward_curve": forward_curve,
                     "implied_volatility": implied_volatility,
                 }
-                synthetic_sources = ["forward_curve", "implied_volatility"]
+                synthetic_sources = synthetic_sources_for_playbook(selected_playbook)
                 carry_metrics = build_fx_carry_metrics(
                     pair=pair,
                     spot_rate=spot_rate,

@@ -239,6 +239,13 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Current data surface**: Playbooks ground themselves in existing FX rates, FRED indicators, market news, and internal research/RAG sources.
 - **Research-only boundary**: Playbook outputs support market research and desk briefing workflows; they do not provide live execution instructions, broker routing, or automated trading advice.
 
+### Feature 13 - Playbook Runtime Primitives (2026-06-08)
+- **Primitive composition**: Backend playbooks are represented as composed runtime definitions: identity, source contract, output contract, runtime profile, and rule metadata.
+- **Developer extensibility**: New playbooks can be added through focused definitions while preserving existing registry helpers such as `list_playbooks`, `get_playbook`, and `select_playbook`.
+- **Deterministic profiles**: The FX carry synthetic specialist layer is expressed through a `demo_synthetic_fx` runtime profile so demo/test behavior remains explicit and stable.
+- **Rule metadata**: Source grounding, data-gap reporting, synthetic source disclosure, and research-only framing are named runtime rules rather than implicit workflow assumptions.
+- **No API breakage**: `/api/chat` workflow responses keep the existing `playbook`, `source_grounding`, `data_gaps`, `specialist_data`, and `carry_metrics` shape.
+
 ---
 
 ## Architecture
@@ -1063,11 +1070,14 @@ AI Market Studio now uses backend runtime playbooks for professional FX/macro br
 This keeps runtime behavior deterministic and small:
 
 - The model selects the intent-level workflow tool `generate_market_briefing`.
-- The workflow applies a compact playbook definition from `backend/agent/financial_playbooks.py`.
+- The workflow applies a compact playbook runtime definition from `backend/agent/financial_playbooks.py`.
+- Each playbook definition is composed from identity, source contract, output contract, runtime profile, and rule metadata.
 - The response keeps the existing top-level shape: `reply`, `data`, and `tool_used`.
 - Specialist missing inputs are exposed as `data_gaps` instead of being hidden.
 - FX carry demo metrics can use deterministic synthetic forward curve and implied-volatility assumptions. These values are labeled separately from connector-backed data and are not live market quotes.
 - Outputs are research-only and do not provide live execution, broker routing, or automated trading advice.
+
+Runtime primitives are backend product definitions, not user-editable configuration in this version. They make playbook behavior easier to extend and test without introducing a YAML loader, UI editor, or prompt template engine.
 
 ### Runtime Playbooks
 

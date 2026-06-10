@@ -9,6 +9,7 @@ Use these notes when creating or updating AI Market Studio architecture diagrams
 - Put equivalent concepts on the same visual layer. For example, FX data, news data, FRED API, and RAG service are all external data sources and should sit on the same row.
 - Use fan-out patterns for one-to-many relationships. A connector layer should branch once into a horizontal bus, then split evenly to each data source.
 - Keep platform services such as AI Gateway, observability, and runtime config visually separate from the main product/data flow.
+- Show playbook runtime primitives as part of the workflow/playbook runtime layer. They are backend definitions for identity, source contracts, output contracts, runtime profiles, and rules; they are not external data providers.
 - Keep synthetic specialist data visually separate from external market data sources. It supports workflow/playbook runtime and should not sit on the same row as FX Data, News Data, FRED API, or RAG Service.
 - Avoid long edge labels. Prefer short labels or no labels, and place explanatory details in a nearby note box.
 - Use large text and fewer nodes so the PNG remains readable when embedded in README.

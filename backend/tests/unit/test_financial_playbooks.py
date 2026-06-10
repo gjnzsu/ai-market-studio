@@ -1,7 +1,9 @@
 from backend.agent.financial_playbooks import (
     get_playbook,
+    has_runtime_profile,
     list_playbooks,
     select_playbook,
+    synthetic_sources_for_playbook,
 )
 
 
@@ -22,6 +24,43 @@ def test_playbook_registry_includes_initial_playbooks():
         assert playbook.intent_triggers
         assert playbook.required_sources
         assert playbook.output_sections
+
+
+def test_playbook_definitions_expose_runtime_primitives():
+    playbook = get_playbook("fx_carry")
+
+    assert playbook.identity.id == "fx_carry"
+    assert playbook.source_contract.required_sources == ("rates", "fred")
+    assert "forward_curve" in playbook.source_contract.gap_sources
+    assert playbook.output_contract.output_sections == playbook.output_sections
+    assert "research_only" in playbook.runtime_profile.profile_ids
+    assert "source_grounding" in playbook.rule_ids
+    assert "synthetic_source_disclosure" in playbook.rule_ids
+
+
+def test_fx_carry_declares_synthetic_specialist_profile():
+    playbook = get_playbook("fx_carry")
+
+    assert has_runtime_profile(playbook, "demo_synthetic_fx")
+    assert playbook.runtime_profile.synthetic_sources == (
+        "forward_curve",
+        "implied_volatility",
+    )
+
+
+def test_non_fx_playbooks_do_not_declare_synthetic_specialist_profile():
+    playbook = get_playbook("macro_rates")
+
+    assert not has_runtime_profile(playbook, "demo_synthetic_fx")
+    assert playbook.runtime_profile.synthetic_sources == ()
+
+
+def test_runtime_layer_returns_synthetic_sources_only_for_profiled_playbooks():
+    assert synthetic_sources_for_playbook(get_playbook("fx_carry")) == [
+        "forward_curve",
+        "implied_volatility",
+    ]
+    assert synthetic_sources_for_playbook(get_playbook("macro_rates")) == []
 
 
 def test_get_playbook_returns_explicit_supported_playbook():
