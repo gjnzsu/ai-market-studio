@@ -20,6 +20,18 @@ This repository is part of a **microservices architecture** that was split from 
 - **AI Gateway**: [ai-gateway-service](https://github.com/gjnzsu/ai-gateway-service) (LiteLLM proxy) - Internal service
 - **AI SRE Observability**: [ai-sre-observability](https://github.com/gjnzsu/ai-sre-observability) (Prometheus + Grafana) - Metrics collection
 
+### Service Technology Stack
+
+| Service | Repository | Main Stack | Role |
+|---|---|---|---|
+| Backend API / Agent Runtime | This repository | Python 3.12, FastAPI, Uvicorn, OpenAI SDK, Pydantic, httpx, reportlab, pytest | Main backend for chat APIs, agent workflows, financial playbooks, FX/FRED/news/RAG connectors, and PDF export |
+| Frontend UI | [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) | Static HTML/CSS/JavaScript, Nginx Alpine container | Browser chat UI, predefined prompts, market briefing rendering, and PDF export trigger |
+| AI Gateway | [ai-gateway-service](https://github.com/gjnzsu/ai-gateway-service) | Python, FastAPI, LiteLLM, httpx, YAML config | OpenAI-compatible LLM gateway for centralized OpenAI/DeepSeek key management and model routing |
+| RAG Service | [ai-rag-service](https://github.com/gjnzsu/ai-rag-service) | Python 3.12, FastAPI, OpenAI embeddings, ChromaDB, LangChain text splitters, PyMuPDF, Atlassian API | PDF/Jira/Confluence/FX ingestion and research document retrieval for backend market analysis |
+| Observability Service | [ai-sre-observability](https://github.com/gjnzsu/ai-sre-observability) | Python 3.12, FastAPI, Prometheus client, Pydantic, custom SDK | Receives LLM telemetry from instrumented services and exposes Prometheus metrics |
+| Metrics Stack | [ai-sre-observability](https://github.com/gjnzsu/ai-sre-observability) Kubernetes manifests | Prometheus, Grafana, Redis | Scrapes observability metrics and visualizes LLM cost, usage, request performance, and service health |
+| Deployment | Service `k8s/` directories and `cloudbuild.yaml` files | GKE, Kubernetes, Cloud Build, Docker, GCR/Artifact Registry | Builds, configures, and deploys the platform services on Google Cloud |
+
 ### Why Microservices?
 
 The original monolithic application was split to achieve:
