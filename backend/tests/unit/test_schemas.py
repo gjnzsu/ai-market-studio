@@ -9,22 +9,11 @@ def test_chat_request_valid():
     req = ChatRequest(message="What is EUR/USD?")
     assert req.message == "What is EUR/USD?"
     assert req.history == []
-    assert req.agent_mode == "legacy"
 
 
-def test_chat_request_accepts_workflow_agent_mode():
-    req = ChatRequest(message="Brief EUR/USD", agent_mode="workflow")
-    assert req.agent_mode == "workflow"
-
-
-def test_chat_request_accepts_explicit_legacy_agent_mode():
-    req = ChatRequest(message="What is EUR/USD?", agent_mode="legacy")
-    assert req.agent_mode == "legacy"
-
-
-def test_chat_request_rejects_unknown_agent_mode():
+def test_chat_request_rejects_removed_agent_mode():
     with pytest.raises(ValidationError):
-        ChatRequest(message="Brief EUR/USD", agent_mode="multi_agent")
+        ChatRequest(message="Brief EUR/USD", agent_mode="workflow")
 
 
 def test_chat_request_with_history():

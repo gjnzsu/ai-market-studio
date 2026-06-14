@@ -2,10 +2,15 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from backend.agent.workflows import (
+    _split_pair,
     analyze_market_context,
     collect_market_context,
     generate_market_briefing,
 )
+
+
+def test_split_pair_accepts_compact_six_letter_fx_pair():
+    assert _split_pair("eurusd") == ("EUR", "USD")
 
 
 @pytest.mark.asyncio
@@ -74,6 +79,174 @@ async def test_analyze_market_context_general_uses_trend_analysis():
 
     assert result["type"] == "market_analysis"
     assert result["analysis"]["analysis_type"] == "trend"
+
+
+@pytest.mark.asyncio
+async def test_analyze_market_context_returns_fx_analysis_for_single_pair():
+    context = {
+        "type": "market_context",
+        "context": {
+            "rates": [
+                {
+                    "base": "EUR",
+                    "target": "USD",
+                    "date": "2026-05-19",
+                    "rate": 1.07,
+                    "source": "mock",
+                },
+                {
+                    "base": "EUR",
+                    "target": "USD",
+                    "date": "2026-05-20",
+                    "rate": 1.08,
+                    "source": "mock",
+                },
+            ]
+        },
+        "warnings": [],
+        "metadata": {"pairs": ["EUR/USD"], "sources": ["rates"], "days": 2},
+    }
+
+    result = await analyze_market_context(
+        context=context,
+        pairs=["EUR/USD"],
+        analysis_type="fx_analysis",
+        horizon="1w",
+        focus="ECB vs Fed rate path",
+    )
+
+    assert result["type"] == "fx_analysis"
+    assert result["pair"] == "EUR/USD"
+    assert result["pairs"] == ["EUR/USD"]
+    assert result["horizon"] == "1w"
+    assert result["focus"] == "ECB vs Fed rate path"
+    assert result["market_context_summary"]["primary_pair"] == "EUR/USD"
+    assert result["sections"]["trend"]["direction"] == "higher"
+    assert result["sections"]["momentum"]["latest_change"] == pytest.approx(0.01)
+    assert result["sections"]["volatility"]["observation_count"] == 2
+    assert {"bull", "base", "bear"} <= set(result["scenarios"])
+    assert result["research_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_analyze_market_context_labels_multi_pair_fx_analysis():
+    context = {
+        "type": "market_context",
+        "context": {
+            "rates": [
+                {"base": "EUR", "target": "USD", "date": "2026-05-20", "rate": 1.08},
+                {"base": "GBP", "target": "USD", "date": "2026-05-20", "rate": 1.27},
+            ]
+        },
+        "warnings": [],
+        "metadata": {"pairs": ["EURUSD", "GBP/USD"], "sources": ["rates"]},
+    }
+
+    result = await analyze_market_context(
+        context=context,
+        pairs=["EURUSD", "GBP/USD"],
+        analysis_type="fx_analysis",
+    )
+
+    assert result["type"] == "fx_analysis"
+    assert result["pair"] == "EUR/USD"
+    assert result["pairs"] == ["EUR/USD", "GBP/USD"]
+    assert [item["pair"] for item in result["pair_summaries"]] == [
+        "EUR/USD",
+        "GBP/USD",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_analyze_market_context_reports_grounding_gaps_and_confidence():
+    context = {
+        "type": "market_context",
+        "context": {
+            "rates": [
+                {"base": "EUR", "target": "USD", "date": "2026-05-20", "rate": 1.08}
+            ],
+            "research": {
+                "answer": "Internal research notes highlight softer USD momentum.",
+                "sources": [{"title": "FX Weekly", "document_id": "doc-1"}],
+            },
+        },
+        "warnings": [
+            {"source": "news", "error": "News connector not available"},
+            {"source": "fred", "error": "FRED connector not available"},
+        ],
+        "metadata": {"pairs": ["EUR/USD"], "sources": ["rates", "news", "fred", "research"]},
+    }
+
+    result = await analyze_market_context(
+        context=context,
+        pairs=["EUR/USD"],
+        analysis_type="fx_analysis",
+    )
+
+    assert result["source_grounding"]["available_sources"] == ["rates", "research"]
+    assert result["source_grounding"]["research_sources"] == ["FX Weekly"]
+    gap_sources = {gap["source"] for gap in result["data_gaps"]}
+    assert {"news", "fred", "history"} <= gap_sources
+    assert result["confidence"]["score"] < 1
+    assert result["confidence"]["label"] in {"low", "medium"}
+    assert "research-only" in result["framing"].lower()
+    text = str(result).lower()
+    assert "place order" not in text
+    assert "execute trade" not in text
+
+
+@pytest.mark.asyncio
+async def test_fx_analysis_can_be_grounded_in_mcp_sourced_spot_data():
+    connector = AsyncMock()
+    connector.get_exchange_rate.return_value = {
+        "base": "EUR",
+        "target": "USD",
+        "rate": 1.0865,
+        "date": "2026-06-14",
+        "source": "mcp-mock-market-data",
+    }
+
+    result = await analyze_market_context(
+        pairs=["EURUSD"],
+        analysis_type="fx_analysis",
+        connector=connector,
+    )
+
+    assert result["type"] == "fx_analysis"
+    assert result["pair"] == "EUR/USD"
+    assert result["market_context_summary"]["rate_sources"] == [
+        "mcp-mock-market-data"
+    ]
+    assert result["source_grounding"]["rate_sources"] == ["mcp-mock-market-data"]
+    assert result["research_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_collect_market_context_uses_history_when_days_are_requested():
+    connector = AsyncMock()
+    connector.get_historical_rates.return_value = {
+        "2026-06-12": {"USD": 1.08},
+        "2026-06-13": {"USD": 1.081},
+        "2026-06-14": {"USD": 1.086},
+    }
+
+    context = await collect_market_context(
+        pairs=["EUR/USD"],
+        sources=["rates"],
+        days=3,
+        connector=connector,
+    )
+    result = await analyze_market_context(
+        context=context,
+        pairs=["EUR/USD"],
+        analysis_type="fx_analysis",
+    )
+
+    connector.get_historical_rates.assert_awaited_once()
+    assert len(context["context"]["rates"]) == 3
+    assert result["sections"]["trend"]["direction"] == "higher"
+    assert result["sections"]["volatility"]["observation_count"] == 3
+    assert "history" not in {gap["source"] for gap in result["data_gaps"]}
 
 
 @pytest.mark.asyncio

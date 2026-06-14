@@ -17,16 +17,39 @@ logger = logging.getLogger(__name__)
 
 
 def create_connector():
-    if settings.use_mock_connector:
+    provider = settings.market_data_provider.lower()
+    if provider == "auto":
+        provider = "mock" if settings.use_mock_connector else "exchangerate_host"
+
+    if provider == "mcp":
+        from backend.connectors.mcp_market_data import (
+            MCPMarketDataConnector,
+            MCPStdioToolClient,
+        )
+
+        logger.info("Using MCPMarketDataConnector")
+        return MCPMarketDataConnector(
+            client=MCPStdioToolClient(
+                command=settings.mcp_market_data_command,
+                args=settings.mcp_market_data_args_list,
+            )
+        )
+
+    if provider == "mock":
         from backend.connectors.mock_connector import MockConnector
-        logger.info("Using MockConnector (USE_MOCK_CONNECTOR=true)")
+
+        logger.info("Using MockConnector")
         return MockConnector()
-    else:
+
+    if provider == "exchangerate_host":
         from backend.connectors.exchangerate_host import ExchangeRateHostConnector
+
         logger.info("Using ExchangeRateHostConnector")
         return ExchangeRateHostConnector(
             api_key=settings.exchangerate_api_key.get_secret_value()
         )
+
+    raise ValueError(f"Unknown MARKET_DATA_PROVIDER: {settings.market_data_provider}")
 
 
 def create_news_connector():

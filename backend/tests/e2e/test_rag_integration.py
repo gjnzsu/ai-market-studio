@@ -43,8 +43,11 @@ def test_chat_returns_normalized_rag_sources(app_client, monkeypatch):
     tool_response = make_response(
         tool_calls=[
             make_tool_call(
-                "get_internal_research",
-                {"question": "Find internal rollout notes"},
+                "collect_market_context",
+                {
+                    "sources": ["research"],
+                    "query": "Find internal rollout notes",
+                },
             )
         ],
         finish_reason="tool_calls",
@@ -82,8 +85,10 @@ def test_chat_returns_normalized_rag_sources(app_client, monkeypatch):
 
     assert response.status_code == 200
     data = response.json()
-    assert data["tool_used"] == "get_internal_research"
-    assert data["data"]["type"] == "rag"
-    assert data["data"]["answer"] == "Refer to the deployment checklist."
-    assert data["data"]["sources"][0]["name"] == "Deployment Checklist"
-    assert data["data"]["sources"][0]["document_id"] == "doc-789"
+    assert data["tool_used"] == "collect_market_context"
+    assert data["data"]["type"] == "market_context"
+    research = data["data"]["context"]["research"]
+    assert research["type"] == "rag"
+    assert research["answer"] == "Refer to the deployment checklist."
+    assert research["sources"][0]["name"] == "Deployment Checklist"
+    assert research["sources"][0]["document_id"] == "doc-789"

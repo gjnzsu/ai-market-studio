@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Literal, Optional
+from typing import Optional
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
@@ -8,39 +8,12 @@ from openai.types.chat import ChatCompletionMessageParam
 from backend.config import settings
 from backend.connectors.base import MarketDataConnector, ConnectorError
 from backend.connectors.news_connector import NewsConnectorBase
-from backend.agent.tools import get_tool_definitions, dispatch_tool, AgentError
+from backend.agent.tools import TOOL_DEFINITIONS, dispatch_tool, AgentError
 from ai_sre_observability import get_client
 
 logger = logging.getLogger(__name__)
 
-LEGACY_SYSTEM_PROMPT = """
-You are an AI assistant for AI Market Studio, an FX market intelligence platform.
-
-You have access to these tools:
-
-**FX Rate Tools:**
-- get_exchange_rate: Get spot rate for a single currency pair
-- get_exchange_rates: Get rates for multiple target currencies from one base
-- get_historical_rates: Get historical rates over a date range
-- generate_dashboard: Create visual charts for rate trends
-
-**Market Data Tools:**
-- get_fx_news: Fetch recent FX and financial news
-- get_interest_rate: Get FRED economic indicators (federal funds rate, treasury rates, etc.)
-
-**Analysis Tools:**
-- analyze_fx_economic_correlation: Analyze correlation between FX pairs and economic indicators
-
-**Utility:**
-- list_supported_currencies: List all supported currency codes
-
-When presenting insights, always cite research documents by name (e.g., "According to the Monthly FX Outlook report...").
-
-Be concise, accurate, and helpful. Always cite your data sources.
-"""
-
-
-WORKFLOW_SYSTEM_PROMPT = """
+SYSTEM_PROMPT = """
 You are an AI assistant for AI Market Studio using intent-level market workflows.
 
 Use collect_market_context for data-only market requests, analyze_market_context
@@ -50,9 +23,6 @@ or multi-source synthesis requests.
 
 Be concise, accurate, and helpful. Always cite your data sources.
 """
-
-MAX_TOOL_ROUNDS = 3  # Reduced from 5 to prevent long sequential chains
-AgentMode = Literal["legacy", "workflow"]
 
 
 def _summarise_tool_result(result: dict) -> dict:
@@ -113,7 +83,6 @@ async def run_agent(
     news_connector: Optional[NewsConnectorBase] = None,
     fred_connector = None,
     rag_connector = None,
-    agent_mode: AgentMode = "legacy",
 ) -> dict:
     """Run the GPT-4o function-calling agent loop.
 
@@ -137,11 +106,7 @@ async def run_agent(
     messages: list[ChatCompletionMessageParam] = [
         {
             "role": "system",
-            "content": (
-                WORKFLOW_SYSTEM_PROMPT
-                if agent_mode == "workflow"
-                else LEGACY_SYSTEM_PROMPT
-            ),
+            "content": SYSTEM_PROMPT,
         },
     ]
     if history:
@@ -150,12 +115,8 @@ async def run_agent(
 
     last_tool_used: Optional[str] = None
     last_tool_data = None
-    tool_definitions = get_tool_definitions(agent_mode)
-    max_rounds = (
-        settings.agent_workflow_max_rounds
-        if agent_mode == "workflow"
-        else MAX_TOOL_ROUNDS
-    )
+    tool_definitions = TOOL_DEFINITIONS
+    max_rounds = settings.agent_max_rounds
 
     # Get observability client (graceful degradation)
     try:
@@ -176,8 +137,7 @@ async def run_agent(
         ) as tracker:
             for _ in range(max_rounds):
                 logger.info(
-                    "[Agent] mode=%s model=%s",
-                    agent_mode,
+                    "[Agent] model=%s",
                     settings.openai_model,
                 )
                 response = await client.chat.completions.create(
@@ -201,8 +161,7 @@ async def run_agent(
                         tool_name = tool_call.function.name
                         tool_args = json.loads(tool_call.function.arguments)
                         logger.info(
-                            "Tool call: mode=%s tool=%s args=%s",
-                            agent_mode,
+                            "Tool call: tool=%s args=%s",
                             tool_name,
                             tool_args,
                         )
@@ -245,8 +204,7 @@ async def run_agent(
         # No observability - run agent normally
         for _ in range(max_rounds):
             logger.info(
-                "[Agent] mode=%s model=%s",
-                agent_mode,
+                "[Agent] model=%s",
                 settings.openai_model,
             )
             response = await client.chat.completions.create(
@@ -265,8 +223,7 @@ async def run_agent(
                     tool_name = tool_call.function.name
                     tool_args = json.loads(tool_call.function.arguments)
                     logger.info(
-                        "Tool call: mode=%s tool=%s args=%s",
-                        agent_mode,
+                        "Tool call: tool=%s args=%s",
                         tool_name,
                         tool_args,
                     )
@@ -299,15 +256,8 @@ async def run_agent(
             reply = msg.content or ""
             return {"reply": reply, "data": last_tool_data, "tool_used": last_tool_used}
 
-    if agent_mode == "workflow":
-        return {
-            "reply": "The workflow could not complete within the configured step limit; the request may be too complex or incomplete.",
-            "data": last_tool_data,
-            "tool_used": last_tool_used,
-        }
-
     return {
-        "reply": "I was unable to complete your request after several attempts. Please try again.",
-        "data": None,
+        "reply": "The workflow could not complete within the configured step limit; the request may be too complex or incomplete.",
+        "data": last_tool_data,
         "tool_used": last_tool_used,
     }

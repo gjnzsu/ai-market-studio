@@ -36,11 +36,11 @@ def make_response(content=None, tool_calls=None, finish_reason=None):
 
 
 @pytest.mark.asyncio
-async def test_agent_calls_get_exchange_rate_tool():
-    """Agent calls get_exchange_rate when user asks for a single pair."""
+async def test_agent_can_collect_market_context_for_single_pair():
+    """Agent calls collect_market_context when user asks for a single pair."""
     connector = MockConnector()
     tool_response = make_response(
-        tool_calls=[make_tool_call("get_exchange_rate", {"base": "EUR", "target": "USD"})],
+        tool_calls=[make_tool_call("collect_market_context", {"pairs": ["EUR/USD"], "sources": ["rates"]})],
         finish_reason="tool_calls",
     )
     final_response = make_response(content="The EUR/USD rate is 1.0823.", finish_reason="stop")
@@ -54,16 +54,16 @@ async def test_agent_calls_get_exchange_rate_tool():
         client=mock_client,
     )
     assert "reply" in result
-    assert result["tool_used"] == "get_exchange_rate"
+    assert result["tool_used"] == "collect_market_context"
     assert result["data"] is not None
 
 
 @pytest.mark.asyncio
-async def test_agent_calls_get_exchange_rates_for_multi_pair():
-    """Agent calls get_exchange_rates for multi-currency comparison."""
+async def test_agent_can_collect_market_context_for_multi_pair():
+    """Agent calls collect_market_context for multi-currency comparison."""
     connector = MockConnector()
     tool_response = make_response(
-        tool_calls=[make_tool_call("get_exchange_rates", {"base": "USD", "targets": ["EUR", "GBP", "JPY"]})],
+        tool_calls=[make_tool_call("collect_market_context", {"pairs": ["USD/EUR", "USD/GBP", "USD/JPY"], "sources": ["rates"]})],
         finish_reason="tool_calls",
     )
     final_response = make_response(content="USD rates: EUR 0.92, GBP 0.79, JPY 149.8.", finish_reason="stop")
@@ -76,7 +76,7 @@ async def test_agent_calls_get_exchange_rates_for_multi_pair():
         connector=connector,
         client=mock_client,
     )
-    assert result["tool_used"] == "get_exchange_rates"
+    assert result["tool_used"] == "collect_market_context"
 
 
 @pytest.mark.asyncio
@@ -84,7 +84,7 @@ async def test_agent_handles_connector_error_gracefully():
     """Agent returns a reply even when connector raises RateFetchError."""
     connector = MockConnector(error_pairs={"EUR/USD"})
     tool_response = make_response(
-        tool_calls=[make_tool_call("get_exchange_rate", {"base": "EUR", "target": "USD"})],
+        tool_calls=[make_tool_call("collect_market_context", {"pairs": ["EUR/USD"], "sources": ["rates"]})],
         finish_reason="tool_calls",
     )
     final_response = make_response(
@@ -151,7 +151,7 @@ async def test_agent_passes_history_to_llm():
 
 
 @pytest.mark.asyncio
-async def test_agent_uses_workflow_tool_set_when_workflow_mode_selected():
+async def test_agent_uses_intent_level_workflow_tool_set():
     connector = MockConnector()
     final_response = make_response(content="ok", finish_reason="stop")
     mock_client = AsyncMock()
@@ -161,7 +161,6 @@ async def test_agent_uses_workflow_tool_set_when_workflow_mode_selected():
         message="Brief EUR/USD",
         connector=connector,
         client=mock_client,
-        agent_mode="workflow",
     )
 
     tools = mock_client.chat.completions.create.call_args.kwargs["tools"]
@@ -174,7 +173,7 @@ async def test_agent_uses_workflow_tool_set_when_workflow_mode_selected():
 
 
 @pytest.mark.asyncio
-async def test_workflow_mode_can_use_market_briefing_tool_for_insight():
+async def test_agent_can_use_market_briefing_tool_for_insight():
     connector = MockConnector()
     tool_response = make_response(
         tool_calls=[make_tool_call("generate_market_briefing", {"pairs": ["EUR/USD"]})],
@@ -190,7 +189,6 @@ async def test_workflow_mode_can_use_market_briefing_tool_for_insight():
         message="Give me a market insight on EUR/USD",
         connector=connector,
         client=mock_client,
-        agent_mode="workflow",
     )
 
     assert result["tool_used"] == "generate_market_briefing"
@@ -198,7 +196,43 @@ async def test_workflow_mode_can_use_market_briefing_tool_for_insight():
 
 
 @pytest.mark.asyncio
-async def test_workflow_mode_can_use_market_briefing_with_explicit_playbook():
+async def test_agent_can_use_market_analysis_tool_for_fx_analysis():
+    connector = MockConnector()
+    tool_response = make_response(
+        tool_calls=[
+            make_tool_call(
+                "analyze_market_context",
+                {
+                    "pairs": ["EURUSD"],
+                    "analysis_type": "fx_analysis",
+                    "horizon": "1w",
+                    "focus": "ECB vs Fed",
+                },
+            )
+        ],
+        finish_reason="tool_calls",
+    )
+    final_response = make_response(content="EUR/USD FX analysis ready.", finish_reason="stop")
+    mock_client = AsyncMock()
+    mock_client.chat.completions.create = AsyncMock(
+        side_effect=[tool_response, final_response]
+    )
+
+    result = await run_agent(
+        message="Analyze EURUSD over the next week",
+        connector=connector,
+        client=mock_client,
+    )
+
+    assert result["tool_used"] == "analyze_market_context"
+    assert result["data"]["type"] == "fx_analysis"
+    assert result["data"]["pair"] == "EUR/USD"
+    assert result["data"]["horizon"] == "1w"
+    assert result["data"]["research_only"] is True
+
+
+@pytest.mark.asyncio
+async def test_agent_can_use_market_briefing_with_explicit_playbook():
     connector = MockConnector()
     tool_response = make_response(
         tool_calls=[
@@ -219,7 +253,6 @@ async def test_workflow_mode_can_use_market_briefing_with_explicit_playbook():
         message="Give me an FX carry view on EUR/USD",
         connector=connector,
         client=mock_client,
-        agent_mode="workflow",
     )
 
     assert result["tool_used"] == "generate_market_briefing"
@@ -255,7 +288,6 @@ async def test_workflow_market_briefing_summary_includes_playbook_details():
         message="Give me a macro rates monitor for EUR/USD",
         connector=connector,
         client=mock_client,
-        agent_mode="workflow",
     )
 
     second_call_messages = mock_client.chat.completions.create.call_args_list[1].kwargs[
@@ -291,7 +323,6 @@ async def test_workflow_market_briefing_summary_includes_synthetic_carry_details
         message="Give me an FX carry view on EUR/USD",
         connector=connector,
         client=mock_client,
-        agent_mode="workflow",
     )
 
     second_call_messages = mock_client.chat.completions.create.call_args_list[1].kwargs[
@@ -309,7 +340,7 @@ async def test_workflow_market_briefing_summary_includes_synthetic_carry_details
 
 
 @pytest.mark.asyncio
-async def test_workflow_mode_unknown_tool_does_not_fallback_to_legacy():
+async def test_unknown_tool_does_not_fallback_to_legacy():
     connector = MockConnector()
     tool_response = make_response(
         tool_calls=[make_tool_call("unknown_workflow_tool", {})],
@@ -328,16 +359,15 @@ async def test_workflow_mode_unknown_tool_does_not_fallback_to_legacy():
         message="Brief EUR/USD",
         connector=connector,
         client=mock_client,
-        agent_mode="workflow",
     )
 
     assert result["tool_used"] is None
 
 
 @pytest.mark.asyncio
-async def test_workflow_mode_stops_at_configured_step_limit(monkeypatch):
+async def test_agent_stops_at_configured_step_limit(monkeypatch):
     connector = MockConnector()
-    monkeypatch.setattr("backend.agent.agent.settings.agent_workflow_max_rounds", 1)
+    monkeypatch.setattr("backend.agent.agent.settings.agent_max_rounds", 1)
     tool_response = make_response(
         tool_calls=[make_tool_call("collect_market_context", {"pairs": ["EUR/USD"]})],
         finish_reason="tool_calls",
@@ -349,42 +379,9 @@ async def test_workflow_mode_stops_at_configured_step_limit(monkeypatch):
         message="Keep working on EUR/USD until complete",
         connector=connector,
         client=mock_client,
-        agent_mode="workflow",
     )
 
     reply = result["reply"].lower()
     assert "too complex" in reply or "incomplete" in reply
     assert result["tool_used"] == "collect_market_context"
 
-
-@pytest.mark.asyncio
-async def test_previous_workflow_failure_does_not_alter_later_legacy_tool_set():
-    connector = MockConnector()
-    workflow_tool_response = make_response(
-        tool_calls=[make_tool_call("unknown_workflow_tool", {})],
-        finish_reason="tool_calls",
-    )
-    workflow_final_response = make_response(content="Workflow failed.", finish_reason="stop")
-    legacy_final_response = make_response(content="Legacy ok.", finish_reason="stop")
-    mock_client = AsyncMock()
-    mock_client.chat.completions.create = AsyncMock(
-        side_effect=[workflow_tool_response, workflow_final_response, legacy_final_response]
-    )
-
-    await run_agent(
-        message="Brief EUR/USD",
-        connector=connector,
-        client=mock_client,
-        agent_mode="workflow",
-    )
-    await run_agent(
-        message="What is EUR/USD?",
-        connector=connector,
-        client=mock_client,
-        agent_mode="legacy",
-    )
-
-    legacy_tools = mock_client.chat.completions.create.call_args.kwargs["tools"]
-    legacy_names = [tool["function"]["name"] for tool in legacy_tools]
-    assert "get_exchange_rate" in legacy_names
-    assert "collect_market_context" not in legacy_names

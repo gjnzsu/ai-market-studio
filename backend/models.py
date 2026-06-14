@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Optional, Any, Literal
 from datetime import date as _date_type
 from backend.config import settings
@@ -9,13 +9,11 @@ class Message(BaseModel):
     content: str
 
 
-AgentMode = Literal["legacy", "workflow"]
-
-
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message: str
     history: list[Message] = []
-    agent_mode: AgentMode = "legacy"
 
     @field_validator("message")
     @classmethod

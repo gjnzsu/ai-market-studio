@@ -1,10 +1,10 @@
 <mxfile host="app.diagrams.net" modified="2026-06-03T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
-  <diagram id="workflow-playbook-sequence" name="Workflow Mode Playbook UML Sequence">
+  <diagram id="workflow-playbook-sequence" name="Workflow Runtime Playbook UML Sequence">
     <mxGraphModel dx="1700" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1200" math="0" shadow="0">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <mxCell id="title" value="Workflow Mode + Financial Playbook - UML Sequence" style="text;html=1;strokeColor=none;fillColor=none;fontSize=32;fontStyle=1;fontColor=#0f172a;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="title" value="Workflow Runtime + Financial Playbook - UML Sequence" style="text;html=1;strokeColor=none;fillColor=none;fontSize=32;fontStyle=1;fontColor=#0f172a;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="250" y="35" width="1200" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="subtitle" value="Time flows downward. This sequence shows one workflow-mode FX carry briefing with source grounding, synthetic specialist data, and research-only output." style="text;html=1;strokeColor=none;fillColor=none;fontSize=18;fontColor=#475569;align=center;verticalAlign=middle;" vertex="1" parent="1">
@@ -70,7 +70,7 @@
         <mxCell id="a_data" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#059669;" vertex="1" parent="1">
           <mxGeometry x="1533" y="820" width="18" height="120" as="geometry"/>
         </mxCell>
-        <mxCell id="m1" value="1. POST /api/chat&lt;br/&gt;agent_mode=workflow" style="html=1;strokeColor=#2563eb;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+        <mxCell id="m1" value="1. POST /api/chat&lt;br/&gt;workflow runtime" style="html=1;strokeColor=#2563eb;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="115" y="280" as="sourcePoint"/>
             <mxPoint x="341" y="280" as="targetPoint"/>

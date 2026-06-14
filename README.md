@@ -8,9 +8,9 @@ Backend API for the AI Market Studio conversational FX market data platform.
 
 ![Component Diagram](docs/diagrams/ai-market-studio-component.drawio.png)
 
-### Workflow Mode Playbook Sequence
+### Workflow Runtime Playbook Sequence
 
-![Workflow Mode Playbook Sequence](docs/diagrams/ai-market-studio-workflow-playbook-sequence.drawio.png)
+![Workflow Runtime Playbook Sequence](docs/diagrams/ai-market-studio-workflow-playbook-sequence.drawio.png)
 
 This repository is part of a **microservices architecture** that was split from a monolithic application for better scalability and independent deployment:
 
@@ -121,7 +121,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 | FX Connector | `USE_MOCK_CONNECTOR=true` (set `false` for live exchangerate.host data) |
 | News Connector | `USE_MOCK_NEWS_CONNECTOR=false` (live RSS feeds) |
 | RAG Service URL | `http://34.10.130.210` (external deployed RAG endpoint) |
-| Workflow Mode | `ENABLE_AGENT_WORKFLOW_MODE=true` |
+| Agent Runtime | Workflow/playbook runtime |
 | CORS Origins | `http://136.116.205.168` (frontend URL) |
 
 ## Features
@@ -188,8 +188,8 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ### Feature 07 - Market Insight Summary
 - Ask in natural language: *"Give me a market insight on EUR/USD and GBP/USD"*
-- Legacy mode answers market insight requests through the approved low-level market data tools.
-- Workflow mode replaces the deprecated `generate_market_insight` tool with `generate_market_briefing`.
+- Market insight requests use the intent-level `generate_market_briefing` workflow.
+- The deprecated `generate_market_insight` tool is no longer model-facing.
 - Market briefings coordinate FX rates, news, FRED indicators, and internal research behind one intent-level workflow result.
 - Responses keep the existing `reply`, `data`, and `tool_used` shape for frontend compatibility.
 
@@ -235,16 +235,16 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Regression Tests**: 5 E2E tests in `backend/tests/e2e/test_observability.py` (97% coverage)
 
 ### Feature 11 - Agent Workflow Foundation (2026-05-21)
-- **Mode selection**: `/api/chat` defaults to `agent_mode: "legacy"` and accepts `agent_mode: "workflow"` only when `ENABLE_AGENT_WORKFLOW_MODE=true`.
-- **Intent-level tools**: Workflow mode exposes `collect_market_context`, `analyze_market_context`, and `generate_market_briefing` instead of low-level internal agent tools.
-- **Market insight replacement**: `generate_market_insight` is no longer an approved model-facing tool; market insight, overview, briefing, and synthesis requests use `generate_market_briefing` in workflow mode.
-- **Guardrails**: Workflow requests have bounded runtime (`AGENT_WORKFLOW_TIMEOUT_SECONDS`) and bounded model/tool rounds (`AGENT_WORKFLOW_MAX_ROUNDS`).
-- **Failure behavior**: Workflow failures return clear timeout or failure responses and do not silently fall back to legacy orchestration.
-- **Observability**: Workflow logs include selected mode, workflow name, internal units, latency, status, and failure category.
-- **Backward compatibility**: Existing clients can omit `agent_mode` and still receive the same `reply`, `data`, and `tool_used` response shape.
+- **Single runtime**: `/api/chat` uses the workflow/playbook runtime for all chat requests.
+- **Intent-level tools**: The chat model sees `collect_market_context`, `analyze_market_context`, and `generate_market_briefing` instead of low-level internal agent tools.
+- **Market insight replacement**: `generate_market_insight` is no longer an approved model-facing tool; market insight, overview, briefing, and synthesis requests use `generate_market_briefing`.
+- **Guardrails**: Chat requests have bounded runtime (`AGENT_TIMEOUT_SECONDS`) and bounded model/tool rounds (`AGENT_MAX_ROUNDS`).
+- **Failure behavior**: Workflow failures return clear timeout or failure responses and do not silently fall back to unsupported legacy behavior.
+- **Observability**: Workflow logs include workflow name, internal units, latency, status, and failure category.
+- **Response compatibility**: Chat responses keep the same `reply`, `data`, and `tool_used` shape.
 
 ### Feature 12 - Financial Analysis Playbooks (2026-06-02)
-- **Runtime playbooks**: Workflow-mode market briefings can apply professional analysis frames for `general`, `fx_carry`, `macro_rates`, `morning_note`, and `catalyst_calendar`.
+- **Runtime playbooks**: Market briefings can apply professional analysis frames for `general`, `fx_carry`, `macro_rates`, `morning_note`, and `catalyst_calendar`.
 - **Explicit or inferred selection**: `generate_market_briefing` accepts an optional `playbook` field and can infer a playbook from briefing focus text when omitted.
 - **Source grounding**: Briefing data includes selected playbook metadata, available/requested sources, missing required/optional sources, and specialist `data_gaps`.
 - **Synthetic FX carry demo metrics**: The `fx_carry` playbook includes deterministic synthetic forward curve and implied-volatility assumptions for demo/test carry metrics; these are labeled as synthetic and are not live market quotes.
@@ -257,6 +257,13 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Deterministic profiles**: The FX carry synthetic specialist layer is expressed through a `demo_synthetic_fx` runtime profile so demo/test behavior remains explicit and stable.
 - **Rule metadata**: Source grounding, data-gap reporting, synthetic source disclosure, and research-only framing are named runtime rules rather than implicit workflow assumptions.
 - **No API breakage**: `/api/chat` workflow responses keep the existing `playbook`, `source_grounding`, `data_gaps`, `specialist_data`, and `carry_metrics` shape.
+
+### Feature 14 - Workflow FX Analysis (2026-06-14)
+- **Structured FX analysis**: `analyze_market_context` can return a first-version `fx_analysis` payload for single-pair and multi-pair FX analysis requests.
+- **Stable sections**: FX analysis includes market context summary, trend, momentum, volatility, drivers, scenarios, watch items, data gaps, confidence, and source grounding.
+- **Compact pair support**: Common notation such as `EURUSD` is normalized to `EUR/USD` before workflow analysis.
+- **Research-only framing**: FX analysis is explicitly marked `research_only: true` and does not provide broker routing, order placement, live execution, or imperative trading instructions.
+- **Workflow baseline**: This capability remains workflow-first and is the baseline for future autonomy-mode experiments; it does not add autonomous planning or a new chat mode.
 
 ---
 
@@ -304,6 +311,7 @@ Backend also connects to:
 Connector Layer
    |-- ExchangeRateHostConnector -> live FX data (exchangerate.host)
    |-- MockConnector             -> deterministic synthetic FX data
+   |-- MCPMarketDataConnector    -> MCP-backed deterministic mock market data
    |-- RSSNewsConnector          -> free RSS feeds
    |-- MockNewsConnector         -> deterministic synthetic news
    |-- FREDConnector             -> Federal Reserve interest rates (direct FRED API)
@@ -314,11 +322,13 @@ Connector Layer
                                  RAG Service (ai-rag-service)
 ```
 
-**Legacy-mode GPT-5.4 tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `list_supported_currencies`, `get_interest_rate`, `analyze_fx_economic_correlation`, `generate_dashboard`, `get_fx_news`, `get_internal_research`
+**Model-facing workflow tools:** `collect_market_context`, `analyze_market_context`, `generate_market_briefing`
 
-**Workflow-mode GPT-5.4 tools:** `collect_market_context`, `analyze_market_context`, `generate_market_briefing`
+Low-level FX rates, FRED data, news, RAG research, dashboard data, and specialist analysis remain internal connector-backed implementation capabilities rather than model-facing chat tools.
 
 `generate_market_briefing` supports optional financial analysis playbooks: `general`, `fx_carry`, `macro_rates`, `morning_note`, and `catalyst_calendar`.
+
+`analyze_market_context` supports structured FX analysis with optional `analysis_type: "fx_analysis"`, `horizon`, and `focus` parameters.
 
 ---
 
@@ -328,14 +338,13 @@ Connector Layer
 
 **POST** `/api/chat`
 
-Main conversational interface with GPT-5.4 agent. Requests use legacy orchestration by default. To opt in to intent-level workflows, set `agent_mode` to `"workflow"` and enable `ENABLE_AGENT_WORKFLOW_MODE=true`.
+Main conversational interface with the GPT-5.4 workflow/playbook agent runtime.
 
 **Request:**
 ```json
 {
   "message": "What is the EUR/USD rate?",
-  "history": [],
-  "agent_mode": "legacy"
+  "history": []
 }
 ```
 
@@ -350,20 +359,19 @@ Main conversational interface with GPT-5.4 agent. Requests use legacy orchestrat
     "date": "2026-04-03",
     "source": "mock"
   },
-  "tool_used": "get_exchange_rate"
+  "tool_used": "collect_market_context"
 }
 ```
 
-**Workflow-mode request:**
+**Market briefing request:**
 ```json
 {
   "message": "Brief EUR/USD with news and research context",
-  "history": [],
-  "agent_mode": "workflow"
+  "history": []
 }
 ```
 
-Workflow mode returns the same top-level response fields. A successful market briefing reports `tool_used` as `generate_market_briefing` and carries structured workflow data inside `data`.
+The chat endpoint always returns the same top-level response fields. A successful market briefing reports `tool_used` as `generate_market_briefing` and carries structured workflow data inside `data`.
 
 ### Historical Rates Endpoint
 
@@ -442,7 +450,7 @@ The live GKE deployment is summarized near the top of this README. Current backe
 - `k8s/configmap.yaml` for non-secret runtime settings such as connector mode, AI Gateway URL, RAG URL, and workflow flags.
 - `k8s/secret.yaml.template` for required secret names; do not commit real API keys.
 
-At the time of this README update, the backend service is externally reachable at `http://35.224.3.54`, the frontend at `http://136.116.205.168`, and workflow mode is enabled in the ConfigMap.
+At the time of this README update, the backend service is externally reachable at `http://35.224.3.54`, the frontend at `http://136.116.205.168`, and the workflow/playbook chat runtime is configured in the ConfigMap.
 
 ---
 
@@ -479,9 +487,8 @@ FRED_API_KEY=your_fred_api_key
 USE_MOCK_CONNECTOR=true
 USE_MOCK_NEWS_CONNECTOR=false
 RAG_SERVICE_URL=http://34.10.130.210
-ENABLE_AGENT_WORKFLOW_MODE=true
-AGENT_WORKFLOW_TIMEOUT_SECONDS=60
-AGENT_WORKFLOW_MAX_ROUNDS=2
+AGENT_TIMEOUT_SECONDS=60
+AGENT_MAX_ROUNDS=2
 ```
 
 > **Note:** In GKE deployment, `OPENAI_BASE_URL` points to the AI Gateway service (`http://ai-gateway.ai-gateway.svc.cluster.local/v1`). For local development, use the default OpenAI endpoint or run the gateway locally.
@@ -613,13 +620,16 @@ kubectl get service ai-market-studio -o wide
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI API base URL (set to gateway URL in GKE: `http://ai-gateway.ai-gateway.svc.cluster.local/v1`) |
 | `OPENAI_MODEL` | `gpt-5.4` | Model used by the agent (options: `gpt-5.4`, `gpt-4o`, `gpt-4o-mini`, `deepseek-chat`) |
 | `EXCHANGERATE_API_KEY` | required | exchangerate.host API key |
-| `FRED_API_KEY` | optional | FRED API key. Required for `get_interest_rate`, FRED-backed market briefings, and FX carry/macro playbooks that require FRED data |
+| `FRED_API_KEY` | optional | FRED API key. Required for FRED-backed market briefings and FX carry/macro playbooks that require FRED data |
+| `MARKET_DATA_PROVIDER` | `auto` | FX market data provider: `auto`, `mock`, `exchangerate_host`, or `mcp`. `auto` preserves `USE_MOCK_CONNECTOR` behavior |
 | `USE_MOCK_CONNECTOR` | `false` | Use synthetic FX data instead of live exchangerate.host API |
+| `MCP_MARKET_DATA_COMMAND` | `python` | Command used by `MCPMarketDataConnector` to start the local MCP market data server |
+| `MCP_MARKET_DATA_ARGS` | `-m backend.mcp_servers.market_data_server` | Arguments for the local MCP market data server command |
+| `MCP_MARKET_DATA_TIMEOUT_SECONDS` | `5.0` | Timeout budget for MCP market data calls |
 | `USE_MOCK_NEWS_CONNECTOR` | `false` | Use synthetic news data instead of live RSS feeds |
 | `RAG_SERVICE_URL` | `http://localhost:8000` | Base URL of the external RAG service; `RAGConnector` calls `POST {RAG_SERVICE_URL}/query` |
-| `ENABLE_AGENT_WORKFLOW_MODE` | `false` | Enables opt-in intent-level workflow mode for `/api/chat`; omitted `agent_mode` still uses legacy mode |
-| `AGENT_WORKFLOW_TIMEOUT_SECONDS` | `20.0` | Timeout for workflow-mode chat requests |
-| `AGENT_WORKFLOW_MAX_ROUNDS` | `2` | Maximum LLM/tool rounds for workflow-mode requests |
+| `AGENT_TIMEOUT_SECONDS` | `20.0` | Timeout for chat agent requests |
+| `AGENT_MAX_ROUNDS` | `2` | Maximum LLM/tool rounds for chat agent requests |
 | `OBSERVABILITY_URL` | `http://ai-sre-observability.default.svc.cluster.local:8080` | AI SRE Observability service endpoint for LLM metrics collection |
 | `MAX_HISTORICAL_DAYS` | `7` | Max date range per dashboard request |
 | `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
@@ -786,23 +796,59 @@ Expected: Valid JSON response with `reply`, `data`, and `tool_used` fields.
 
 ---
 
-## MCP Integration & FRED Connector Testing
+## MCP Market Data Provider & FRED Connector Testing
 
-### Architecture Decision: Direct API vs MCP
+### Architecture Decision: MCP as Provider Layer
 
-**Rationale:** Backend now calls FRED API directly via `httpx` instead of via MCP subprocess.
+AI Market Studio uses MCP below the workflow layer, not as a model-facing tool surface. The chat model still sees only the approved workflow tools:
 
-**Why?**
-- **Simpler deployment:** One less GKE service to operate
-- **Lower latency:** No subprocess overhead or IPC serialization
-- **Better error handling:** Synchronous error handling in FastAPI context
-- **No extra dependencies:** MCP subprocess would require service discovery, health checks, and failure modes
+- `collect_market_context`
+- `analyze_market_context`
+- `generate_market_briefing`
 
-### Reference Implementation
+When `MARKET_DATA_PROVIDER=mcp`, backend workflows call `MCPMarketDataConnector`, which starts the local MCP market data server and normalizes MCP responses into the existing `MarketDataConnector` contract.
 
-The `ai-mcp-server` repository remains as a **working MCP protocol reference** (not deployed to GKE).
+```text
+/api/chat
+  -> workflow tool
+  -> MarketDataConnector
+  -> MCPMarketDataConnector
+  -> backend.mcp_servers.market_data_server
+```
 
-**Use case:** If workflows become complex (e.g., multiple data providers, tool composition), the reference implementation shows how to convert them to MCP servers.
+The first MCP server is intentionally deterministic and mock-backed. It validates MCP lifecycle, subprocess transport, response normalization, and failure handling without claiming live vendor data support.
+
+### Local MCP Mock Market Data Server
+
+**Server module:** `backend/mcp_servers/market_data_server.py`
+
+**MCP tools:**
+```text
+get_fx_spot(pair, date?)
+get_fx_history(pair, start_date, end_date)
+list_supported_currencies()
+```
+
+**Connector:** `backend/connectors/mcp_market_data.py`
+
+**Use it locally:**
+```bash
+MARKET_DATA_PROVIDER=mcp
+MCP_MARKET_DATA_COMMAND=python
+MCP_MARKET_DATA_ARGS="-m backend.mcp_servers.market_data_server"
+```
+
+MCP market data is labeled with source `mcp-mock-market-data`. It is deterministic mock market data for development, tests, and MCP integration validation.
+
+### FRED Remains Direct API
+
+FRED remains a direct connector integration via `httpx`. It is not routed through MCP in this version.
+
+**Rationale:**
+- **Simpler deployment:** no additional FRED MCP process to operate
+- **Lower latency:** direct HTTP avoids subprocess overhead
+- **Clearer failure handling:** FRED errors stay inside the existing connector path
+- **Focused MCP scope:** first MCP integration validates FX market data provider boundaries only
 
 ### FRED Connector Testing
 
@@ -842,7 +888,7 @@ historical = await connector.get_historical_rates(
 print(historical)
 ```
 
-**API Endpoint (via chat tool):**
+**API Endpoint (via workflow tool):**
 ```bash
 # Ask the agent
 curl -X POST http://localhost:8000/api/chat \
@@ -850,28 +896,17 @@ curl -X POST http://localhost:8000/api/chat \
   -d '{"message": "What is the current federal funds rate?", "history": []}'
 ```
 
-The agent will call `get_interest_rate`, which invokes the FRED connector and returns formatted rate data.
+The model selects an intent-level workflow tool. Workflow internals may use `FREDConnector` when FRED-backed market context is requested.
 
 ### Deployment Checklist
 
 - [x] FRED connector implemented and tested locally
 - [x] FRED API key injected through `ai-market-studio-secrets` (Kubernetes Secret)
 - [x] Router endpoints wired to connector
-- [x] Agent tools updated to call `get_interest_rate`
+- [x] Workflow internals can use FRED connector data
 - [x] E2E chat workflow verified with live FRED API (`DFF` and `DGS10`)
+- [x] MCP mock market data provider added as an optional provider-layer integration
 - [ ] Add FRED rates to dashboard panels (future feature)
-
-### Future: MCP Server Integration
-
-If you need to integrate additional data providers (e.g., Bloomberg, Refinitiv) or create a tool composition layer, follow this pattern:
-
-1. **Write an MCP server** (e.g., `ai-mcp-server` or a new `ai-mcp-market-data`)
-2. **Test it standalone** with `mcp-server-test` or raw stdio
-3. **Integrate as subprocess** in backend via `subprocess.Popen`
-4. **Add health checks** and error handling for subprocess lifecycle
-5. **Monitor latency** and consider caching layers
-
-See `ai-mcp-server/app.py` for the reference stdio MCP implementation.
 
 ---
 
@@ -929,11 +964,11 @@ ai-market-studio/ (Backend API)
 | P2 - Done | Output Generation | PDF report generation via Export to PDF button, email delivery pending | ✅ Complete |
 | P3 - Done | Intelligence & Economic Data | RAG research integration (Feature 05), FRED interest rates (Feature 08), economic indicator queries | ✅ Complete |
 | P4 - Done | Data Breadth & Observability | Direct FRED connector, AI Gateway service (OpenAI + DeepSeek), AI SRE Observability (LLM cost tracking) | ✅ Complete |
-| P5 - Done | Agent Workflow Foundation | Opt-in workflow mode, intent-level market workflows, workflow guardrails, archived OpenSpec specs | ✅ Complete |
+| P5 - Done | Agent Workflow Foundation | Single workflow/playbook chat runtime, intent-level market workflows, workflow guardrails, archived OpenSpec specs | ✅ Complete |
 | P6 - In Progress | Platform & Simulation | Financial analysis playbooks implemented for workflow-mode briefings; custom agent creation, OCR/document ingestion for scanned PDFs, and paper-trading simulation remain future work | 🔄 In Progress |
 | P7 - Planned | Execution & Risk | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls | 🔄 Planned |
 
-**Note:** Feature 11 is an internal workflow foundation, not user-facing custom agent creation. Future custom agent work should build on the opt-in workflow mode rather than exposing low-level internal agent tools directly.
+**Note:** Feature 11 is an internal workflow foundation, not user-facing custom agent creation. Future custom agent work should build on the workflow/playbook runtime rather than exposing low-level internal agent tools directly.
 
 ### Completed in P3/P4 (Phase 2026-04-12)
 
@@ -1108,8 +1143,7 @@ curl -X POST http://localhost:8000/api/chat \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Use the financial analysis playbook for an FX carry briefing on EUR/USD. Include FRED macro rate data and keep it research-only.",
-    "history": [],
-    "agent_mode": "workflow"
+    "history": []
   }'
 ```
 
@@ -1145,15 +1179,14 @@ Expected structured response highlights:
 }
 ```
 
-Recent local e2e verification fetched live FRED values for `DFF` and `DGS10` during an `fx_carry` workflow-mode briefing.
+Recent local e2e verification fetched live FRED values for `DFF` and `DGS10` during an `fx_carry` briefing.
 The forward curve, implied volatility, and carry metrics in FX carry examples are deterministic synthetic assumptions for demo and test coverage, not live derivatives market data.
 
 ### Configuration for Playbooks
 
 ```env
-ENABLE_AGENT_WORKFLOW_MODE=true
-AGENT_WORKFLOW_TIMEOUT_SECONDS=60
-AGENT_WORKFLOW_MAX_ROUNDS=2
+AGENT_TIMEOUT_SECONDS=60
+AGENT_MAX_ROUNDS=2
 
 FRED_API_KEY=your_fred_api_key
 USE_MOCK_CONNECTOR=true
@@ -1167,10 +1200,6 @@ OPENAI_MODEL=gpt-5.4
 For local development, `OPENAI_BASE_URL` can remain `https://api.openai.com/v1`. In GKE, it points to the AI Gateway service.
 
 ### Troubleshooting
-
-#### Workflow request returns disabled error
-
-Set `ENABLE_AGENT_WORKFLOW_MODE=true` and restart the backend. Legacy chat still works without this flag, but playbook briefings require workflow mode.
 
 #### FX carry briefing reports missing FRED
 

@@ -2,11 +2,8 @@ import pytest
 from backend.connectors.fred_connector import InterestRateData
 from backend.agent.tools import (
     AgentError,
-    LEGACY_TOOL_DEFINITIONS,
     TOOL_DEFINITIONS,
-    WORKFLOW_TOOL_DEFINITIONS,
     dispatch_tool,
-    get_tool_definitions,
 )
 from backend.connectors.mock_connector import MockConnector
 from backend.connectors.news_connector import MockNewsConnector
@@ -28,27 +25,8 @@ class MockFredConnector:
         )
 
 
-def test_legacy_tool_definitions_exclude_workflow_and_deprecated_tools():
-    names = _tool_names(LEGACY_TOOL_DEFINITIONS)
-    assert "get_exchange_rate" in names
-    assert "get_exchange_rates" in names
-    assert "get_historical_rates" in names
-    assert "list_supported_currencies" in names
-    assert "generate_dashboard" in names
-    assert "get_fx_news" in names
-    assert "generate_market_insight" not in names
-    assert "get_internal_research" in names
-    assert "get_interest_rate" in names
-    assert "analyze_fx_economic_correlation" in names
-    assert "collect_market_data" not in names
-    assert "analyze_market_trends" not in names
-    assert "generate_report" not in names
-    assert "synthesize_research" not in names
-    assert "collect_market_context" not in names
-
-
-def test_workflow_tool_definitions_expose_only_intent_tools():
-    assert _tool_names(WORKFLOW_TOOL_DEFINITIONS) == [
+def test_tool_definitions_expose_only_intent_tools():
+    assert _tool_names(TOOL_DEFINITIONS) == [
         "collect_market_context",
         "analyze_market_context",
         "generate_market_briefing",
@@ -58,7 +36,7 @@ def test_workflow_tool_definitions_expose_only_intent_tools():
 def test_generate_market_briefing_tool_accepts_optional_playbook():
     briefing_tool = next(
         tool
-        for tool in WORKFLOW_TOOL_DEFINITIONS
+        for tool in TOOL_DEFINITIONS
         if tool["function"]["name"] == "generate_market_briefing"
     )
 
@@ -73,13 +51,41 @@ def test_generate_market_briefing_tool_accepts_optional_playbook():
     ]
 
 
-def test_get_tool_definitions_selects_by_agent_mode():
-    assert get_tool_definitions("legacy") == LEGACY_TOOL_DEFINITIONS
-    assert get_tool_definitions("workflow") == WORKFLOW_TOOL_DEFINITIONS
+def test_analyze_market_context_tool_accepts_fx_analysis_parameters():
+    analysis_tool = next(
+        tool
+        for tool in TOOL_DEFINITIONS
+        if tool["function"]["name"] == "analyze_market_context"
+    )
+
+    properties = analysis_tool["function"]["parameters"]["properties"]
+    assert "horizon" in properties
+    assert "focus" in properties
+    assert properties["horizon"]["enum"] == ["intraday", "1w", "1m", "3m"]
+    assert "fx_analysis" in properties["analysis_type"]["enum"]
 
 
-def test_tool_definitions_alias_remains_legacy_compatible():
-    assert TOOL_DEFINITIONS == LEGACY_TOOL_DEFINITIONS
+def test_tool_definitions_hide_low_level_tools():
+    names = _tool_names(TOOL_DEFINITIONS)
+    hidden_names = {
+        "get_exchange_rate",
+        "get_exchange_rates",
+        "get_historical_rates",
+        "list_supported_currencies",
+        "generate_dashboard",
+        "get_fx_news",
+        "get_internal_research",
+        "get_interest_rate",
+        "analyze_fx_economic_correlation",
+        "collect_market_data",
+        "analyze_market_trends",
+        "generate_report",
+        "synthesize_research",
+        "get_fx_spot",
+        "get_fx_history",
+        "list_supported_currencies",
+    }
+    assert hidden_names.isdisjoint(names)
 
 
 def test_tool_definitions_have_required_fields():
@@ -91,74 +97,27 @@ def test_tool_definitions_have_required_fields():
 
 
 @pytest.mark.asyncio
-async def test_dispatch_get_exchange_rate():
-    connector = MockConnector()
-    result = await dispatch_tool("get_exchange_rate", {"base": "USD", "target": "EUR"}, connector)
-    assert result["base"] == "USD"
-    assert result["target"] == "EUR"
-    assert "rate" in result
-
-
-@pytest.mark.asyncio
-async def test_dispatch_get_exchange_rates():
-    connector = MockConnector()
-    result = await dispatch_tool("get_exchange_rates", {"base": "USD", "targets": ["EUR", "GBP"]}, connector)
-    assert isinstance(result, list)
-    assert len(result) == 2
-
-
-@pytest.mark.asyncio
-async def test_dispatch_list_supported_currencies():
-    connector = MockConnector()
-    result = await dispatch_tool("list_supported_currencies", {}, connector)
-    assert "currencies" in result
-    assert isinstance(result["currencies"], list)
-
-
-@pytest.mark.asyncio
-async def test_dispatch_get_fx_news_no_connector():
-    """get_fx_news with no news_connector returns empty items and error key."""
-    connector = MockConnector()
-    result = await dispatch_tool("get_fx_news", {}, connector, news_connector=None)
-    assert result["type"] == "news"
-    assert result["items"] == []
-    assert "error" in result
-
-
-@pytest.mark.asyncio
-async def test_dispatch_get_fx_news_with_mock_connector():
-    connector = MockConnector()
-    news = MockNewsConnector()
-    result = await dispatch_tool("get_fx_news", {}, connector, news_connector=news)
-    assert result["type"] == "news"
-    assert isinstance(result["items"], list)
-    assert len(result["items"]) <= 5
-    assert result["query"] is None
-
-
-@pytest.mark.asyncio
-async def test_dispatch_get_fx_news_with_query():
-    connector = MockConnector()
-    news = MockNewsConnector()
-    result = await dispatch_tool(
-        "get_fx_news", {"query": "Fed", "max_items": 3}, connector, news_connector=news
-    )
-    assert result["type"] == "news"
-    assert result["query"] == "Fed"
-    assert len(result["items"]) <= 3
-    for item in result["items"]:
-        text = item["title"].lower() + item["summary"].lower()
-        assert "fed" in text
-
-
-@pytest.mark.asyncio
-async def test_dispatch_get_fx_news_max_items_capped_at_10():
-    connector = MockConnector()
-    news = MockNewsConnector()
-    result = await dispatch_tool(
-        "get_fx_news", {"max_items": 999}, connector, news_connector=news
-    )
-    assert len(result["items"]) <= 10
+@pytest.mark.parametrize(
+    "tool_name,tool_args",
+    [
+        ("get_exchange_rate", {"base": "USD", "target": "EUR"}),
+        ("get_exchange_rates", {"base": "USD", "targets": ["EUR", "GBP"]}),
+        ("get_historical_rates", {"base": "USD", "targets": ["EUR"], "start_date": "2025-01-01", "end_date": "2025-01-02"}),
+        ("list_supported_currencies", {}),
+        ("generate_dashboard", {"base": "USD", "targets": ["EUR"], "start_date": "2025-01-01", "end_date": "2025-01-02", "panel_type": "line_trend"}),
+        ("get_fx_news", {}),
+        ("get_internal_research", {"question": "EUR/USD outlook"}),
+        ("get_interest_rate", {"series_id": "DFF"}),
+        ("analyze_fx_economic_correlation", {"pair": "EUR/USD", "indicators": ["DFF"]}),
+        ("collect_market_data", {"data_type": "rates", "pairs": ["EUR/USD"]}),
+        ("analyze_market_trends", {"data": {}, "analysis_type": "trend"}),
+        ("generate_report", {"data": {}, "format": "summary"}),
+        ("synthesize_research", {"sources": {}}),
+    ],
+)
+async def test_dispatch_rejects_low_level_and_legacy_sub_agent_tools(tool_name, tool_args):
+    with pytest.raises(AgentError, match="Unknown tool"):
+        await dispatch_tool(tool_name, tool_args, MockConnector())
 
 
 @pytest.mark.asyncio
@@ -166,59 +125,6 @@ async def test_dispatch_unknown_tool_raises_agent_error():
     connector = MockConnector()
     with pytest.raises(AgentError):
         await dispatch_tool("unknown_tool", {}, connector)
-
-
-@pytest.mark.asyncio
-async def test_dispatch_tool_get_historical_rates():
-    """dispatch_tool routes get_historical_rates to connector correctly."""
-    connector = MockConnector()
-    result = await dispatch_tool(
-        "get_historical_rates",
-        {
-            "base": "USD",
-            "targets": ["EUR", "GBP"],
-            "start_date": "2025-01-01",
-            "end_date": "2025-01-03",
-        },
-        connector,
-    )
-    assert isinstance(result, dict)
-    assert "2025-01-01" in result
-    assert "2025-01-03" in result
-    assert "EUR" in result["2025-01-01"]
-    assert "GBP" in result["2025-01-01"]
-
-
-@pytest.mark.asyncio
-async def test_dispatch_get_interest_rate():
-    """get_interest_rate tool dispatches to FREDConnector and returns rate data."""
-    result = await dispatch_tool(
-        "get_interest_rate",
-        {"series_id": "DFF"},
-        MockConnector(),
-        fred_connector=MockFredConnector(),
-    )
-    assert isinstance(result, dict)
-    assert "series_id" in result
-    assert "series_name" in result
-    assert "date" in result
-    assert "value" in result
-    assert "unit" in result
-    assert result["series_id"] == "DFF"
-    assert result["unit"] == "percent"
-    assert result["source"] == "FRED (Federal Reserve Economic Data)"
-
-
-@pytest.mark.asyncio
-async def test_dispatch_get_interest_rate_missing_series_id():
-    """get_interest_rate raises AgentError if series_id is missing."""
-    with pytest.raises(AgentError) as exc_info:
-        await dispatch_tool(
-            "get_interest_rate",
-            {},
-            MockConnector(),
-        )
-    assert "series_id is required" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
