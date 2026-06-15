@@ -4,9 +4,9 @@ Backend API for the AI Market Studio conversational FX market data platform.
 
 ## Architecture
 
-### Component Diagram
+### Current GKE Component Architecture
 
-![Component Diagram](docs/diagrams/ai-market-studio-component.drawio.png)
+![Current GKE Component Architecture](docs/diagrams/ai-market-studio-current-gke-component.drawio.png)
 
 ### Workflow Mode Playbook Sequence
 
@@ -57,10 +57,15 @@ Frontend (ai-market-studio-ui) - nginx on port 80
    v
 Backend API (this repo) - FastAPI on port 8000
    |
-   |-- HTTP (internal) --> AI Gateway Service (LiteLLM proxy)
-   |                          |
-   |                          |-- OpenAI (gpt-5.4, gpt-4o, gpt-4o-mini)
-   |                          `-- DeepSeek (deepseek-chat)
+   |-- HTTP (internal Kubernetes DNS)
+   |   v
+   |   Kong Gateway OSS
+   |      |
+   |      v
+   |   AI Gateway Service (LiteLLM proxy)
+   |      |
+   |      |-- OpenAI (gpt-5.4, gpt-4o, gpt-4o-mini)
+   |      `-- DeepSeek (deepseek-chat)
    |
    |-- HTTP (internal) --> AI SRE Observability Service
    |                          |
@@ -264,64 +269,19 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ---
 
-## Architecture
+## Runtime Traffic Boundaries
 
-```text
-User Browser
-   |
-   | HTTP (external: http://136.116.205.168)
-   v
-Frontend (ai-market-studio-ui) - nginx on port 80
-   |
-   | HTTP POST (external: http://35.224.3.54/api/*)
-   v
-Backend API (this repo - FastAPI) on port 8000
-   |
-   |-- /api/chat              -> configurable GPT agent loop
-   |-- /api/rates/historical  -> daily FX rates, LRU cached
-   |-- /api/dashboard         -> batch panel fetch
-   |-- /api/export/pdf        -> PDF report generation (reportlab via backend/exporters/pdf_exporter.py)
-   |
-   v
-Kong Gateway - http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1
-   |
-   v
-AI Gateway Service (LiteLLM) - http://ai-gateway.ai-gateway.svc.cluster.local
-   |
-   |-- OpenAI (gpt-5.4, gpt-4o, gpt-4o-mini)
-   `-- DeepSeek (deepseek-chat)
+The current component diagram is maintained as a Draw.io source file and exported PNG:
 
-Backend also connects to:
-   |
-   |-- AI SRE Observability Service (metrics collection)
-   |      |
-   |      | POST /ingest (batched every 5s)
-   |      v
-   |   Observability Service - http://ai-sre-observability:8080
-   |      |
-   |      | GET /metrics (Prometheus scrape)
-   |      v
-   |   Prometheus - http://prometheus-service:9090
-   |      |
-   |      | PromQL queries
-   |      v
-   |   Grafana - http://136.114.77.0
-   |
-   v
-Connector Layer
-   |-- ExchangeRateHostConnector -> live FX data (exchangerate.host)
-   |-- MockConnector             -> deterministic synthetic FX data
-   |-- RSSNewsConnector          -> free RSS feeds
-   |-- MockNewsConnector         -> deterministic synthetic news
-   |-- FREDConnector             -> Federal Reserve interest rates (direct FRED API)
-   `-- RAGConnector              -> external RAG service
-                                    |
-                                    | HTTP (configured by RAG_SERVICE_URL)
-                                    v
-                                 RAG Service (ai-rag-service)
-```
+![Current GKE Component Architecture](docs/diagrams/ai-market-studio-current-gke-component.drawio.png)
 
-**Legacy-mode GPT-5.4 tools:** `get_exchange_rate`, `get_exchange_rates`, `get_historical_rates`, `list_supported_currencies`, `get_interest_rate`, `analyze_fx_economic_correlation`, `generate_dashboard`, `get_fx_news`, `get_internal_research`
+Runtime traffic follows these boundaries:
+
+- Browser traffic enters the frontend LoadBalancer, then calls the backend API LoadBalancer for `/api/*`.
+- LLM traffic goes from Backend API -> Kong Gateway OSS (`ai-gateway-kong.ai-gateway.svc.cluster.local/v1`) -> AI Gateway Service -> OpenAI/DeepSeek.
+- Tool and market-data traffic stays inside backend connectors: FX rates, historical rates, RSS/news with mock fallback, FRED, RAG, and correlation inputs are not routed through Kong.
+- Backend telemetry is batched to AI SRE Observability; Prometheus scrapes metrics and Grafana renders the three monitoring dashboards.
+- Kubernetes ConfigMaps and Secrets own runtime wiring such as `OPENAI_BASE_URL`, selected model, connector keys, and workflow-only agent mode.
 
 **Workflow-mode GPT-5.4 tools:** `collect_market_context`, `analyze_market_context`, `generate_market_briefing`
 
