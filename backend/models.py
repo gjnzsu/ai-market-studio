@@ -9,13 +9,13 @@ class Message(BaseModel):
     content: str
 
 
-AgentMode = Literal["legacy", "workflow"]
+AgentMode = Literal["workflow"]
 
 
 class ChatRequest(BaseModel):
     message: str
     history: list[Message] = []
-    agent_mode: AgentMode = "legacy"
+    agent_mode: AgentMode = "workflow"
 
     @field_validator("message")
     @classmethod

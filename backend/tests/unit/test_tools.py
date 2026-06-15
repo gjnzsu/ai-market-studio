@@ -2,7 +2,6 @@ import pytest
 from backend.connectors.fred_connector import InterestRateData
 from backend.agent.tools import (
     AgentError,
-    LEGACY_TOOL_DEFINITIONS,
     TOOL_DEFINITIONS,
     WORKFLOW_TOOL_DEFINITIONS,
     dispatch_tool,
@@ -28,31 +27,14 @@ class MockFredConnector:
         )
 
 
-def test_legacy_tool_definitions_exclude_workflow_and_deprecated_tools():
-    names = _tool_names(LEGACY_TOOL_DEFINITIONS)
-    assert "get_exchange_rate" in names
-    assert "get_exchange_rates" in names
-    assert "get_historical_rates" in names
-    assert "list_supported_currencies" in names
-    assert "generate_dashboard" in names
-    assert "get_fx_news" in names
-    assert "generate_market_insight" not in names
-    assert "get_internal_research" in names
-    assert "get_interest_rate" in names
-    assert "analyze_fx_economic_correlation" in names
-    assert "collect_market_data" not in names
-    assert "analyze_market_trends" not in names
-    assert "generate_report" not in names
-    assert "synthesize_research" not in names
-    assert "collect_market_context" not in names
-
-
-def test_workflow_tool_definitions_expose_only_intent_tools():
-    assert _tool_names(WORKFLOW_TOOL_DEFINITIONS) == [
+def test_tool_definitions_expose_only_workflow_tools():
+    expected_names = [
         "collect_market_context",
         "analyze_market_context",
         "generate_market_briefing",
     ]
+    assert _tool_names(WORKFLOW_TOOL_DEFINITIONS) == expected_names
+    assert _tool_names(TOOL_DEFINITIONS) == expected_names
 
 
 def test_generate_market_briefing_tool_accepts_optional_playbook():
@@ -73,13 +55,14 @@ def test_generate_market_briefing_tool_accepts_optional_playbook():
     ]
 
 
-def test_get_tool_definitions_selects_by_agent_mode():
-    assert get_tool_definitions("legacy") == LEGACY_TOOL_DEFINITIONS
+def test_get_tool_definitions_returns_workflow_for_workflow_or_omitted_mode():
     assert get_tool_definitions("workflow") == WORKFLOW_TOOL_DEFINITIONS
+    assert get_tool_definitions(None) == WORKFLOW_TOOL_DEFINITIONS
 
 
-def test_tool_definitions_alias_remains_legacy_compatible():
-    assert TOOL_DEFINITIONS == LEGACY_TOOL_DEFINITIONS
+def test_get_tool_definitions_rejects_legacy_mode():
+    with pytest.raises(AgentError):
+        get_tool_definitions("legacy")
 
 
 def test_tool_definitions_have_required_fields():

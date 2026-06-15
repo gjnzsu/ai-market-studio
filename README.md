@@ -82,7 +82,7 @@ Observability Stack:
 
 **Key Points:**
 - Frontend → Backend: Uses external LoadBalancer IP (browser cannot access internal DNS)
-- Backend → AI Gateway: Uses internal Kubernetes DNS (`http://ai-gateway.ai-gateway.svc.cluster.local/v1`)
+- Backend → Kong Gateway: Uses internal Kubernetes DNS (`http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1`); Kong then proxies to `ai-gateway-service`
 - Backend → RAG Service: Uses the configured `RAG_SERVICE_URL` (`http://34.10.130.210` in the current ConfigMap; internal service DNS can be used when the RAG service is deployed in the same cluster/namespace)
 - AI Gateway routes LLM requests to OpenAI or DeepSeek based on model name
 
@@ -101,7 +101,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 | **Frontend UI** | http://136.116.205.168 | ✓ Running | 2 |
 | **Backend API** | http://35.224.3.54 | ✓ Running | 1 |
 | **API Docs** | http://35.224.3.54/docs | ✓ Available | - |
-| **AI Gateway** | `http://ai-gateway.ai-gateway.svc.cluster.local/v1` (internal) | ✓ Running | 2 |
+| **Kong Gateway for AI** | `http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1` (internal) | ✓ Running | 2 |
 | **RAG Service** | `http://34.10.130.210` (`RAG_SERVICE_URL`) | ✓ Running | 1 |
 | **AI SRE Observability** | `http://ai-sre-observability:8080` (internal) | ✓ Running | 1 |
 | **Prometheus** | http://136.113.33.154:9090 | ✓ Running | 1 |
@@ -213,8 +213,8 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Cost Optimization**: Route queries to cost-effective models (gpt-4o-mini, deepseek-chat) based on complexity
 - **Centralized LLM Key Management**: OpenAI/DeepSeek provider keys are managed by the gateway; non-LLM connector keys such as FRED stay with the backend
 - **Single Observability Point**: All LLM requests logged and monitored at gateway level
-- **Architecture**: Backend → AI Gateway (ClusterIP) → OpenAI/DeepSeek
-- **Gateway Endpoint**: `http://ai-gateway.ai-gateway.svc.cluster.local/v1` (internal)
+- **Architecture**: Backend → Kong Gateway (ClusterIP) → AI Gateway Service → OpenAI/DeepSeek
+- **Gateway Endpoint**: `http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1` (internal)
 - **Available Models**: `gpt-4o` (default), `gpt-4o-mini`, `deepseek-chat`
 - **Model Switching**: Update `OPENAI_MODEL` in ConfigMap, rolling restart deployment
 - **Rollback**: Easy revert to direct OpenAI calls via ConfigMap change
@@ -235,13 +235,13 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Regression Tests**: 5 E2E tests in `backend/tests/e2e/test_observability.py` (97% coverage)
 
 ### Feature 11 - Agent Workflow Foundation (2026-05-21)
-- **Mode selection**: `/api/chat` defaults to `agent_mode: "legacy"` and accepts `agent_mode: "workflow"` only when `ENABLE_AGENT_WORKFLOW_MODE=true`.
+- **Mode selection**: `/api/chat` is workflow-only; omitted `agent_mode` defaults to `"workflow"`, and `"legacy"` is rejected.
 - **Intent-level tools**: Workflow mode exposes `collect_market_context`, `analyze_market_context`, and `generate_market_briefing` instead of low-level internal agent tools.
 - **Market insight replacement**: `generate_market_insight` is no longer an approved model-facing tool; market insight, overview, briefing, and synthesis requests use `generate_market_briefing` in workflow mode.
 - **Guardrails**: Workflow requests have bounded runtime (`AGENT_WORKFLOW_TIMEOUT_SECONDS`) and bounded model/tool rounds (`AGENT_WORKFLOW_MAX_ROUNDS`).
 - **Failure behavior**: Workflow failures return clear timeout or failure responses and do not silently fall back to legacy orchestration.
 - **Observability**: Workflow logs include selected mode, workflow name, internal units, latency, status, and failure category.
-- **Backward compatibility**: Existing clients can omit `agent_mode` and still receive the same `reply`, `data`, and `tool_used` response shape.
+- **Backward compatibility**: Existing clients can omit `agent_mode` and still receive the same `reply`, `data`, and `tool_used` response shape; only legacy-mode selection is removed.
 
 ### Feature 12 - Financial Analysis Playbooks (2026-06-02)
 - **Runtime playbooks**: Workflow-mode market briefings can apply professional analysis frames for `general`, `fx_carry`, `macro_rates`, `morning_note`, and `catalyst_calendar`.
@@ -279,7 +279,10 @@ Backend API (this repo - FastAPI) on port 8000
    |-- /api/export/pdf        -> PDF report generation (reportlab via backend/exporters/pdf_exporter.py)
    |
    v
-AI Gateway Service (LiteLLM) - http://ai-gateway.ai-gateway.svc.cluster.local/v1
+Kong Gateway - http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1
+   |
+   v
+AI Gateway Service (LiteLLM) - http://ai-gateway.ai-gateway.svc.cluster.local
    |
    |-- OpenAI (gpt-5.4, gpt-4o, gpt-4o-mini)
    `-- DeepSeek (deepseek-chat)
@@ -328,14 +331,14 @@ Connector Layer
 
 **POST** `/api/chat`
 
-Main conversational interface with GPT-5.4 agent. Requests use legacy orchestration by default. To opt in to intent-level workflows, set `agent_mode` to `"workflow"` and enable `ENABLE_AGENT_WORKFLOW_MODE=true`.
+Main conversational interface with GPT-5.4 agent. Requests use workflow orchestration by default; `agent_mode` may be omitted or set to `"workflow"`. Legacy mode is no longer supported.
 
 **Request:**
 ```json
 {
   "message": "What is the EUR/USD rate?",
   "history": [],
-  "agent_mode": "legacy"
+  "agent_mode": "workflow"
 }
 ```
 
@@ -484,7 +487,7 @@ AGENT_WORKFLOW_TIMEOUT_SECONDS=60
 AGENT_WORKFLOW_MAX_ROUNDS=2
 ```
 
-> **Note:** In GKE deployment, `OPENAI_BASE_URL` points to the AI Gateway service (`http://ai-gateway.ai-gateway.svc.cluster.local/v1`). For local development, use the default OpenAI endpoint or run the gateway locally.
+> **Note:** In GKE deployment, `OPENAI_BASE_URL` points to Kong in front of the AI Gateway service (`http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1`). For local development, use the default OpenAI endpoint or run the gateway locally.
 
 > The exchangerate.host free tier has a low request quota. Keep `USE_MOCK_CONNECTOR=true` during development unless you specifically need live FX data.
 
@@ -591,6 +594,9 @@ RAG_SERVICE_URL: "http://34.10.130.210"
 
 ```bash
 kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/kong-config.yaml
+kubectl apply -f k8s/kong-deployment.yaml
+kubectl apply -f k8s/kong-service.yaml
 kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
 kubectl rollout restart deployment/ai-market-studio
@@ -610,14 +616,14 @@ kubectl get service ai-market-studio -o wide
 | Variable | Default | Description |
 |---|---|---|
 | `OPENAI_API_KEY` | required | OpenAI API key for direct OpenAI use, or a dummy value when routing through AI Gateway |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI API base URL (set to gateway URL in GKE: `http://ai-gateway.ai-gateway.svc.cluster.local/v1`) |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI API base URL (set to Kong gateway URL in GKE: `http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1`) |
 | `OPENAI_MODEL` | `gpt-5.4` | Model used by the agent (options: `gpt-5.4`, `gpt-4o`, `gpt-4o-mini`, `deepseek-chat`) |
 | `EXCHANGERATE_API_KEY` | required | exchangerate.host API key |
 | `FRED_API_KEY` | optional | FRED API key. Required for `get_interest_rate`, FRED-backed market briefings, and FX carry/macro playbooks that require FRED data |
 | `USE_MOCK_CONNECTOR` | `false` | Use synthetic FX data instead of live exchangerate.host API |
 | `USE_MOCK_NEWS_CONNECTOR` | `false` | Use synthetic news data instead of live RSS feeds |
 | `RAG_SERVICE_URL` | `http://localhost:8000` | Base URL of the external RAG service; `RAGConnector` calls `POST {RAG_SERVICE_URL}/query` |
-| `ENABLE_AGENT_WORKFLOW_MODE` | `false` | Enables opt-in intent-level workflow mode for `/api/chat`; omitted `agent_mode` still uses legacy mode |
+| `ENABLE_AGENT_WORKFLOW_MODE` | `false` | Enables workflow-only `/api/chat`; when disabled, chat returns 403, and legacy mode remains unsupported |
 | `AGENT_WORKFLOW_TIMEOUT_SECONDS` | `20.0` | Timeout for workflow-mode chat requests |
 | `AGENT_WORKFLOW_MAX_ROUNDS` | `2` | Maximum LLM/tool rounds for workflow-mode requests |
 | `OBSERVABILITY_URL` | `http://ai-sre-observability.default.svc.cluster.local:8080` | AI SRE Observability service endpoint for LLM metrics collection |
@@ -662,7 +668,10 @@ Backend (ai-market-studio)
    |
    | AsyncOpenAI(base_url=OPENAI_BASE_URL)
    v
-AI Gateway (ai-gateway.ai-gateway.svc.cluster.local/v1)
+Kong Gateway (ai-gateway-kong.ai-gateway.svc.cluster.local/v1)
+   |
+   v
+AI Gateway Service (ai-gateway.ai-gateway.svc.cluster.local)
    |
    |-- model=gpt-5.4       --> OpenAI API
    |-- model=gpt-4o       --> OpenAI API
@@ -681,7 +690,7 @@ openai_model: str = "gpt-4o"        # Configurable via ConfigMap
 
 **Kubernetes ConfigMap** (`k8s/configmap.yaml`):
 ```yaml
-OPENAI_BASE_URL: "http://ai-gateway.ai-gateway.svc.cluster.local/v1"
+OPENAI_BASE_URL: "http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1"
 OPENAI_MODEL: "gpt-5.4"  # Change to gpt-4o, gpt-4o-mini, or deepseek-chat
 ```
 
@@ -959,7 +968,7 @@ ai-market-studio/ (Backend API)
 - Single observability point for all LLM requests
 - Cost optimization through model selection
 - GKE deployment: `ai-gateway` namespace, 2 replicas
-- Backend integration: `OPENAI_BASE_URL=http://ai-gateway.ai-gateway.svc.cluster.local/v1`
+- Backend integration: `OPENAI_BASE_URL=http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1`
 - Verified working: All features tested through gateway (chat, dashboard, news, RAG, PDF)
 - Model switching tested: gpt-4o, gpt-4o-mini, deepseek-chat all operational
 
@@ -979,8 +988,8 @@ ai-market-studio/ (Backend API)
 - Regression tests: 5 E2E tests with 97% coverage
 
 ✅ **Internal: Agent Workflow Foundation** (2026-05-21)
-- Added explicit `/api/chat` mode selection with `legacy` as the default and `workflow` as a gated opt-in mode.
-- Split model-facing tool exposure into legacy and workflow tool sets.
+- Added explicit `/api/chat` mode selection with `legacy` as the default and `workflow` as a gated opt-in mode. This has since been superseded by workflow-only chat in the Kong gateway integration.
+- Split model-facing tool exposure into legacy and workflow tool sets. The current runtime exposes only the workflow tool set.
 - Added intent-level workflow tools: `collect_market_context`, `analyze_market_context`, and `generate_market_briefing`.
 - Removed deprecated `generate_market_insight` from approved model-facing tool sets.
 - Added workflow timeout, step-limit, no-silent-fallback, source warning, and legacy isolation coverage.
@@ -1160,17 +1169,17 @@ USE_MOCK_CONNECTOR=true
 USE_MOCK_NEWS_CONNECTOR=false
 RAG_SERVICE_URL=http://34.10.130.210
 
-OPENAI_BASE_URL=http://ai-gateway.ai-gateway.svc.cluster.local/v1
+OPENAI_BASE_URL=http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1
 OPENAI_MODEL=gpt-5.4
 ```
 
-For local development, `OPENAI_BASE_URL` can remain `https://api.openai.com/v1`. In GKE, it points to the AI Gateway service.
+For local development, `OPENAI_BASE_URL` can remain `https://api.openai.com/v1`. In GKE, it points to Kong in front of the AI Gateway service.
 
 ### Troubleshooting
 
 #### Workflow request returns disabled error
 
-Set `ENABLE_AGENT_WORKFLOW_MODE=true` and restart the backend. Legacy chat still works without this flag, but playbook briefings require workflow mode.
+Set `ENABLE_AGENT_WORKFLOW_MODE=true` and restart the backend. Legacy chat mode is no longer supported; when this flag is disabled, `/api/chat` returns 403.
 
 #### FX carry briefing reports missing FRED
 

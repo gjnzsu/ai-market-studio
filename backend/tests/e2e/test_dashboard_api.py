@@ -172,6 +172,7 @@ def test_dashboard_endpoint_422_on_empty_panels(client):
 def test_existing_chat_endpoint_still_works(client, monkeypatch):
     """POST /api/chat unaffected by dashboard additions."""
     from unittest.mock import AsyncMock, MagicMock
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
 
     msg = MagicMock()
     msg.content = "EUR/USD is 1.08"

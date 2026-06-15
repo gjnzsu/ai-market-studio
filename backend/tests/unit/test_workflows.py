@@ -6,6 +6,7 @@ from backend.agent.workflows import (
     collect_market_context,
     generate_market_briefing,
 )
+from backend.connectors.mock_connector import MockConnector
 
 
 @pytest.mark.asyncio
@@ -32,6 +33,57 @@ async def test_collect_market_context_returns_data_only():
 
 
 @pytest.mark.asyncio
+async def test_collect_market_context_includes_historical_rates_when_days_requested():
+    connector = AsyncMock()
+    connector.get_exchange_rate.return_value = {
+        "base": "EUR",
+        "target": "USD",
+        "rate": 1.08,
+        "date": "2026-05-20",
+        "source": "mock",
+    }
+    connector.get_historical_rates.return_value = {
+        "2026-05-18": {"USD": 1.07},
+        "2026-05-19": {"USD": 1.08},
+        "2026-05-20": {"USD": 1.09},
+    }
+
+    result = await collect_market_context(
+        pairs=["EUR/USD"],
+        sources=["rates"],
+        days=3,
+        connector=connector,
+    )
+
+    history = result["context"]["historical_rates"][0]
+    assert history["pair"] == "EUR/USD"
+    assert history["series"] == [
+        {"date": "2026-05-18", "rate": 1.07},
+        {"date": "2026-05-19", "rate": 1.08},
+        {"date": "2026-05-20", "rate": 1.09},
+    ]
+    connector.get_historical_rates.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_collect_market_context_falls_back_for_broad_fx_news_query():
+    news_connector = MagicMock()
+    news_connector.get_fx_news.side_effect = [
+        [],
+        [{"title": "Dollar index retreats", "source": "mock"}],
+    ]
+
+    result = await collect_market_context(
+        sources=["news"],
+        query="latest FX market news",
+        news_connector=news_connector,
+    )
+
+    assert result["context"]["news"][0]["title"] == "Dollar index retreats"
+    assert news_connector.get_fx_news.call_count == 2
+
+
+@pytest.mark.asyncio
 async def test_analyze_market_context_returns_analysis_not_briefing():
     context = {
         "type": "market_context",
@@ -52,6 +104,68 @@ async def test_analyze_market_context_returns_analysis_not_briefing():
     assert result["type"] == "market_analysis"
     assert "analysis" in result
     assert "briefing" not in result
+
+
+@pytest.mark.asyncio
+async def test_analyze_market_context_uses_historical_rates_for_pair_specific_output():
+    context = {
+        "type": "market_context",
+        "context": {
+            "rates": [{"base": "EUR", "target": "USD", "rate": 1.09}],
+            "historical_rates": [
+                {
+                    "pair": "EUR/USD",
+                    "base": "EUR",
+                    "target": "USD",
+                    "start_date": "2026-05-18",
+                    "end_date": "2026-05-20",
+                    "series": [
+                        {"date": "2026-05-18", "rate": 1.07},
+                        {"date": "2026-05-19", "rate": 1.08},
+                        {"date": "2026-05-20", "rate": 1.09},
+                    ],
+                }
+            ],
+        },
+        "warnings": [],
+    }
+
+    result = await analyze_market_context(
+        context=context,
+        analysis_type="trend",
+    )
+
+    assert result["type"] == "market_analysis"
+    assert result["analysis"]["pairs"][0]["pair"] == "EUR/USD"
+    assert result["analysis"]["pairs"][0]["observations"] == 3
+
+
+@pytest.mark.asyncio
+async def test_analyze_market_context_recollects_when_supplied_context_is_malformed():
+    connector = AsyncMock()
+    connector.get_exchange_rate.return_value = {
+        "base": "EUR",
+        "target": "USD",
+        "rate": 1.09,
+        "date": "2026-05-20",
+        "source": "mock",
+    }
+    connector.get_historical_rates.return_value = {
+        "2026-05-18": {"USD": 1.07},
+        "2026-05-19": {"USD": 1.08},
+        "2026-05-20": {"USD": 1.09},
+    }
+
+    result = await analyze_market_context(
+        context={"rates": ["EUR/USD: 1.09"], "historical_series": []},
+        pairs=["EUR/USD"],
+        analysis_type="trend",
+        days=3,
+        connector=connector,
+    )
+
+    assert result["analysis"]["pairs"][0]["pair"] == "EUR/USD"
+    connector.get_historical_rates.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -100,6 +214,22 @@ async def test_generate_market_briefing_coordinates_context_and_analysis():
     assert "context" in result
     assert "analysis" in result
     assert "briefing" in result
+
+
+@pytest.mark.asyncio
+async def test_generate_market_briefing_normalizes_compact_pairs_and_warns_on_unsupported():
+    result = await generate_market_briefing(
+        pairs=["EURUSD", "USDCNH"],
+        connector=MockConnector(),
+        include_news=False,
+        include_fred=False,
+        include_research=False,
+    )
+
+    assert result["type"] == "market_briefing"
+    assert result["context"]["context"]["rates"][0]["base"] == "EUR"
+    assert result["context"]["context"]["rates"][0]["target"] == "USD"
+    assert any("USD/CNH" in warning["error"] for warning in result["warnings"])
 
 
 @pytest.mark.asyncio

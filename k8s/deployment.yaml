@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: ai-market-studio
-          image: gcr.io/gen-lang-client-0896070179/ai-market-studio:v2026-05-21-workflow-analysis-fix
+          image: gcr.io/gen-lang-client-0896070179/ai-market-studio:v2026-06-15-workflow-ui-polish
           ports:
             - containerPort: 8000
           envFrom:

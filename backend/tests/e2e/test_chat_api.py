@@ -1,4 +1,6 @@
 import pytest
+import httpx
+import openai
 from unittest.mock import AsyncMock, MagicMock
 from backend.connectors.base import RateFetchError
 
@@ -19,6 +21,7 @@ def make_response(content=None, tool_calls=None, finish_reason=None):
 @pytest.fixture
 def client_with_mock_llm(app_client, monkeypatch):
     """App client with both MockConnector and mocked OpenAI client."""
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
     final_response = make_response(content="The EUR/USD rate is 1.0823.", finish_reason="stop")
     mock_openai = AsyncMock()
     mock_openai.chat.completions.create = AsyncMock(return_value=final_response)
@@ -47,12 +50,80 @@ def test_chat_missing_message_returns_422(app_client):
 
 def test_chat_connector_failure_returns_503(app_client, monkeypatch):
     """When connector raises RateFetchError, API returns 503."""
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
+
     async def failing_run_agent(**kwargs):
         raise RateFetchError("Simulated connector failure")
     monkeypatch.setattr("backend.router.run_agent", failing_run_agent)
     resp = app_client.post("/api/chat", json={"message": "What is EUR/USD?"})
     assert resp.status_code == 503
     assert "unavailable" in resp.json()["detail"].lower()
+
+
+def test_chat_gateway_timeout_returns_504(app_client, monkeypatch, caplog):
+    """Gateway transport timeouts are reported separately from local connectors."""
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
+
+    async def failing_run_agent(**kwargs):
+        raise httpx.TimeoutException("Kong timed out")
+
+    monkeypatch.setattr("backend.router.run_agent", failing_run_agent)
+
+    resp = app_client.post("/api/chat", json={"message": "Brief EUR/USD"})
+
+    assert resp.status_code == 504
+    assert "gateway timeout" in resp.json()["detail"].lower()
+    assert "ai_path=gateway" in caplog.text
+
+
+def test_chat_gateway_upstream_error_returns_503(app_client, monkeypatch, caplog):
+    """Gateway connection failures are distinguishable from local connector failures."""
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
+
+    async def failing_run_agent(**kwargs):
+        raise httpx.ConnectError("Kong unavailable")
+
+    monkeypatch.setattr("backend.router.run_agent", failing_run_agent)
+
+    resp = app_client.post("/api/chat", json={"message": "Brief EUR/USD"})
+
+    assert resp.status_code == 503
+    assert "gateway unavailable" in resp.json()["detail"].lower()
+    assert "ai_path=gateway" in caplog.text
+
+
+def test_chat_openai_sdk_timeout_returns_504(app_client, monkeypatch, caplog):
+    """OpenAI SDK timeout wrappers are mapped as gateway timeouts."""
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
+    request = httpx.Request("POST", "http://ai-gateway-kong/v1/chat/completions")
+
+    async def failing_run_agent(**kwargs):
+        raise openai.APITimeoutError(request)
+
+    monkeypatch.setattr("backend.router.run_agent", failing_run_agent)
+
+    resp = app_client.post("/api/chat", json={"message": "Brief EUR/USD"})
+
+    assert resp.status_code == 504
+    assert "gateway timeout" in resp.json()["detail"].lower()
+    assert "ai_path=gateway" in caplog.text
+
+
+def test_chat_openai_sdk_connection_error_returns_503(app_client, monkeypatch, caplog):
+    """OpenAI SDK connection wrappers are mapped as gateway service failures."""
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
+    request = httpx.Request("POST", "http://ai-gateway-kong/v1/chat/completions")
+
+    async def failing_run_agent(**kwargs):
+        raise openai.APIConnectionError(request=request)
+
+    monkeypatch.setattr("backend.router.run_agent", failing_run_agent)
+
+    resp = app_client.post("/api/chat", json={"message": "Brief EUR/USD"})
+
+    assert resp.status_code == 503
+    assert "gateway unavailable" in resp.json()["detail"].lower()
+    assert "ai_path=gateway" in caplog.text
 
 
 def test_chat_cors_headers_present(client_with_mock_llm):
@@ -76,20 +147,21 @@ def test_chat_with_history(client_with_mock_llm):
     assert "reply" in resp.json()
 
 
-def test_chat_workflow_mode_disabled_is_rejected(app_client, monkeypatch):
+def test_chat_default_workflow_mode_disabled_is_rejected(app_client, monkeypatch):
     monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", False)
 
     resp = app_client.post(
         "/api/chat",
-        json={"message": "Brief EUR/USD", "agent_mode": "workflow"},
+        json={"message": "Brief EUR/USD"},
     )
 
-    assert resp.is_error
+    assert resp.status_code == 403
     assert "workflow" in resp.text.lower()
 
 
-def test_chat_default_mode_passes_legacy_to_run_agent(app_client, monkeypatch):
+def test_chat_default_mode_passes_workflow_to_run_agent(app_client, monkeypatch):
     captured = {}
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
 
     async def fake_run_agent(**kwargs):
         captured.update(kwargs)
@@ -100,27 +172,17 @@ def test_chat_default_mode_passes_legacy_to_run_agent(app_client, monkeypatch):
     resp = app_client.post("/api/chat", json={"message": "What is EUR/USD?"})
 
     assert resp.status_code == 200
-    assert captured["agent_mode"] == "legacy"
+    assert captured["agent_mode"] == "workflow"
     assert set(resp.json().keys()) == {"reply", "data", "tool_used"}
 
 
-def test_chat_explicit_legacy_mode_passes_legacy_to_run_agent(app_client, monkeypatch):
-    captured = {}
-
-    async def fake_run_agent(**kwargs):
-        captured.update(kwargs)
-        return {"reply": "ok", "data": None, "tool_used": None}
-
-    monkeypatch.setattr("backend.router.run_agent", fake_run_agent)
-
+def test_chat_rejects_legacy_agent_mode(app_client):
     resp = app_client.post(
         "/api/chat",
         json={"message": "What is EUR/USD?", "agent_mode": "legacy"},
     )
 
-    assert resp.status_code == 200
-    assert captured["agent_mode"] == "legacy"
-    assert set(resp.json().keys()) == {"reply", "data", "tool_used"}
+    assert resp.status_code == 422
 
 
 def test_chat_workflow_mode_keeps_response_shape_when_enabled(app_client, monkeypatch):

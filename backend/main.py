@@ -30,14 +30,22 @@ def create_connector():
 
 
 def create_news_connector():
-    if settings.use_mock_news_connector:
-        from backend.connectors.news_connector import MockNewsConnector
-        logger.info("Using MockNewsConnector (USE_MOCK_NEWS_CONNECTOR=true)")
-        return MockNewsConnector()
-    else:
+    mode = settings.news_connector_mode.lower().strip()
+    if mode == "live_with_mock_fallback":
+        from backend.connectors.news_connector import LiveWithMockFallbackNewsConnector
+        logger.info("Using LiveWithMockFallbackNewsConnector")
+        return LiveWithMockFallbackNewsConnector()
+    if mode == "live":
         from backend.connectors.news_connector import RSSNewsConnector
         logger.info("Using RSSNewsConnector (live RSS feeds)")
         return RSSNewsConnector()
+    if settings.use_mock_news_connector or mode == "mock":
+        from backend.connectors.news_connector import MockNewsConnector
+        logger.info("Using MockNewsConnector")
+        return MockNewsConnector()
+    from backend.connectors.news_connector import RSSNewsConnector
+    logger.info("Using RSSNewsConnector (legacy USE_MOCK_NEWS_CONNECTOR=false)")
+    return RSSNewsConnector()
 
 
 def create_fred_connector():

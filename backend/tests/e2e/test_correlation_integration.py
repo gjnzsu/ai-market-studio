@@ -79,6 +79,7 @@ def make_text_response(content: str):
 
 def test_correlation_integration_via_chat(app_client, monkeypatch):
     """Test correlation analysis through the chat endpoint."""
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
 
     # Setup mocks
     mock_market_connector = AsyncMock(spec=MarketDataConnector)
@@ -149,6 +150,7 @@ def test_correlation_integration_via_chat(app_client, monkeypatch):
 
 def test_correlation_integration_multiple_indicators(app_client, monkeypatch):
     """Test correlation analysis with multiple indicators."""
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
 
     mock_market_connector = AsyncMock(spec=MarketDataConnector)
 

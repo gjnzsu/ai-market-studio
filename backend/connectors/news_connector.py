@@ -120,6 +120,103 @@ class MockNewsConnector(NewsConnectorBase):
         return items[:max_items]
 
 
+def _is_broad_news_query(query: Optional[str]) -> bool:
+    if not query:
+        return False
+    terms = ("fx", "foreign exchange", "currency", "currencies", "market", "news", "latest")
+    lowered = query.lower()
+    return any(term in lowered for term in terms)
+
+
+def _annotate_items(
+    items: list[dict],
+    data_source: str,
+    fallback_reason: Optional[str] = None,
+) -> list[dict]:
+    annotated = []
+    for item in items:
+        copy = dict(item)
+        copy["data_source"] = data_source
+        if fallback_reason:
+            copy["fallback_reason"] = fallback_reason
+        annotated.append(copy)
+    return annotated
+
+
+def _filter_fx_relevant_items(items: list[dict]) -> list[dict]:
+    terms = (
+        "fx",
+        "forex",
+        "foreign exchange",
+        "currency",
+        "currencies",
+        "dollar",
+        "euro",
+        "yen",
+        "sterling",
+        "pound",
+        "franc",
+        "eur/usd",
+        "gbp/usd",
+        "usd/jpy",
+        "fed",
+        "ecb",
+        "boj",
+        "rates",
+    )
+    relevant = []
+    for item in items:
+        text = f"{item.get('title', '')} {item.get('summary', '')}".lower()
+        if any(term in text for term in terms):
+            relevant.append(item)
+    return relevant
+
+
+class LiveWithMockFallbackNewsConnector(NewsConnectorBase):
+    """Use live RSS first, then deterministic mock headlines when live data is unavailable."""
+
+    def __init__(
+        self,
+        live_connector: Optional[NewsConnectorBase] = None,
+        mock_connector: Optional[NewsConnectorBase] = None,
+    ) -> None:
+        self._live_connector = live_connector or RSSNewsConnector()
+        self._mock_connector = mock_connector or MockNewsConnector()
+
+    def get_fx_news(
+        self, query: Optional[str] = None, max_items: int = 5
+    ) -> list[dict]:
+        live_query = None if _is_broad_news_query(query) else query
+        fallback_query = None if _is_broad_news_query(query) else query
+        try:
+            live_items = self._live_connector.get_fx_news(
+                query=live_query,
+                max_items=max_items,
+            )
+        except Exception as exc:
+            mock_items = self._mock_connector.get_fx_news(
+                query=fallback_query,
+                max_items=max_items,
+            )
+            return _annotate_items(
+                mock_items,
+                "mock_fallback",
+                f"live_error: {type(exc).__name__}",
+            )
+
+        if live_items and _is_broad_news_query(query):
+            live_items = _filter_fx_relevant_items(live_items)
+
+        if live_items:
+            return _annotate_items(live_items, "live_rss")
+
+        mock_items = self._mock_connector.get_fx_news(
+            query=fallback_query,
+            max_items=max_items,
+        )
+        return _annotate_items(mock_items, "mock_fallback", "live_empty")
+
+
 # ---------------------------------------------------------------------------
 # Live RSS connector
 # ---------------------------------------------------------------------------

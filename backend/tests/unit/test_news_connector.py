@@ -1,6 +1,10 @@
-"""Unit tests for MockNewsConnector and RSSNewsConnector."""
+"""Unit tests for MockNewsConnector, RSSNewsConnector, and fallback news mode."""
 
-from backend.connectors.news_connector import MockNewsConnector, RSSNewsConnector
+from backend.connectors.news_connector import (
+    LiveWithMockFallbackNewsConnector,
+    MockNewsConnector,
+    RSSNewsConnector,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -213,3 +217,110 @@ class TestRSSNewsConnector:
         connector._fetch_feed = lambda url: []
         items = connector.get_fx_news()
         assert items == []
+
+
+class StubNewsConnector:
+    def __init__(self, responses=None, error=None):
+        self.responses = list(responses or [])
+        self.error = error
+        self.calls = []
+
+    def get_fx_news(self, query=None, max_items=5):
+        self.calls.append({"query": query, "max_items": max_items})
+        if self.error:
+            raise self.error
+        if self.responses:
+            return self.responses.pop(0)
+        return []
+
+
+class TestLiveWithMockFallbackNewsConnector:
+    def test_uses_live_feed_first_and_marks_live_source(self):
+        live = StubNewsConnector(
+            responses=[
+                [
+                    {
+                        "title": "Euro rises after ECB comments",
+                        "summary": "EUR/USD moved higher.",
+                        "source": "Live Feed",
+                        "published": "2026-06-15T08:00:00+00:00",
+                        "url": "https://example.com/live",
+                    }
+                ]
+            ]
+        )
+        mock = StubNewsConnector(responses=[[{"title": "Mock item"}]])
+        connector = LiveWithMockFallbackNewsConnector(live_connector=live, mock_connector=mock)
+
+        items = connector.get_fx_news(query="EUR/USD", max_items=5)
+
+        assert items[0]["title"] == "Euro rises after ECB comments"
+        assert items[0]["data_source"] == "live_rss"
+        assert live.calls == [{"query": "EUR/USD", "max_items": 5}]
+        assert mock.calls == []
+
+    def test_broad_latest_fx_query_uses_general_live_feed_not_exact_phrase_filter(self):
+        live = StubNewsConnector(
+            responses=[
+                [
+                    {
+                        "title": "Tech shares rise on earnings",
+                        "summary": "Stocks moved higher.",
+                        "source": "Live Feed",
+                        "published": "2026-06-15T08:00:00+00:00",
+                        "url": "https://example.com/stocks",
+                    },
+                    {
+                        "title": "Dollar slips as risk appetite improves",
+                        "summary": "Major currencies traded firmer.",
+                        "source": "Live Feed",
+                        "published": "2026-06-15T08:00:00+00:00",
+                        "url": "https://example.com/live",
+                    }
+                ]
+            ]
+        )
+        connector = LiveWithMockFallbackNewsConnector(
+            live_connector=live,
+            mock_connector=StubNewsConnector(),
+        )
+
+        items = connector.get_fx_news(query="latest FX market news", max_items=5)
+
+        assert len(items) == 1
+        assert items[0]["title"] == "Dollar slips as risk appetite improves"
+        assert items[0]["data_source"] == "live_rss"
+        assert live.calls == [{"query": None, "max_items": 5}]
+
+    def test_falls_back_to_mock_when_live_returns_empty(self):
+        live = StubNewsConnector(responses=[[]])
+        mock = StubNewsConnector(
+            responses=[
+                [
+                    {
+                        "title": "Fed holds rates steady amid inflation uncertainty",
+                        "summary": "Mock summary",
+                        "source": "Mock Financial Times",
+                    }
+                ]
+            ]
+        )
+        connector = LiveWithMockFallbackNewsConnector(live_connector=live, mock_connector=mock)
+
+        items = connector.get_fx_news(query="latest FX market news", max_items=5)
+
+        assert items[0]["title"] == "Fed holds rates steady amid inflation uncertainty"
+        assert items[0]["data_source"] == "mock_fallback"
+        assert items[0]["fallback_reason"] == "live_empty"
+        assert mock.calls == [{"query": None, "max_items": 5}]
+
+    def test_falls_back_to_mock_when_live_errors(self):
+        live = StubNewsConnector(error=TimeoutError("rss timeout"))
+        mock = StubNewsConnector(responses=[[{"title": "Fallback headline"}]])
+        connector = LiveWithMockFallbackNewsConnector(live_connector=live, mock_connector=mock)
+
+        items = connector.get_fx_news(query="Fed", max_items=3)
+
+        assert items[0]["data_source"] == "mock_fallback"
+        assert items[0]["fallback_reason"] == "live_error: TimeoutError"
+        assert mock.calls == [{"query": "Fed", "max_items": 3}]

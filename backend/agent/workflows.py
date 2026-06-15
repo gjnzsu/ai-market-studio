@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import date as date_type, timedelta
 from typing import Any, Optional
 
 from backend.agents.market_analyst import analyze_market_trends
@@ -13,17 +14,109 @@ from backend.agent.synthetic_specialist_data import (
     get_synthetic_forward_curve,
     get_synthetic_implied_volatility,
 )
-from backend.connectors.base import MarketDataConnector
+from backend.connectors.base import MarketDataConnector, UnsupportedPairError
 from backend.connectors.news_connector import NewsConnectorBase
 
 logger = logging.getLogger(__name__)
 
 
 def _split_pair(pair: str) -> tuple[str, str]:
-    parts = pair.upper().replace("-", "/").split("/")
+    normalized = pair.upper().replace("-", "/")
+    if "/" not in normalized and len(normalized) == 6:
+        normalized = f"{normalized[:3]}/{normalized[3:]}"
+    parts = normalized.split("/")
     if len(parts) != 2:
         raise ValueError(f"Invalid currency pair: {pair}")
     return parts[0], parts[1]
+
+
+def _historical_window(days: Optional[int]) -> tuple[str, str] | None:
+    if days is None or days <= 1:
+        return None
+    lookback_days = max(2, min(int(days), 30))
+    end = date_type.today()
+    start = end - timedelta(days=lookback_days - 1)
+    return start.isoformat(), end.isoformat()
+
+
+def _historical_payload(
+    pair: str,
+    base: str,
+    target: str,
+    raw: dict[str, dict[str, float]],
+) -> dict[str, Any]:
+    sorted_dates = sorted(raw.keys())
+    return {
+        "pair": pair.upper().replace("-", "/"),
+        "base": base,
+        "target": target,
+        "start_date": sorted_dates[0] if sorted_dates else None,
+        "end_date": sorted_dates[-1] if sorted_dates else None,
+        "series": [
+            {"date": day, "rate": raw[day].get(target)}
+            for day in sorted_dates
+            if raw[day].get(target) is not None
+        ],
+        "source": "mock",
+    }
+
+
+def _build_pair_series_analysis(
+    historical_rates: list[dict[str, Any]],
+    analysis_type: str,
+) -> dict[str, Any] | None:
+    pair_results = []
+    for history in historical_rates:
+        series = [
+            point
+            for point in history.get("series", [])
+            if isinstance(point.get("rate"), (int, float))
+        ]
+        if len(series) < 2:
+            continue
+        rates = [float(point["rate"]) for point in series]
+        first_rate = rates[0]
+        last_rate = rates[-1]
+        change_pct = ((last_rate - first_rate) / first_rate) * 100 if first_rate else 0.0
+        mean_rate = sum(rates) / len(rates)
+        variance = sum((rate - mean_rate) ** 2 for rate in rates) / (len(rates) - 1)
+        volatility = variance ** 0.5
+        volatility_pct = (volatility / mean_rate) * 100 if mean_rate else 0.0
+        if change_pct > 0.5:
+            trend_direction = "uptrend"
+        elif change_pct < -0.5:
+            trend_direction = "downtrend"
+        else:
+            trend_direction = "sideways"
+        pair_results.append(
+            {
+                "pair": history.get("pair"),
+                "start_date": history.get("start_date"),
+                "end_date": history.get("end_date"),
+                "observations": len(series),
+                "first_rate": round(first_rate, 6),
+                "last_rate": round(last_rate, 6),
+                "change_pct": round(change_pct, 2),
+                "trend_direction": trend_direction,
+                "volatility": round(volatility, 6),
+                "volatility_pct": round(volatility_pct, 2),
+            }
+        )
+    if not pair_results:
+        return None
+    return {
+        "analysis_type": analysis_type,
+        "pairs": pair_results,
+        "summary": "Pair-specific analysis generated from historical mock FX series.",
+    }
+
+
+def _is_broad_news_query(query: Optional[str]) -> bool:
+    if not query:
+        return False
+    terms = {"fx", "foreign exchange", "currency", "currencies", "market", "news", "latest"}
+    lowered = query.lower()
+    return any(term in lowered for term in terms)
 
 
 async def collect_market_context(
@@ -45,19 +138,42 @@ async def collect_market_context(
         if connector is None:
             raise ValueError("connector is required for rates context")
         rate_results = []
+        historical_results = []
+        history_window = _historical_window(days)
         for pair in pairs or []:
-            base, target = _split_pair(pair)
-            rate_results.append(
-                await connector.get_exchange_rate(base=base, target=target)
-            )
+            try:
+                base, target = _split_pair(pair)
+                rate_results.append(
+                    await connector.get_exchange_rate(base=base, target=target)
+                )
+                if history_window is not None:
+                    raw_history = await connector.get_historical_rates(
+                        base=base,
+                        targets=[target],
+                        start_date=history_window[0],
+                        end_date=history_window[1],
+                    )
+                    historical_results.append(
+                        _historical_payload(pair, base, target, raw_history)
+                    )
+            except UnsupportedPairError as e:
+                pair_label = "/".join(_split_pair(pair)) if len(pair) == 6 else pair
+                warnings.append(
+                    {"source": "rates", "error": f"{pair_label}: {str(e)}"}
+                )
         context["rates"] = rate_results
+        if historical_results:
+            context["historical_rates"] = historical_results
 
     if "news" in selected:
         if news_connector is None:
             warnings.append({"source": "news", "error": "News connector not available"})
         else:
             try:
-                context["news"] = news_connector.get_fx_news(query=query, max_items=5)
+                news_items = news_connector.get_fx_news(query=query, max_items=5)
+                if not news_items and _is_broad_news_query(query):
+                    news_items = news_connector.get_fx_news(query=None, max_items=5)
+                context["news"] = news_items
             except Exception as e:
                 warnings.append({"source": "news", "error": str(e)})
 
@@ -104,7 +220,12 @@ async def analyze_market_context(
     **connectors,
 ) -> dict[str, Any]:
     market_context = context
-    if market_context is None:
+    if (
+        market_context is None
+        or not isinstance(market_context, dict)
+        or market_context.get("type") != "market_context"
+        or not isinstance(market_context.get("context"), dict)
+    ):
         market_context = await collect_market_context(
             pairs=pairs,
             sources=["rates"],
@@ -114,6 +235,17 @@ async def analyze_market_context(
         )
 
     analysis_input = {"data": market_context.get("context", {}).get("rates", [])}
+    historical_analysis = _build_pair_series_analysis(
+        market_context.get("context", {}).get("historical_rates", []),
+        analysis_type,
+    )
+    if historical_analysis is not None:
+        return {
+            "type": "market_analysis",
+            "context": market_context,
+            "analysis": historical_analysis,
+            "warnings": market_context.get("warnings", []),
+        }
     internal_analysis_type = (
         "correlation" if analysis_type == "economic_relationship" else analysis_type
     )

@@ -40,6 +40,8 @@ def make_response(content=None, tool_calls=None, finish_reason=None):
 
 
 def test_chat_returns_normalized_rag_sources(app_client, monkeypatch):
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
+
     tool_response = make_response(
         tool_calls=[
             make_tool_call(

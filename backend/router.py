@@ -1,5 +1,7 @@
 import logging
 from datetime import datetime
+import httpx
+import openai
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import Response
 
@@ -39,14 +41,10 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     history = [m.model_dump() for m in body.history]
 
     try:
-        if body.agent_mode == "workflow" and not settings.enable_agent_workflow_mode:
+        if not settings.enable_agent_workflow_mode:
             raise _workflow_mode_disabled_error()
 
-        timeout_seconds = (
-            settings.agent_workflow_timeout_seconds
-            if body.agent_mode == "workflow"
-            else 20.0
-        )
+        timeout_seconds = settings.agent_workflow_timeout_seconds
 
         result = await asyncio.wait_for(
             run_agent(
@@ -61,13 +59,29 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
             timeout=timeout_seconds,
         )
     except asyncio.TimeoutError:
-        logger.error("Request timeout after 20s for message: %s", body.message)
+        logger.error(
+            "Request timeout after %ss for message: %s ai_path=gateway",
+            settings.agent_workflow_timeout_seconds,
+            body.message,
+        )
         raise HTTPException(status_code=504, detail="Request timeout - query too complex. Please simplify your question.")
     except HTTPException:
         raise
     except ConnectorError as e:
         logger.error("Connector error in /chat: %s", e)
         raise HTTPException(status_code=503, detail="Market data service unavailable.")
+    except openai.APITimeoutError as e:
+        logger.error("Gateway timeout in /chat: %s ai_path=gateway", e)
+        raise HTTPException(status_code=504, detail="AI gateway timeout.")
+    except (openai.APIConnectionError, openai.APIStatusError) as e:
+        logger.error("Gateway OpenAI SDK error in /chat: %s ai_path=gateway", e)
+        raise HTTPException(status_code=503, detail="AI gateway unavailable.")
+    except httpx.TimeoutException as e:
+        logger.error("Gateway timeout in /chat: %s ai_path=gateway", e)
+        raise HTTPException(status_code=504, detail="AI gateway timeout.")
+    except httpx.HTTPError as e:
+        logger.error("Gateway transport error in /chat: %s ai_path=gateway", e)
+        raise HTTPException(status_code=503, detail="AI gateway unavailable.")
     except Exception as e:
         logger.exception("Unexpected error in /chat: %s", e)
         raise HTTPException(status_code=500, detail="Internal server error.")

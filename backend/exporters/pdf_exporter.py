@@ -309,6 +309,65 @@ def generate_insight_pdf(reply: str, data: Optional[Any], tool_used: Optional[st
             if sources:
                 story.extend(_build_sources_list(sources, styles))
 
+        elif dtype in ("market_context", "market_briefing"):
+            workflow_context = data if dtype == "market_context" else data.get("context", {})
+            context = workflow_context.get("context", {})
+
+            rates = context.get("rates", [])
+            if rates:
+                story.append(Paragraph("Spot Rates", styles["section"]))
+                t = _build_rates_table(rates, styles)
+                if t:
+                    story.append(t)
+                story.append(Spacer(1, 4 * mm))
+
+            history = context.get("historical_rates", [])
+            if history:
+                story.append(Paragraph("Historical Rates", styles["section"]))
+                rows = [
+                    [
+                        Paragraph("Pair", styles["table_header"]),
+                        Paragraph("Start", styles["table_header"]),
+                        Paragraph("End", styles["table_header"]),
+                        Paragraph("Observations", styles["table_header"]),
+                    ]
+                ]
+                for item in history:
+                    rows.append(
+                        [
+                            Paragraph(str(item.get("pair", "")), styles["body"]),
+                            Paragraph(str(item.get("start_date", "")), styles["muted"]),
+                            Paragraph(str(item.get("end_date", "")), styles["muted"]),
+                            Paragraph(str(len(item.get("series", []))), styles["body"]),
+                        ]
+                    )
+                t = Table(rows, colWidths=[35 * mm, 35 * mm, 35 * mm, 35 * mm], repeatRows=1)
+                t.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), BRAND_PRIMARY),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [BRAND_LIGHT, colors.white]),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CCCCCC")),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]))
+                story.append(t)
+                story.append(Spacer(1, 4 * mm))
+
+            news = context.get("news", [])
+            if news:
+                story.append(Paragraph("Market News", styles["section"]))
+                t = _build_news_table(news, styles)
+                if t:
+                    story.append(t)
+                story.append(Spacer(1, 4 * mm))
+
+            research = context.get("research", {})
+            sources = []
+            if isinstance(research, dict):
+                sources = research.get("sources", []) or research.get("results", [])
+            if sources:
+                story.extend(_build_sources_list(sources, styles))
+
     # Footer rule
     story.append(Spacer(1, 10 * mm))
     story.append(HRFlowable(width="100%", thickness=1, color=BRAND_LIGHT))

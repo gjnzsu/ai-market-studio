@@ -386,29 +386,6 @@ _ALL_TOOL_DEFINITIONS = [
 ]
 
 
-def _tool_name(tool: dict[str, Any]) -> str:
-    return tool["function"]["name"]
-
-
-_LEGACY_TOOL_NAMES = {
-    "get_exchange_rate",
-    "get_exchange_rates",
-    "get_historical_rates",
-    "list_supported_currencies",
-    "generate_dashboard",
-    "get_fx_news",
-    "get_internal_research",
-    "get_interest_rate",
-    "analyze_fx_economic_correlation",
-}
-
-
-LEGACY_TOOL_DEFINITIONS = [
-    tool for tool in _ALL_TOOL_DEFINITIONS
-    if _tool_name(tool) in _LEGACY_TOOL_NAMES
-]
-
-
 WORKFLOW_TOOL_DEFINITIONS = [
     {
         "type": "function",
@@ -426,7 +403,10 @@ WORKFLOW_TOOL_DEFINITIONS = [
                             "enum": ["rates", "news", "fred", "research"],
                         },
                     },
-                    "days": {"type": "integer"},
+                    "days": {
+                        "type": "integer",
+                        "description": "Historical lookback in days. Use 2-30 when the user asks for trends, charts, or last-N-day rates.",
+                    },
                     "fred_series_ids": {"type": "array", "items": {"type": "string"}},
                     "query": {"type": "string"},
                 },
@@ -447,7 +427,10 @@ WORKFLOW_TOOL_DEFINITIONS = [
                         "type": "string",
                         "enum": ["trend", "volatility", "economic_relationship", "general"],
                     },
-                    "days": {"type": "integer"},
+                    "days": {
+                        "type": "integer",
+                        "description": "Historical lookback in days for pair-specific trend or volatility analysis.",
+                    },
                     "context": {"type": "object"},
                 },
                 "required": [],
@@ -486,17 +469,17 @@ WORKFLOW_TOOL_DEFINITIONS = [
 ]
 
 
-TOOL_DEFINITIONS = LEGACY_TOOL_DEFINITIONS
-
-
-def get_tool_definitions(agent_mode: str) -> list[dict[str, Any]]:
-    if agent_mode == "workflow":
-        return WORKFLOW_TOOL_DEFINITIONS
-    return LEGACY_TOOL_DEFINITIONS
-
-
 class AgentError(Exception):
     """Raised when the agent cannot complete a request."""
+
+
+TOOL_DEFINITIONS = WORKFLOW_TOOL_DEFINITIONS
+
+
+def get_tool_definitions(agent_mode: Optional[str] = None) -> list[dict[str, Any]]:
+    if agent_mode in (None, "workflow"):
+        return WORKFLOW_TOOL_DEFINITIONS
+    raise AgentError(f"Unsupported agent mode: {agent_mode}")
 
 
 # ---------------------------------------------------------------------------

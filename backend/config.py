@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     exchangerate_api_key: SecretStr
     use_mock_connector: bool = False
     use_mock_news_connector: bool = True  # independent flag; defaults True for safety
+    news_connector_mode: str = "mock"
 
     # Optional connectors
     fred_api_key: Optional[SecretStr] = None
