@@ -14,23 +14,27 @@ Backend API for the AI Market Studio conversational FX market data platform.
 
 This repository is part of a **microservices architecture** that was split from a monolithic application for better scalability and independent deployment:
 
-- **Backend API**: This repository (FastAPI) - Port 8000
-- **Frontend UI**: [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) (Static HTML/JS) - Port 80
-- **RAG Service**: [ai-rag-service](https://github.com/gjnzsu/ai-rag-service) (Research document query) - Port 8000
-- **AI Gateway**: [ai-gateway-service](https://github.com/gjnzsu/ai-gateway-service) (LiteLLM proxy) - Internal service
-- **AI SRE Observability**: [ai-sre-observability](https://github.com/gjnzsu/ai-sre-observability) (Prometheus + Grafana) - Metrics collection
+- **Backend API / Agent Runtime**: This repository (FastAPI) - Port 8000
+- **Frontend UI**: [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) (Static HTML/JS + Chart.js) - Port 80
+- **Kong Gateway for AI Traffic**: Kong OSS deployed independently in GKE; routes OpenAI-compatible `/v1` traffic to `ai-gateway-service`
+- **AI Gateway Service**: [ai-gateway-service](https://github.com/gjnzsu/ai-gateway-service) (FastAPI + LiteLLM proxy) - Internal service
+- **RAG Service**: [ai-rag-service](https://github.com/gjnzsu/ai-rag-service) (PDF/Jira/Confluence research ingestion and query) - Port 8000
+- **AI SRE Observability**: [ai-sre-observability](https://github.com/gjnzsu/ai-sre-observability) (SDK ingest + Prometheus + Grafana) - Metrics collection
 
 ### Service Technology Stack
 
-| Service | Repository | Main Stack | Role |
+| Service | Repository / Manifests | Main Stack | Role |
 |---|---|---|---|
-| Backend API / Agent Runtime | This repository | Python 3.12, FastAPI, Uvicorn, OpenAI SDK, Pydantic, httpx, reportlab, pytest | Main backend for chat APIs, agent workflows, financial playbooks, FX/FRED/news/RAG connectors, and PDF export |
-| Frontend UI | [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) | Static HTML/CSS/JavaScript, Nginx Alpine container | Browser chat UI, predefined prompts, market briefing rendering, and PDF export trigger |
-| AI Gateway | [ai-gateway-service](https://github.com/gjnzsu/ai-gateway-service) | Python, FastAPI, LiteLLM, httpx, YAML config | OpenAI-compatible LLM gateway for centralized OpenAI/DeepSeek key management and model routing |
-| RAG Service | [ai-rag-service](https://github.com/gjnzsu/ai-rag-service) | Python 3.12, FastAPI, OpenAI embeddings, ChromaDB, LangChain text splitters, PyMuPDF, Atlassian API | PDF/Jira/Confluence/FX ingestion and research document retrieval for backend market analysis |
-| Observability Service | [ai-sre-observability](https://github.com/gjnzsu/ai-sre-observability) | Python 3.12, FastAPI, Prometheus client, Pydantic, custom SDK | Receives LLM telemetry from instrumented services and exposes Prometheus metrics |
+| Frontend UI | [ai-market-studio-ui](https://github.com/gjnzsu/ai-market-studio-ui) | Static HTML/CSS/JavaScript, Chart.js, Nginx Alpine, Kubernetes LoadBalancer | Browser chat UI, predefined workflow prompts, inline charts, structured market briefing rendering, and PDF export trigger |
+| Backend API / Agent Runtime | This repository | Python 3.12, FastAPI, Uvicorn, OpenAI SDK, Pydantic, httpx, reportlab, pytest | Workflow-only chat backend for `/api/chat`, rates/dashboard APIs, PDF export, GPT tool calling, financial playbooks, FRED grounding, and connector orchestration |
+| Workflow and Playbook Layer | This repository (`backend/agent/`) | OpenAI function calling, typed workflow tools, runtime playbook registry, deterministic synthetic specialist data | Exposes `collect_market_context`, `analyze_market_context`, and `generate_market_briefing`; supports FX carry, macro rates, morning note, catalyst, and general briefing flows |
+| Kong Gateway for AI Traffic | This repository (`k8s/kong-*.yaml`) | Kong Gateway OSS, Kubernetes Deployment/Service/ConfigMap | Independently deployed GKE gateway for OpenAI-compatible `/v1` traffic; receives backend LLM traffic and proxies to `ai-gateway-service` |
+| AI Gateway Service | [ai-gateway-service](https://github.com/gjnzsu/ai-gateway-service) | Python, FastAPI, LiteLLM, httpx, YAML config, provider secrets | Centralized OpenAI/DeepSeek provider key ownership, model routing, and OpenAI-compatible chat-completions endpoint behind Kong |
+| Connector Layer | This repository (`backend/connectors/`) | httpx, exchangerate.host/mock FX, RSS/live-with-mock-fallback news, FRED API, RAG client | Keeps tool/data traffic inside backend connectors; fetches FX rates, historical series, market news, FRED DFF/FEDFUNDS/DGS10, RAG research, and correlation inputs |
+| RAG Service | [ai-rag-service](https://github.com/gjnzsu/ai-rag-service) | Python 3.12, FastAPI, OpenAI embeddings, ChromaDB, LangChain text splitters, PyMuPDF, Atlassian API | PDF/Jira/Confluence/FX research ingestion and document retrieval for market context and cited research reports |
+| Observability Service | [ai-sre-observability](https://github.com/gjnzsu/ai-sre-observability) | Python 3.12, FastAPI, Prometheus client, Pydantic, custom SDK | Receives LLM telemetry from instrumented backend calls and exposes Prometheus metrics |
 | Metrics Stack | [ai-sre-observability](https://github.com/gjnzsu/ai-sre-observability) Kubernetes manifests | Prometheus, Grafana, Redis | Scrapes observability metrics and visualizes LLM cost, usage, request performance, and service health |
-| Deployment | Service `k8s/` directories and `cloudbuild.yaml` files | GKE, Kubernetes, Cloud Build, Docker, GCR/Artifact Registry | Builds, configures, and deploys the platform services on Google Cloud |
+| Deployment Platform | Service `k8s/` directories and `cloudbuild.yaml` files | GKE, Kubernetes, Cloud Build, Docker, GCR/Artifact Registry, ConfigMaps, Secrets | Builds, configures, and deploys frontend, backend, Kong, gateway, RAG, and observability services on Google Cloud |
 
 ### Why Microservices?
 
