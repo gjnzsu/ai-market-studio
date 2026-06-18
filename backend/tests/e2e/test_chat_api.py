@@ -126,6 +126,70 @@ def test_chat_openai_sdk_connection_error_returns_503(app_client, monkeypatch, c
     assert "ai_path=gateway" in caplog.text
 
 
+def test_chat_gateway_prompt_safety_denial_returns_400(app_client, monkeypatch, caplog):
+    """Gateway input guardrails are surfaced as explicit safety denials."""
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
+    request = httpx.Request("POST", "http://ai-gateway-kong/v1/chat/completions")
+    response = httpx.Response(
+        400,
+        request=request,
+        json={"error": {"code": "prompt_safety_violation", "message": "blocked"}},
+    )
+
+    async def failing_run_agent(**kwargs):
+        raise openai.APIStatusError(
+            "prompt safety violation",
+            response=response,
+            body=response.json(),
+        )
+
+    monkeypatch.setattr("backend.router.run_agent", failing_run_agent)
+
+    resp = app_client.post("/api/chat", json={"message": "unsafe prompt"})
+
+    assert resp.status_code == 400
+    assert "safety" in resp.json()["detail"].lower()
+    assert "ai_path=gateway" in caplog.text
+    assert "prompt_safety_violation" in caplog.text
+
+
+def test_chat_gateway_response_safety_denial_returns_502_without_content(
+    app_client,
+    monkeypatch,
+    caplog,
+):
+    """Gateway output guardrails do not leak blocked model content to the frontend."""
+    monkeypatch.setattr("backend.router.settings.enable_agent_workflow_mode", True)
+    request = httpx.Request("POST", "http://ai-gateway-kong/v1/chat/completions")
+    response = httpx.Response(
+        502,
+        request=request,
+        json={
+            "error": {
+                "code": "response_safety_violation",
+                "message": "unsafe model output: SECRET_UNSAFE_CONTENT",
+            }
+        },
+    )
+
+    async def failing_run_agent(**kwargs):
+        raise openai.APIStatusError(
+            "response safety violation",
+            response=response,
+            body=response.json(),
+        )
+
+    monkeypatch.setattr("backend.router.run_agent", failing_run_agent)
+
+    resp = app_client.post("/api/chat", json={"message": "Brief EUR/USD"})
+
+    assert resp.status_code == 502
+    assert "safety" in resp.json()["detail"].lower()
+    assert "SECRET_UNSAFE_CONTENT" not in resp.text
+    assert "ai_path=gateway" in caplog.text
+    assert "response_safety_violation" in caplog.text
+
+
 def test_chat_cors_headers_present(client_with_mock_llm):
     resp = client_with_mock_llm.post(
         "/api/chat",
