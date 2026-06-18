@@ -23,6 +23,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _gateway_error_code(exc: openai.APIStatusError) -> str | None:
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        error = body.get("error")
+        if isinstance(error, dict) and isinstance(error.get("code"), str):
+            return error["code"]
+        if isinstance(body.get("code"), str):
+            return body["code"]
+    try:
+        payload = exc.response.json()
+    except Exception:
+        return None
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict) and isinstance(error.get("code"), str):
+            return error["code"]
+        if isinstance(payload.get("code"), str):
+            return payload["code"]
+    return None
+
+
+def _is_gateway_safety_error(code: str | None) -> bool:
+    return bool(code and "safety" in code)
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     """Accept a user message and return an AI-generated reply with FX data."""
@@ -73,7 +98,26 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     except openai.APITimeoutError as e:
         logger.error("Gateway timeout in /chat: %s ai_path=gateway", e)
         raise HTTPException(status_code=504, detail="AI gateway timeout.")
-    except (openai.APIConnectionError, openai.APIStatusError) as e:
+    except openai.APIStatusError as e:
+        gateway_code = _gateway_error_code(e)
+        if _is_gateway_safety_error(gateway_code):
+            logger.error(
+                "Gateway safety policy denied /chat: code=%s status=%s ai_path=gateway",
+                gateway_code,
+                e.status_code,
+            )
+            if gateway_code and gateway_code.startswith("prompt_"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="AI gateway safety policy rejected the prompt.",
+                )
+            raise HTTPException(
+                status_code=502,
+                detail="AI gateway safety policy blocked the model response.",
+            )
+        logger.error("Gateway OpenAI SDK error in /chat: %s ai_path=gateway", e)
+        raise HTTPException(status_code=503, detail="AI gateway unavailable.")
+    except openai.APIConnectionError as e:
         logger.error("Gateway OpenAI SDK error in /chat: %s ai_path=gateway", e)
         raise HTTPException(status_code=503, detail="AI gateway unavailable.")
     except httpx.TimeoutException as e:

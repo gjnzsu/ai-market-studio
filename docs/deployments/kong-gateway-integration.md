@@ -46,10 +46,37 @@ Timeout and error categories:
 | Kong connection timeout | Kong cannot connect to `ai-gateway.ai-gateway.svc.cluster.local`. |
 | Kong read timeout | Kong connected but AI Gateway did not respond before the proxy timeout. |
 | Rate limited | Kong rate-limiting plugin returns `429` before forwarding upstream. |
+| Prompt safety denial | `ai-gateway-service` rejects an inbound prompt before provider routing. |
+| Response safety denial | `ai-gateway-service` blocks model output before returning it to AI Market Studio. |
 | Upstream error | AI Gateway or the model provider returns `4xx` or `5xx`. |
 | Client request error | AI Market Studio sends invalid JSON, missing headers, or unsupported paths. |
 
 Rollback changes `OPENAI_BASE_URL` back to the previous AI Gateway target. Rollback does not restore legacy orchestration behavior or any removed runtime/schema code paths.
+
+## AI Gateway Guardrails
+
+Kong OSS remains the routing and basic policy layer. PII masking and prompt/response safety policy are implemented in `ai-gateway-service` first because Kong's AI PII Sanitizer and advanced AI guardrail plugins require Kong AI Gateway Enterprise licensing.
+
+Expected `ai-gateway-service` guardrail modes:
+
+| Mode | Behavior |
+| --- | --- |
+| `disabled` | Preserve existing OpenAI-compatible proxy behavior. |
+| `audit` | Detect and log guardrail decisions without changing or blocking content. |
+| `mask` | Mask configured PII categories before provider calls or before responses return. |
+| `enforce` | Block configured high-confidence prompt or response safety violations. |
+
+Expected `ai-gateway-service` configuration names:
+
+| Variable | Purpose |
+| --- | --- |
+| `AI_GUARDRAILS_MODE` | `disabled`, `audit`, `mask`, or `enforce`. |
+| `AI_GUARDRAILS_PII_CATEGORIES` | Comma-separated PII categories such as `email,phone,api_key`. |
+| `AI_GUARDRAILS_INPUT_POLICY` | Prompt input policy profile. |
+| `AI_GUARDRAILS_OUTPUT_POLICY` | Model response policy profile. |
+| `AI_GUARDRAILS_LOG_RAW_VALUES` | Must remain `false` in production. |
+
+AI Market Studio maps `prompt_safety_violation` gateway errors to a clear `400` chat API response and response safety denials to a clear `502` chat API response. The frontend receives sanitized error details only.
 
 ## Rollback
 
@@ -64,6 +91,8 @@ kubectl rollout status deployment/ai-market-studio -n ai-market-studio
 ```
 
 Do not re-enable legacy orchestration as part of rollback.
+
+To roll back only guardrails, disable or relax the `ai-gateway-service` guardrail mode and restart that service. Keep `OPENAI_BASE_URL` pointed at Kong unless the gateway route itself is unhealthy.
 
 ## Deploy
 
