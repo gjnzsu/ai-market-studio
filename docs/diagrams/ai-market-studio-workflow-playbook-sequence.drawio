@@ -4,10 +4,10 @@
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
-        <mxCell id="title" value="Workflow Mode + Financial Playbook - UML Sequence" style="text;html=1;strokeColor=none;fillColor=none;fontSize=32;fontStyle=1;fontColor=#0f172a;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="title" value="Workflow Mode + Gateway-routed Financial Playbook - Sequence" style="text;html=1;strokeColor=none;fillColor=none;fontSize=32;fontStyle=1;fontColor=#0f172a;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="250" y="35" width="1200" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="subtitle" value="Time flows downward. This sequence shows one workflow-mode FX carry briefing with source grounding, synthetic specialist data, and research-only output." style="text;html=1;strokeColor=none;fillColor=none;fontSize=18;fontColor=#475569;align=center;verticalAlign=middle;" vertex="1" parent="1">
+        <mxCell id="subtitle" value="Time flows downward. This shows one workflow-mode FX carry briefing through Kong + ai-gateway-service, with guardrails, source grounding, synthetic specialist data, and research-only output." style="text;html=1;strokeColor=none;fillColor=none;fontSize=18;fontColor=#475569;align=center;verticalAlign=middle;" vertex="1" parent="1">
           <mxGeometry x="260" y="85" width="1180" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="p_user" value="User / UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
@@ -19,7 +19,7 @@
         <mxCell id="p_agent" value="Agent Loop" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffbeb;strokeColor=#d97706;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
           <mxGeometry x="510" y="145" width="165" height="58" as="geometry"/>
         </mxCell>
-        <mxCell id="p_llm" value="AI Gateway&lt;br/&gt;/ LLM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef2ff;strokeColor=#4f46e5;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
+        <mxCell id="p_llm" value="Kong + AI Gateway&lt;br/&gt;/ LLM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef2ff;strokeColor=#4f46e5;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
           <mxGeometry x="745" y="145" width="165" height="58" as="geometry"/>
         </mxCell>
         <mxCell id="p_workflow" value="Workflow&lt;br/&gt;Runtime" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontSize=18;fontStyle=1;fontColor=#0f172a;align=center;" vertex="1" parent="1">
@@ -70,7 +70,7 @@
         <mxCell id="a_data" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#059669;" vertex="1" parent="1">
           <mxGeometry x="1533" y="820" width="18" height="120" as="geometry"/>
         </mxCell>
-        <mxCell id="m1" value="1. POST /api/chat&lt;br/&gt;agent_mode=workflow" style="html=1;strokeColor=#2563eb;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+        <mxCell id="m1" value="1. POST /api/chat&lt;br/&gt;agent_mode omitted or workflow" style="html=1;strokeColor=#2563eb;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="115" y="280" as="sourcePoint"/>
             <mxPoint x="341" y="280" as="targetPoint"/>
@@ -82,7 +82,7 @@
             <mxPoint x="583" y="355" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="m3" value="3. model call with workflow tools" style="html=1;strokeColor=#4f46e5;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
+        <mxCell id="m3" value="3. model call via Kong /v1&lt;br/&gt;with workflow tools" style="html=1;strokeColor=#4f46e5;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="601" y="430" as="sourcePoint"/>
             <mxPoint x="818" y="430" as="targetPoint"/>
@@ -148,7 +148,7 @@
             <mxPoint x="818" y="1075" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="m12" value="12. final research-only answer" style="html=1;strokeColor=#4f46e5;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
+        <mxCell id="m12" value="12. final answer or safety error" style="html=1;strokeColor=#4f46e5;strokeWidth=2;fontSize=16;fontColor=#0f172a;endArrow=block;dashed=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="818" y="1115" as="sourcePoint"/>
             <mxPoint x="601" y="1115" as="targetPoint"/>
@@ -166,11 +166,11 @@
             <mxPoint x="115" y="1168" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
-        <mxCell id="note1" value="Tool arguments&lt;br/&gt;pairs: EUR/USD&lt;br/&gt;playbook: fx_carry&lt;br/&gt;include_fred: true&lt;br/&gt;fred_series_ids: DFF, DGS10" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=16;fontColor=#0f172a;align=left;spacing=12;" vertex="1" parent="1">
-          <mxGeometry x="930" y="405" width="250" height="145" as="geometry"/>
+        <mxCell id="note1" value="Tool arguments + gateway path&lt;br/&gt;pairs: EUR/USD&lt;br/&gt;playbook: fx_carry&lt;br/&gt;fred_series_ids: DFF, DGS10&lt;br/&gt;Kong route: /v1/chat/completions&lt;br/&gt;guardrails may reject prompt/response" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=16;fontColor=#0f172a;align=left;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="930" y="390" width="270" height="175" as="geometry"/>
         </mxCell>
-        <mxCell id="note2" value="Structured output&lt;br/&gt;source_grounding.synthetic_sources&lt;br/&gt;specialist_data.source: synthetic&lt;br/&gt;carry_metrics: demo metrics&lt;br/&gt;data_gaps: real missing inputs only&lt;br/&gt;research_only: true" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=16;fontColor=#0f172a;align=left;spacing=12;" vertex="1" parent="1">
-          <mxGeometry x="1185" y="1025" width="330" height="165" as="geometry"/>
+        <mxCell id="note2" value="Structured output&lt;br/&gt;source_grounding.synthetic_sources&lt;br/&gt;specialist_data.source: synthetic&lt;br/&gt;carry_metrics: demo metrics&lt;br/&gt;data_gaps: real missing inputs only&lt;br/&gt;research_only: true&lt;br/&gt;PDF export renders these sections" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=16;fontColor=#0f172a;align=left;spacing=12;" vertex="1" parent="1">
+          <mxGeometry x="1185" y="1005" width="340" height="185" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>

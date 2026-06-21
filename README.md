@@ -8,6 +8,8 @@ Backend API for the AI Market Studio conversational FX market data platform.
 
 ![Current GKE Component Architecture](docs/diagrams/ai-market-studio-current-gke-component.drawio.png)
 
+The diagram already reflects the current PDF export boundary: export is a backend API capability (`/api/export/pdf`) triggered by the browser UI, not a separate GKE service.
+
 ### Workflow Mode Playbook Sequence
 
 ![Workflow Mode Playbook Sequence](docs/diagrams/ai-market-studio-workflow-playbook-sequence.drawio.png)
@@ -170,8 +172,8 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - Research-report/PDF ingestion is handled by the external RAG service; this repo currently provides the query and citation UI layer
 
 ### Feature 06 - Export to PDF
-- Ask a question that returns structured data (market insight, dashboard, news, or research), then click **Export to PDF**
-- The button appears automatically below any assistant response that contains `insight`, `dashboard`, `news`, or `rag` data
+- Ask a question that returns structured data (market insight, workflow briefing, dashboard, news, or research), then click **Export to PDF**
+- The button appears automatically below assistant responses that contain exportable structured data such as `insight`, `market_briefing`, `dashboard`, `news`, or `rag`
 - The backend renders a branded PDF via `reportlab` containing:
   - Report title, timestamp, and tool used
   - LLM reply/summary text
@@ -179,6 +181,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
   - Market news table (for insight and news responses)
   - Dashboard series table (for dashboard responses)
   - Source documents list (for RAG responses)
+  - Workflow briefing sections for source grounding, data gaps, and carry metrics
 - **Endpoint:** `POST /api/export/pdf`
 - **Request body:**
   ```json
@@ -188,12 +191,12 @@ The application is deployed on Google Kubernetes Engine (GKE):
     "tool_used": "generate_market_briefing"
   }
   ```
-- **Response:** Binary PDF file (`application/pdf`) with `Content-Disposition: attachment; filename="fx-insight-YYYYMMDD_HHMM.pdf"`
+- **Response:** Binary PDF file (`application/pdf`) with `Content-Disposition: attachment; filename="fx-insight-YYYYMMDD-HHMMSS.pdf"`
 - **Testing:** Comprehensive E2E test suite in `backend/tests/e2e/test_pdf_export.py`
-  - 8 test cases covering all data types (rates, insights, dashboard, news, RAG)
-  - Tests verify PDF generation, content validation, file size, and error handling
+  - 10 test cases covering rates, insights, dashboard, news, RAG, workflow briefing sections, and mojibake prevention
+  - Tests verify PDF generation, content validation, file size, graceful degradation, and report text quality
   - Run tests: `pytest backend/tests/e2e/test_pdf_export.py -v`
-  - Coverage: 93% of PDF exporter module
+  - Current focused coverage: 92% of PDF exporter module
 
 ### Feature 07 - Market Insight Summary
 - Ask in natural language: *"Give me a market insight on EUR/USD and GBP/USD"*
@@ -280,6 +283,7 @@ Runtime traffic follows these boundaries:
 - Browser traffic enters the frontend LoadBalancer, then calls the backend API LoadBalancer for `/api/*`.
 - LLM traffic goes from Backend API -> Kong Gateway OSS (`ai-gateway-kong.ai-gateway.svc.cluster.local/v1`) -> AI Gateway Service -> OpenAI/DeepSeek.
 - Tool and market-data traffic stays inside backend connectors: FX rates, historical rates, RSS/news with mock fallback, FRED, RAG, and correlation inputs are not routed through Kong.
+- PDF export stays inside the backend API: the browser posts the current reply and structured data to `/api/export/pdf`, and the backend renders the binary PDF with `reportlab`.
 - Backend telemetry is batched to AI SRE Observability; Prometheus scrapes metrics and Grafana renders the three monitoring dashboards.
 - Kubernetes ConfigMaps and Secrets own runtime wiring such as `OPENAI_BASE_URL`, selected model, connector keys, and workflow-only agent mode.
 
