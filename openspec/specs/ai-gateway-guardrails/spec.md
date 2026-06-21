@@ -71,4 +71,3 @@ The AI gateway service SHALL allow operators to enable, disable, or run guardrai
 #### Scenario: Guardrails are disabled
 - **WHEN** guardrails are disabled by configuration
 - **THEN** the AI gateway service preserves the existing OpenAI-compatible proxy behavior
-
