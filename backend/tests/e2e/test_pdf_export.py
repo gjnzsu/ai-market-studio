@@ -18,6 +18,11 @@ from io import BytesIO
 from pypdf import PdfReader
 
 
+def _pdf_text(content: bytes) -> str:
+    reader = PdfReader(BytesIO(content))
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+
 def test_export_simple_rate_to_pdf(app_client):
     """Test PDF export with simple exchange rate data."""
     payload = {
@@ -234,3 +239,91 @@ def test_export_pdf_invalid_data_handled(app_client):
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
 
+
+def test_export_market_briefing_includes_workflow_sections(app_client):
+    """Workflow briefing exports include source grounding, data gaps, and carry metrics."""
+    payload = {
+        "reply": "FX carry briefing for EUR/USD.",
+        "data": {
+            "type": "market_briefing",
+            "context": {
+                "context": {
+                    "rates": [
+                        {
+                            "base": "EUR",
+                            "target": "USD",
+                            "rate": 1.0868,
+                            "date": "2026-04-18",
+                        },
+                        {
+                            "base": "GBP",
+                            "target": "USD",
+                            "error": "timeout",
+                        },
+                    ],
+                    "news": [
+                        {
+                            "title": "EUR/USD steadies before central bank remarks",
+                            "source": "Reuters",
+                        }
+                    ],
+                    "research": {
+                        "sources": [{"name": "Monthly FX Outlook.pdf"}]
+                    },
+                }
+            },
+            "source_grounding": {
+                "available_sources": ["rates", "fred"],
+                "synthetic_sources": ["forward_curve"],
+                "missing_required_sources": ["options_surface"],
+            },
+            "data_gaps": ["Live options surface unavailable."],
+            "carry_metrics": {
+                "source": "synthetic",
+                "rate_differential_proxy": 0.85,
+                "carry_to_vol": 0.12,
+                "interpretation": "Research-only demo metric.",
+            },
+        },
+        "tool_used": "generate_market_briefing",
+    }
+
+    response = app_client.post("/api/export/pdf", json=payload)
+
+    assert response.status_code == 200
+    text = _pdf_text(response.content)
+    assert "Source Grounding" in text
+    assert "available_sources: rates, fred" in text
+    assert "synthetic_sources: forward_curve" in text
+    assert "Data Gaps" in text
+    assert "Live options surface unavailable." in text
+    assert "Carry Metrics" in text
+    assert "rate_differential_proxy: 0.85" in text
+    assert "Research-only demo metric." in text
+    assert "N/A" in text
+
+
+def test_export_pdf_text_avoids_mojibake(app_client):
+    """PDF text should not contain known mojibake replacement artifacts."""
+    payload = {
+        "reply": "Dashboard data for EUR/USD.",
+        "data": {
+            "type": "dashboard",
+            "panel_type": "line_trend",
+            "base": "EUR",
+            "targets": ["USD"],
+            "start_date": "2026-04-11",
+            "end_date": "2026-04-18",
+            "series": [{"date": "2026-04-11", "rates": {"USD": 1.0850}}],
+        },
+        "tool_used": "get_dashboard_data",
+    }
+
+    response = app_client.post("/api/export/pdf", json=payload)
+
+    assert response.status_code == 200
+    text = _pdf_text(response.content)
+    assert "Period: 2026-04-11 -> 2026-04-18" in text
+    assert "\u9225" not in text
+    assert "\u922b" not in text
+    assert "\ufffd" not in text

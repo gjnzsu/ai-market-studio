@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 import httpx
 import openai
 from fastapi import APIRouter, HTTPException, Request, status
@@ -232,7 +232,7 @@ async def export_pdf(body: ExportPdfRequest) -> Response:
             content=pdf_bytes,
             media_type="application/pdf",
             headers={
-                "Content-Disposition": f'attachment; filename="fx-insight-{datetime.utcnow().strftime("%Y%m%d-%H%M%S")}.pdf"'
+                "Content-Disposition": f'attachment; filename="fx-insight-{datetime.now(UTC).strftime("%Y%m%d-%H%M%S")}.pdf"'
             }
         )
     except Exception as e:

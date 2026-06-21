@@ -24,10 +24,17 @@ async def test_generate_pdf_report():
     assert result["format"] == "pdf"
     assert result["title"] == "EUR/USD Analysis"
     assert "content" in result
-    assert "pdf_url" in result["content"]
+    assert "export_payload" in result["content"]
     assert "filename" in result["content"]
     assert "metadata" in result
     assert "generated_at" in result["metadata"]
+    assert result["content"]["export_endpoint"] == "/api/export/pdf"
+    assert result["content"]["export_payload"] == {
+        "reply": "EUR/USD Analysis",
+        "data": data,
+        "tool_used": "generate_report",
+    }
+    assert "pdf_url" not in result["content"]
 
 
 @pytest.mark.asyncio
