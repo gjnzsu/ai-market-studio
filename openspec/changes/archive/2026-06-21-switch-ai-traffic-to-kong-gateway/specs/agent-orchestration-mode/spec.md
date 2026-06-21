@@ -52,8 +52,3 @@ The system SHALL preserve the `/api/chat` response shape while removing legacy o
 ### Requirement: Legacy orchestration is the default
 **Reason**: Legacy orchestration is no longer a supported product path after the gateway migration.
 **Migration**: Omitted `agent_mode` requests use workflow orchestration, and clients that previously sent `agent_mode=legacy` must migrate to workflow/default behavior.
-
-### Requirement: Legacy mode remains available as explicit orchestration mode
-**Reason**: Maintaining legacy mode would duplicate gateway validation and preserve deprecated low-level tool orchestration.
-**Migration**: Use workflow orchestration and approved intent-level workflow tools.
-

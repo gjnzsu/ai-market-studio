@@ -92,3 +92,21 @@ The system SHALL represent financial analysis playbooks through the playbook run
 #### Scenario: Existing data-gap behavior is preserved
 - **WHEN** a workflow market briefing uses a financial analysis playbook
 - **THEN** unavailable specialist sources are represented as data gaps unless the selected runtime profile provides synthetic specialist data for those sources
+
+### Requirement: ### Requirement: Financial playbook outputs remain stable under gateway routing
+The system SHALL preserve financial analysis playbook response shape and semantics when workflow AI traffic is routed through Kong Gateway.
+
+#### Scenario: Gateway-routed playbook briefing
+- **WHEN** a workflow market briefing uses a financial analysis playbook
+- **AND** AI chat completion traffic is routed through Kong Gateway
+- **THEN** the workflow result includes the selected playbook identifier and display name
+- **THEN** the workflow result includes source grounding and data gap information
+- **THEN** the workflow result remains research-oriented
+
+#### Scenario: Gateway-routed FX carry playbook
+- **WHEN** a workflow market briefing uses the FX carry playbook
+- **AND** AI chat completion traffic is routed through Kong Gateway
+- **THEN** the workflow result includes synthetic forward curve data
+- **THEN** the workflow result includes synthetic implied volatility data
+- **THEN** the workflow result includes carry metrics derived from the available context and synthetic specialist data
+- **THEN** the workflow result identifies synthetic inputs as synthetic rather than live market quotes

@@ -1,23 +1,19 @@
 # agent-orchestration-mode Specification
 
 ## Purpose
-TBD - created by archiving change agent-workflow-foundation. Update Purpose after archive.
+Define the supported chat orchestration mode and response contract for AI Market Studio.
+
 ## Requirements
-### Requirement: Legacy orchestration is the default
-The system SHALL use the existing legacy chat orchestration path when a chat request does not explicitly request agent workflow mode.
+### Requirement: Workflow orchestration is the default
+The system SHALL use workflow chat orchestration when a chat request does not specify an agent orchestration mode.
 
-#### Scenario: Chat request omits orchestration mode
-- **WHEN** a client sends a valid `/api/chat` request with `message` and optional `history` only
-- **THEN** the system uses legacy tool orchestration
-- **THEN** the request does not expose intent-level agent workflow tools to the model
+#### Scenario: Chat request omits agent mode
+- **WHEN** a client sends a valid `/api/chat` request without `agent_mode`
+- **THEN** the system uses workflow orchestration
+- **THEN** the request may expose approved intent-level agent workflow tools to the model
 
-#### Scenario: Existing clients remain compatible
-- **WHEN** an existing client sends a chat request using the current request shape
-- **THEN** the system accepts the request without requiring any new field
-- **THEN** the response remains compatible with the current `ChatResponse` shape
-
-### Requirement: Agent workflow mode is explicit opt-in
-The system SHALL run agent workflow orchestration only when the request explicitly selects agent workflow mode and agent workflow mode is enabled by configuration.
+### Requirement: Agent workflow mode is the supported chat orchestration mode
+The system SHALL run agent workflow orchestration for supported chat requests and SHALL NOT support legacy orchestration as a product mode.
 
 #### Scenario: Chat request selects workflow mode
 - **WHEN** a client sends a valid `/api/chat` request that explicitly selects agent workflow mode
@@ -26,41 +22,31 @@ The system SHALL run agent workflow orchestration only when the request explicit
 - **THEN** the system may expose intent-level agent workflow tools to the model
 
 #### Scenario: Chat request selects legacy mode
-- **WHEN** a client sends a valid `/api/chat` request that explicitly selects legacy mode
-- **THEN** the system uses legacy tool orchestration
-- **THEN** the request does not expose intent-level agent workflow tools to the model
+- **WHEN** a client sends a `/api/chat` request that explicitly selects legacy mode
+- **THEN** the system rejects the request as unsupported
+- **THEN** the system does not run legacy tool orchestration
 
 ### Requirement: Disabled workflow mode is predictable
-The system SHALL handle requests for agent workflow mode predictably when agent workflow mode is disabled by configuration.
+The system SHALL handle workflow availability predictably when workflow mode is disabled by configuration.
 
-#### Scenario: Workflow mode requested while disabled
-- **WHEN** a client sends a valid `/api/chat` request that explicitly selects agent workflow mode
-- **AND** agent workflow mode is disabled by configuration
-- **THEN** the system rejects the request with a clear client-facing error
-- **THEN** the system does not silently run legacy orchestration for that request
+#### Scenario: Workflow mode disabled
+- **WHEN** a client sends a valid `/api/chat` request
+- **AND** workflow mode is disabled by configuration
+- **THEN** the system returns a clear workflow-disabled response
+- **THEN** the system does not silently run legacy orchestration
 
-### Requirement: Tool exposure is mode-specific
-The system SHALL choose the model tool set according to the selected orchestration mode.
+### Requirement: Tool exposure is mode-safe
+The system SHALL expose only approved workflow tools to the model for chat orchestration.
 
-#### Scenario: Legacy mode tool set
-- **WHEN** a chat request runs in legacy mode
-- **THEN** the model receives only legacy-supported chat tools
-- **THEN** low-level or intent-level agent workflow tools are not available to the model
+#### Scenario: Workflow tool set
+- **WHEN** a chat request runs through the supported workflow orchestration path
+- **THEN** the model receives the approved intent-level agent workflow tools
+- **THEN** overlapping low-level internal agent tools are not directly exposed unless explicitly approved by the workflow specification
 
-#### Scenario: Agent workflow mode tool set
-- **WHEN** a chat request runs in agent workflow mode
-- **THEN** the model receives the approved intent-level agent workflow tools for that mode
-- **THEN** overlapping low-level internal agent tools are not directly exposed unless explicitly approved by the workflow spec
+### Requirement: Response shape remains stable across orchestration cleanup
+The system SHALL preserve the `/api/chat` response shape while removing legacy orchestration.
 
-### Requirement: Response contract remains backward compatible
-The system SHALL preserve the existing chat response contract for both orchestration modes.
-
-#### Scenario: Legacy mode response
-- **WHEN** a chat request completes successfully in legacy mode
-- **THEN** the response contains `reply`, `data`, and `tool_used` fields using the existing response shape
-
-#### Scenario: Agent workflow mode response
-- **WHEN** a chat request completes successfully in agent workflow mode
-- **THEN** the response contains `reply`, `data`, and `tool_used` fields using the existing response shape
+#### Scenario: Workflow response
+- **WHEN** a chat request completes successfully
+- **THEN** the response includes `reply`, `data`, and `tool_used`
 - **THEN** workflow-specific details are represented inside `data` or observability records without requiring a breaking response schema change
-
