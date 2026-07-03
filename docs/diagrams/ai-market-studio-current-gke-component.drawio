@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6">
   <diagram id="component-architecture" name="Component Architecture">
-    <mxGraphModel dx="2109" dy="1085" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1050" math="0" shadow="0">
+    <mxGraphModel dx="2561" dy="1317" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1050" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -16,19 +16,13 @@
         <mxCell id="external" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;dashed=1;fontSize=20;fontStyle=1;fontColor=#334155;align=left;verticalAlign=top;spacing=14;" value="Related Services and External Data Sources" vertex="1">
           <mxGeometry height="750" width="580" x="1260" y="135" as="geometry" />
         </mxCell>
-        <mxCell id="lane-api" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontSize=16;fontStyle=1;fontColor=#1e3a8a;align=center;" value="User-facing HTTP/API flow" vertex="1">
-          <mxGeometry height="34" width="540" x="80" y="190" as="geometry" />
-        </mxCell>
-        <mxCell id="lane-llm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2fe;strokeColor=#0284c7;fontSize=16;fontStyle=1;fontColor=#075985;align=center;" value="LLM flow - only chat-completion traffic uses Kong" vertex="1">
-          <mxGeometry height="34" width="520" x="650" y="190" as="geometry" />
-        </mxCell>
         <mxCell id="browser" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#2563eb;fontSize=16;fontColor=#0f172a;spacing=10;" value="User Browser&lt;br/&gt;chat, charts, PDF export" vertex="1">
           <mxGeometry height="110" width="220" x="80" y="250" as="geometry" />
         </mxCell>
         <mxCell id="ui" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;fontSize=16;fontColor=#0f172a;spacing=10;" value="Frontend UI&lt;br/&gt;ai-market-studio-ui&lt;br/&gt;Static HTML, Chart.js, Nginx&lt;br/&gt;1 pod for POC" vertex="1">
           <mxGeometry height="140" width="230" x="350" y="235" as="geometry" />
         </mxCell>
-        <mxCell id="backend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;fontSize=16;fontStyle=1;fontColor=#0f172a;spacing=10;" value="Backend API / Agent Runtime&lt;br/&gt;FastAPI, Uvicorn, OpenAI SDK&lt;br/&gt;/api/chat, dashboard, export/pdf&lt;br/&gt;workflow-only mode" vertex="1">
+        <mxCell id="backend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;fontSize=16;fontStyle=1;fontColor=#0f172a;spacing=10;" value="Backend API / Agent Runtime" vertex="1">
           <mxGeometry height="160" width="250" x="650" y="225" as="geometry" />
         </mxCell>
         <mxCell id="kong" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2fe;strokeColor=#0284c7;fontSize=16;fontStyle=1;fontColor=#0f172a;spacing=10;" value="Kong Gateway OSS&lt;br/&gt;ai-gateway namespace&lt;br/&gt;ClusterIP /v1 route" vertex="1">
@@ -41,10 +35,10 @@
           <mxGeometry height="120" width="210" x="1570" y="245" as="geometry" />
         </mxCell>
         <mxCell id="config" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fee2e2;strokeColor=#dc2626;fontSize=16;fontColor=#0f172a;spacing=10;" value="Runtime Config&lt;br/&gt;ConfigMap: Kong URL, model, workflow flags&lt;br/&gt;Secret: FRED and FX connector keys" vertex="1">
-          <mxGeometry height="120" width="220" x="80" y="430" as="geometry" />
+          <mxGeometry height="120" width="220" x="80" y="520" as="geometry" />
         </mxCell>
-        <mxCell id="observe" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#64748b;fontSize=16;fontColor=#0f172a;spacing=10;" value="AI SRE Observability&lt;br/&gt;Backend SDK ingest&lt;br/&gt;query-level tokens, latency, cost&lt;br/&gt;Prometheus + Grafana" vertex="1">
-          <mxGeometry height="120" width="220" x="80" y="660" as="geometry" />
+        <mxCell id="observe" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#64748b;fontSize=16;fontColor=#0f172a;spacing=10;" value="AI SRE Observability&lt;br&gt;&lt;br&gt;query-level tokens, latency, cost&lt;br&gt;Prometheus + Grafana" vertex="1">
+          <mxGeometry height="120" width="260" x="70" y="680" as="geometry" />
         </mxCell>
         <mxCell id="workflow" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontSize=16;fontColor=#0f172a;spacing=10;" value="Workflow Tools&lt;br/&gt;collect_market_context&lt;br/&gt;analyze_market_context&lt;br/&gt;generate_market_briefing" vertex="1">
           <mxGeometry height="130" width="230" x="350" y="620" as="geometry" />
@@ -52,7 +46,7 @@
         <mxCell id="connectors" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ccfbf1;strokeColor=#0f766e;fontSize=16;fontStyle=1;fontColor=#0f172a;spacing=10;" value="Connector Layer&lt;br/&gt;FX rates, RSS/mock news&lt;br/&gt;FRED, RAG, correlation" vertex="1">
           <mxGeometry height="130" width="250" x="650" y="620" as="geometry" />
         </mxCell>
-        <mxCell id="playbooks" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#7c3aed;fontSize=16;fontColor=#0f172a;spacing=10;" value="Financial Playbooks&lt;br/&gt;fx_carry, macro_rates&lt;br/&gt;morning_note, catalysts&lt;br/&gt;research-only guardrails" vertex="1">
+        <mxCell id="playbooks" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#7c3aed;fontSize=16;fontColor=#0f172a;spacing=10;" value="Financial Playbooks" vertex="1">
           <mxGeometry height="120" width="220" x="950" y="730" as="geometry" />
         </mxCell>
         <mxCell id="rag" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#22c55e;fontSize=16;fontColor=#0f172a;spacing=10;" value="RAG Service&lt;br/&gt;FastAPI + ChromaDB&lt;br/&gt;PDF, Jira, Confluence ingestion&lt;br/&gt;research citations" vertex="1">
@@ -60,12 +54,6 @@
         </mxCell>
         <mxCell id="marketdata" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#ea580c;fontSize=16;fontColor=#0f172a;spacing=10;" value="Market Data Sources&lt;br/&gt;exchangerate.host or mock FX&lt;br/&gt;RSS/live-with-mock-fallback news&lt;br/&gt;FRED API: DFF, FEDFUNDS, DGS10" vertex="1">
           <mxGeometry height="125" width="250" x="1390" y="725" as="geometry" />
-        </mxCell>
-        <mxCell id="legend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=15;fontColor=#0f172a;align=left;spacing=10;" value="Legend&lt;br/&gt;Blue: browser/API traffic&lt;br/&gt;Cyan/Purple: Kong and AI gateway traffic&lt;br/&gt;Green: backend data connector traffic&lt;br/&gt;Gray: telemetry/platform support" vertex="1">
-          <mxGeometry height="110" width="380" x="80" y="910" as="geometry" />
-        </mxCell>
-        <mxCell id="note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;fontSize=15;fontColor=#0f172a;align=left;spacing=10;" value="Boundary note&lt;br/&gt;Backend calls Kong only for OpenAI-compatible chat completions. Kong routes to ai-gateway-service by internal DNS. Gateway guardrails can mask or reject LLM traffic. FX, news, FRED, RAG, and PDF export stay in backend connector/exporter paths." vertex="1">
-          <mxGeometry height="110" width="910" x="520" y="910" as="geometry" />
         </mxCell>
         <mxCell id="e-browser-ui" edge="1" parent="1" source="browser" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2563eb;strokeWidth=3;endArrow=block;" target="ui" value="">
           <mxGeometry relative="1" as="geometry" />

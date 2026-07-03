@@ -1,16 +1,16 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6">
   <diagram id="d1o7QJQkpr1m-Xnipkdr" name="AI Gateway Flow">
-    <mxGraphModel dx="3487" dy="971" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="760" math="0" shadow="0">
+    <mxGraphModel dx="3592" dy="1024" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="760" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#0f172a;" value="AI Market Studio AI Gateway Flow" vertex="1">
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#0f172a;" value="AI FX Studio AI Gateway Flow" vertex="1">
           <mxGeometry height="40" width="560" x="380" y="20" as="geometry" />
         </mxCell>
         <mxCell id="subtitle" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontColor=#475569;" value="UI to backend, Kong routing, self-built AI gateway service, guardrails, model routing, fallback, and LLM provider call" vertex="1">
-          <mxGeometry height="28" width="840" x="380" y="56" as="geometry" />
+          <mxGeometry height="28" width="840" x="200" y="60" as="geometry" />
         </mxCell>
-        <mxCell id="ui" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#e0f2fe;strokeColor=#0284c7;fontColor=#0f172a;fontSize=15;spacing=10;" value="AI Market Studio UI&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Browser chat experience&lt;br&gt;Sends /api/chat&lt;/font&gt;" vertex="1">
+        <mxCell id="ui" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#e0f2fe;strokeColor=#0284c7;fontColor=#0f172a;fontSize=15;spacing=10;" value="AI FX Studio UI&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Browser chat experience&lt;br&gt;Sends /api/chat&lt;/font&gt;" vertex="1">
           <mxGeometry height="100" width="180" x="-100" y="160" as="geometry" />
         </mxCell>
         <mxCell id="backend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#dcfce7;strokeColor=#16a34a;fontColor=#0f172a;fontSize=15;spacing=10;" value="Backend API&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;FastAPI agent runtime&lt;br&gt;OpenAI SDK client&lt;br&gt;model=gpt-5.4&lt;/font&gt;" vertex="1">
@@ -25,16 +25,16 @@
         <mxCell id="guardrails" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#fee2e2;strokeColor=#dc2626;fontColor=#0f172a;fontSize=14;spacing=10;" value="Guardrails&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;PII / secret masking&lt;br&gt;prompt safety policy&lt;br&gt;response safety policy&lt;/font&gt;" vertex="1">
           <mxGeometry height="110" width="190" x="825" y="330" as="geometry" />
         </mxCell>
-        <mxCell id="routing" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f3e8ff;strokeColor=#9333ea;fontColor=#0f172a;fontSize=14;spacing=10;" value="Model Routing&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;alias to provider model&lt;br&gt;gpt-5.4 / gpt-4o / mini&lt;br&gt;deepseek-chat&lt;/font&gt;" vertex="1">
+        <mxCell id="routing" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f3e8ff;strokeColor=#9333ea;fontColor=#0f172a;fontSize=14;spacing=10;" value="Model Routing&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;alias to provider model&lt;br&gt;gpt-5.4 / gpt-4o / gpt-4o-mini&lt;br&gt;deepseek-chat&lt;/font&gt;" vertex="1">
           <mxGeometry height="110" width="180" x="1190" y="330" as="geometry" />
         </mxCell>
-        <mxCell id="reliability" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ccfbf1;strokeColor=#0f766e;fontColor=#0f172a;fontSize=14;spacing=10;" value="Provider Reliability&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;timeout + retry&lt;br&gt;circuit breaker&lt;br&gt;fallback chain:&lt;br&gt;gpt-5.4 -&amp;gt; gpt-4o -&amp;gt; gpt-4o-mini&lt;/font&gt;" vertex="1">
+        <mxCell id="reliability" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ccfbf1;strokeColor=#0f766e;fontColor=#0f172a;fontSize=14;spacing=10;" value="Provider Reliability&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;timeout + retry&lt;br&gt;fallback chain:&lt;br&gt;gpt-5.4 -&amp;gt; gpt-4o -&amp;gt; gpt-4o-mini&lt;/font&gt;" vertex="1">
           <mxGeometry height="130" width="250" x="1155" y="480" as="geometry" />
         </mxCell>
         <mxCell id="provider" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8fafc;strokeColor=#64748b;fontColor=#0f172a;fontSize=15;spacing=10;" value="LLM Provider&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;OpenAI / DeepSeek&lt;br&gt;selected resolved model&lt;br&gt;fallback target if needed&lt;/font&gt;" vertex="1">
           <mxGeometry height="120" width="200" x="1280" y="150" as="geometry" />
         </mxCell>
-        <mxCell id="note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f1f5f9;strokeColor=#94a3b8;fontColor=#0f172a;fontSize=13;spacing=10;" value="Guardrail modes&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;log_only / audit: observe only&lt;br&gt;mask: redact PII and secrets&lt;br&gt;enforce: block unsafe prompt or response&lt;/font&gt;" vertex="1">
+        <mxCell id="note" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f1f5f9;strokeColor=#94a3b8;fontColor=#0f172a;fontSize=13;spacing=10;" value="Guardrail modes&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;log_only / audit: observe only&lt;br&gt;mask: redact PII and secrets&lt;br&gt;&lt;/font&gt;" vertex="1">
           <mxGeometry height="110" width="320" x="760" y="480" as="geometry" />
         </mxCell>
         <mxCell id="e1" edge="1" parent="1" source="ui" style="endArrow=block;html=1;rounded=0;strokeWidth=2;strokeColor=#334155;fontSize=12;fontColor=#334155;" target="backend" value="HTTP /api/chat">
