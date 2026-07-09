@@ -1,10 +1,9 @@
-"""End-to-end integration test for correlation analysis through chat endpoint."""
+"""End-to-end integration test for economic relationship analysis through chat endpoint."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from backend.main import app
 from backend.connectors.base import MarketDataConnector
-from backend.connectors.fred_connector import HistoricalRatesData, HistoricalObservation
 from datetime import datetime, timedelta
 
 
@@ -17,26 +16,6 @@ def generate_mock_fx_data(start_date: str, days: int):
         rate = 1.08 - (0.0003 * i)  # Declining trend
         data[date] = {"USD": rate}
     return data
-
-
-def generate_mock_fred_data(start_date: str, days: int):
-    """Generate mock FRED data for testing."""
-    start = datetime.fromisoformat(start_date)
-    observations = []
-    for i in range(days):
-        date = (start + timedelta(days=i)).isoformat()
-        value = 5.25 + (0.008 * i)  # Rising trend
-        observations.append(HistoricalObservation(date=date, value=value))
-
-    return HistoricalRatesData(
-        series_id="DFF",
-        series_name="Effective Federal Funds Rate",
-        start_date=start_date,
-        end_date=(start + timedelta(days=days-1)).isoformat(),
-        observations=observations,
-        count=len(observations),
-        source="FRED"
-    )
 
 
 def make_tool_call_response(tool_name: str, arguments: str):
@@ -91,61 +70,43 @@ def test_correlation_integration_via_chat(app_client, monkeypatch):
     fx_data = generate_mock_fx_data(start_date, days)
     mock_market_connector.get_historical_rates.return_value = fx_data
 
-    # Mock FRED connector
-    with patch("backend.connectors.correlation_connector.FREDConnector") as mock_fred_class:
-        mock_fred_instance = AsyncMock()
-        fred_data = generate_mock_fred_data(start_date, days)
-        mock_fred_instance.get_historical_rates.return_value = fred_data
-        mock_fred_class.return_value = mock_fred_instance
+    tool_call_response = make_tool_call_response(
+        "analyze_market_context",
+        '{"pairs": ["EUR/USD"], "analysis_type": "economic_relationship", "days": 90}'
+    )
+    text_response = make_text_response(
+        "EUR/USD economic relationship analysis is complete with a declining 90-day trend."
+    )
 
-        # Mock OpenAI responses
-        tool_call_response = make_tool_call_response(
-            "analyze_fx_economic_correlation",
-            '{"pair": "EUR/USD", "indicators": ["DFF"], "days": 90}'
-        )
-        text_response = make_text_response(
-            "Over the past 90 days, EUR/USD declined 2.78% while the Federal Funds Rate rose 75 basis points. "
-            "The directional alignment is 78.5%, indicating a strong inverse correlation."
-        )
+    mock_openai = AsyncMock()
+    mock_openai.chat.completions.create.side_effect = [
+        tool_call_response,
+        text_response
+    ]
 
-        mock_openai = AsyncMock()
-        mock_openai.chat.completions.create.side_effect = [
-            tool_call_response,
-            text_response
-        ]
+    monkeypatch.setattr("backend.agent.agent.AsyncOpenAI", lambda **kwargs: mock_openai)
 
-        monkeypatch.setattr("backend.agent.agent.AsyncOpenAI", lambda **kwargs: mock_openai)
+    app.state.connector = mock_market_connector
 
-        # Patch connector in app
-        app.state.connector = mock_market_connector
+    response = app_client.post(
+        "/api/chat",
+        json={
+            "message": "How does EUR/USD correlate with Fed rate changes over the last 90 days?",
+            "history": []
+        }
+    )
 
-        # Make request
-        response = app_client.post(
-            "/api/chat",
-            json={
-                "message": "How does EUR/USD correlate with Fed rate changes over the last 90 days?",
-                "history": []
-            }
-        )
+    assert response.status_code == 200
+    data = response.json()
 
-        # Verify response
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "reply" in data
-        assert "EUR/USD" in data["reply"]
-        assert "correlation" in data["reply"].lower()
-
-        # Verify tool was used
-        assert data.get("tool_used") == "analyze_fx_economic_correlation"
-
-        # Verify data payload
-        assert data.get("data") is not None
-        assert data["data"]["type"] == "economic_correlation"
-        assert "pair" in data["data"]["data"]
-        assert data["data"]["data"]["pair"] == "EUR/USD"
-        assert "directional_alignment" in data["data"]["data"]
-        assert "trend_summary" in data["data"]["data"]
+    assert "reply" in data
+    assert "EUR/USD" in data["reply"]
+    assert "analysis" in data["reply"].lower()
+    assert data.get("tool_used") == "analyze_market_context"
+    assert data.get("data") is not None
+    assert data["data"]["type"] == "market_analysis"
+    assert data["data"]["analysis"]["analysis_type"] == "economic_relationship"
+    assert data["data"]["analysis"]["pairs"][0]["pair"] == "EUR/USD"
 
 
 def test_correlation_integration_multiple_indicators(app_client, monkeypatch):
@@ -160,51 +121,35 @@ def test_correlation_integration_multiple_indicators(app_client, monkeypatch):
     fx_data = generate_mock_fx_data(start_date, days)
     mock_market_connector.get_historical_rates.return_value = fx_data
 
-    # Mock FRED connector with multiple series
-    with patch("backend.connectors.correlation_connector.FREDConnector") as mock_fred_class:
-        mock_fred_instance = AsyncMock()
+    tool_call_response = make_tool_call_response(
+        "analyze_market_context",
+        '{"pairs": ["EUR/USD"], "analysis_type": "economic_relationship", "days": 90}'
+    )
+    text_response = make_text_response(
+        "Analysis compares EUR/USD with Fed rates and 10-Year Treasury context."
+    )
 
-        async def mock_get_historical(series_id, start_date, end_date):
-            data = generate_mock_fred_data(start_date, days)
-            if series_id == "DGS10":
-                data.series_id = "DGS10"
-                data.series_name = "10-Year Treasury"
-            return data
+    mock_openai = AsyncMock()
+    mock_openai.chat.completions.create.side_effect = [
+        tool_call_response,
+        text_response
+    ]
 
-        mock_fred_instance.get_historical_rates.side_effect = mock_get_historical
-        mock_fred_class.return_value = mock_fred_instance
+    monkeypatch.setattr("backend.agent.agent.AsyncOpenAI", lambda **kwargs: mock_openai)
 
-        # Mock OpenAI responses
-        tool_call_response = make_tool_call_response(
-            "analyze_fx_economic_correlation",
-            '{"pair": "EUR/USD", "indicators": ["DFF", "DGS10"], "days": 90}'
-        )
-        text_response = make_text_response(
-            "Analysis shows correlation with both Fed Funds Rate and 10-Year Treasury."
-        )
+    app.state.connector = mock_market_connector
 
-        mock_openai = AsyncMock()
-        mock_openai.chat.completions.create.side_effect = [
-            tool_call_response,
-            text_response
-        ]
+    response = app_client.post(
+        "/api/chat",
+        json={
+            "message": "Correlate EUR/USD with Fed rates and 10Y Treasury",
+            "history": []
+        }
+    )
 
-        monkeypatch.setattr("backend.agent.agent.AsyncOpenAI", lambda **kwargs: mock_openai)
+    assert response.status_code == 200
+    data = response.json()
 
-        app.state.connector = mock_market_connector
-
-        response = app_client.post(
-            "/api/chat",
-            json={
-                "message": "Correlate EUR/USD with Fed rates and 10Y Treasury",
-                "history": []
-            }
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-
-        # Verify multiple indicators in response
-        assert len(data["data"]["data"]["indicators"]) == 2
-        assert data["data"]["data"]["indicators"][0]["series_id"] in ["DFF", "DGS10"]
-        assert data["data"]["data"]["indicators"][1]["series_id"] in ["DFF", "DGS10"]
+    assert data["tool_used"] == "analyze_market_context"
+    assert data["data"]["type"] == "market_analysis"
+    assert data["data"]["analysis"]["pairs"][0]["pair"] == "EUR/USD"

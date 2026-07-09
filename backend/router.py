@@ -13,6 +13,7 @@ from backend.models import (
     ExportPdfRequest,
 )
 from backend.agent.agent import run_agent
+from backend.attribution import ensure_request_id
 from backend.connectors.base import ConnectorError
 from backend.cache import RateCache
 from backend.exporters.pdf_exporter import generate_insight_pdf
@@ -64,6 +65,7 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     fred_connector = getattr(request.app.state, 'fred_connector', None)
     rag_connector = getattr(request.app.state, 'rag_connector', None)
     history = [m.model_dump() for m in body.history]
+    request_id = ensure_request_id(body.client_context)
 
     try:
         if not settings.enable_agent_workflow_mode:
@@ -80,6 +82,8 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
                 fred_connector=fred_connector,
                 rag_connector=rag_connector,
                 agent_mode=body.agent_mode,
+                client_context=body.client_context,
+                request_id=request_id,
             ),
             timeout=timeout_seconds,
         )

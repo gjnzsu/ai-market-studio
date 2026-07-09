@@ -5,9 +5,16 @@ from typing import Literal, Optional
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
+from backend.attribution import (
+    attribution_headers,
+    business_metric_labels,
+    classify_use_case,
+    ensure_request_id,
+)
 from backend.config import settings
 from backend.connectors.base import MarketDataConnector, ConnectorError
 from backend.connectors.news_connector import NewsConnectorBase
+from backend.models import ChatClientContext
 from backend.agent.tools import get_tool_definitions, dispatch_tool, AgentError
 from ai_sre_observability import get_client
 
@@ -195,6 +202,42 @@ def _correct_reply_with_tool_data(reply: str, data) -> str:
     return reply
 
 
+def _emit_cost_attribution_metric(
+    obs,
+    *,
+    message: str,
+    tool_used: str | None,
+    data,
+    client_context: ChatClientContext | None,
+    status: str,
+) -> None:
+    if not obs:
+        logger.info("Skipping cost attribution metric: observability unavailable")
+        return
+
+    use_case, feature = classify_use_case(
+        message=message,
+        tool_used=tool_used,
+        data=data,
+        context=client_context,
+    )
+    labels = business_metric_labels(
+        context=client_context,
+        use_case=use_case,
+        feature=feature,
+        tool_used=tool_used,
+        status=status,
+    )
+    try:
+        obs.increment(
+            "ai_cost_attribution_requests_total",
+            value=1,
+            labels=labels,
+        )
+    except Exception as exc:
+        logger.warning("Skipping cost attribution metric after error: %s", exc)
+
+
 async def run_agent(
     message: str,
     history: Optional[list[dict]] = None,
@@ -204,6 +247,8 @@ async def run_agent(
     fred_connector = None,
     rag_connector = None,
     agent_mode: AgentMode = "workflow",
+    client_context: ChatClientContext | None = None,
+    request_id: str | None = None,
 ) -> dict:
     """Run the GPT-4o function-calling agent loop.
 
@@ -216,12 +261,25 @@ async def run_agent(
     Returns:
         dict with keys: reply (str), data (any), tool_used (str or None)
     """
+    request_id = request_id or ensure_request_id(client_context)
+    header_use_case, header_feature = classify_use_case(
+        message=message,
+        tool_used=None,
+        data=None,
+        context=client_context,
+    )
+
     if client is None:
         import httpx
         client = AsyncOpenAI(
             api_key=settings.openai_api_key.get_secret_value(),
             base_url=settings.openai_base_url,
-            default_headers={"X-Consumer-Service": "ai-market-studio"},
+            default_headers=attribution_headers(
+                context=client_context,
+                request_id=request_id,
+                use_case=header_use_case,
+                feature=header_feature,
+            ),
             http_client=httpx.AsyncClient(trust_env=False),
         )
 
@@ -320,6 +378,14 @@ async def run_agent(
                 # Set accumulated totals before exiting context
                 tracker.prompt_tokens = total_prompt_tokens
                 tracker.completion_tokens = total_completion_tokens
+                _emit_cost_attribution_metric(
+                    obs,
+                    message=message,
+                    tool_used=last_tool_used,
+                    data=last_tool_data,
+                    client_context=client_context,
+                    status="success",
+                )
                 return {"reply": reply, "data": last_tool_data, "tool_used": last_tool_used}
 
             # Max rounds reached - set totals before exiting
@@ -382,8 +448,24 @@ async def run_agent(
             # Final text response
             reply = msg.content or ""
             reply = _correct_reply_with_tool_data(reply, last_tool_data)
+            _emit_cost_attribution_metric(
+                obs,
+                message=message,
+                tool_used=last_tool_used,
+                data=last_tool_data,
+                client_context=client_context,
+                status="success",
+            )
             return {"reply": reply, "data": last_tool_data, "tool_used": last_tool_used}
 
+    _emit_cost_attribution_metric(
+        obs,
+        message=message,
+        tool_used=last_tool_used,
+        data=last_tool_data,
+        client_context=client_context,
+        status="success",
+    )
     return {
         "reply": _fallback_reply_from_tool_data(last_tool_data),
         "data": last_tool_data,

@@ -10,6 +10,36 @@ def test_chat_request_valid():
     assert req.message == "What is EUR/USD?"
     assert req.history == []
     assert req.agent_mode == "workflow"
+    assert req.client_context is None
+
+
+def test_chat_request_accepts_client_context_camel_case():
+    req = ChatRequest(
+        message="Give me a market briefing",
+        clientContext={
+            "applicationId": "ai-market-studio",
+            "projectId": "fx-market-insight",
+            "teamId": "markets",
+            "userId": "u-123",
+            "sessionId": "s-123",
+            "conversationId": "c-123",
+            "requestId": "r-123",
+            "useCase": "fx-advisory-report",
+            "feature": "advisory-report-generation",
+            "environment": "dev",
+        },
+    )
+    assert req.client_context.application_id == "ai-market-studio"
+    assert req.client_context.project_id == "fx-market-insight"
+    assert req.client_context.request_id == "r-123"
+    assert req.client_context.use_case == "fx-advisory-report"
+
+
+def test_chat_request_client_context_defaults_are_safe():
+    req = ChatRequest(message="What is EUR/USD?", clientContext={})
+    assert req.client_context.application_id == "ai-market-studio"
+    assert req.client_context.project_id == "fx-market-insight"
+    assert req.client_context.team_id == "markets"
 
 
 def test_chat_request_accepts_workflow_agent_mode():

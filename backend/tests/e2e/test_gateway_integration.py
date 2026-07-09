@@ -68,9 +68,14 @@ async def test_run_agent_configures_gateway_base_url_and_consumer_header(monkeyp
     assert captured_kwargs["base_url"] == (
         "http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1"
     )
-    assert captured_kwargs["default_headers"] == {
-        "X-Consumer-Service": "ai-market-studio"
-    }
+    headers = captured_kwargs["default_headers"]
+    assert headers["X-Consumer-Service"] == "ai-market-studio"
+    assert headers["X-Request-ID"]
+    assert headers["X-AI-Application-ID"] == "ai-market-studio"
+    assert headers["X-AI-Project-ID"] == "fx-market-insight"
+    assert headers["X-AI-Team-ID"] == "markets"
+    assert headers["X-AI-Use-Case"] == "fx-data-query"
+    assert headers["X-AI-Feature"] == "query-result-generation"
 
 
 def test_chat_via_gateway(app_client, monkeypatch):

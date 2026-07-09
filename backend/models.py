@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Optional, Any, Literal
 from datetime import date as _date_type
 from backend.config import settings
@@ -12,10 +12,31 @@ class Message(BaseModel):
 AgentMode = Literal["workflow"]
 
 
+class ChatClientContext(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    application_id: str = Field(default="ai-market-studio", alias="applicationId")
+    project_id: str = Field(default="fx-market-insight", alias="projectId")
+    team_id: str = Field(default="markets", alias="teamId")
+    user_id: Optional[str] = Field(default=None, alias="userId")
+    session_id: Optional[str] = Field(default=None, alias="sessionId")
+    conversation_id: Optional[str] = Field(default=None, alias="conversationId")
+    request_id: Optional[str] = Field(default=None, alias="requestId")
+    use_case: Optional[str] = Field(default=None, alias="useCase")
+    feature: Optional[str] = None
+    environment: str = "prod"
+
+
 class ChatRequest(BaseModel):
     message: str
     history: list[Message] = []
     agent_mode: AgentMode = "workflow"
+    client_context: Optional[ChatClientContext] = Field(
+        default=None,
+        alias="clientContext",
+    )
+
+    model_config = ConfigDict(populate_by_name=True)
 
     @field_validator("message")
     @classmethod

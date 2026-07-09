@@ -1,13 +1,13 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6">
   <diagram id="IU4iCQJxzePutwgObgY5" name="第 1 页">
-    <mxGraphModel dx="1554" dy="922" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1125" pageHeight="635" math="0" shadow="0">
+    <mxGraphModel dx="1303" dy="793" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1125" pageHeight="635" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="ui" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d9e8fc;strokeColor=#6c8ebf;fontColor=#1a1a1a;arcSize=14;spacing=6;fontSize=14;" value="&lt;b&gt;ai-market-studio-ui&lt;/b&gt;&lt;br&gt;Frontend" vertex="1">
           <mxGeometry height="82" width="190" x="555" y="4" as="geometry" />
         </mxCell>
-        <mxCell id="backend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1a1a1a;arcSize=14;spacing=8;fontSize=14;" value="&lt;b&gt;ai-market-studio&lt;/b&gt;&lt;br&gt;Backend API&lt;br&gt;&lt;br&gt;FastAPI&lt;br&gt;PDF Export" vertex="1">
+        <mxCell id="backend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1a1a1a;arcSize=14;spacing=8;fontSize=14;" value="&lt;b&gt;ai-market-studio&lt;/b&gt;&lt;br&gt;Backend API&lt;br&gt;&lt;br&gt;FastAPI" vertex="1">
           <mxGeometry height="142" width="190" x="555" y="168" as="geometry" />
         </mxCell>
         <mxCell id="fred" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#1a1a1a;arcSize=12;spacing=8;fontSize=14;" value="&lt;b&gt;FRED API&lt;/b&gt;&lt;br&gt;&lt;br&gt;Economic Data" vertex="1">
@@ -19,7 +19,7 @@
         <mxCell id="rag" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#1a1a1a;arcSize=14;spacing=8;fontSize=14;" value="&lt;b&gt;ai-rag-service&lt;/b&gt;&lt;br&gt;RAG Provider&lt;br&gt;&lt;br&gt;FastAPI + ChromaDB&lt;br&gt;PDF/Jira/Confluence" vertex="1">
           <mxGeometry height="118" width="189" x="732" y="393" as="geometry" />
         </mxCell>
-        <mxCell id="observability" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#1a1a1a;arcSize=14;spacing=8;fontSize=14;" value="&lt;b&gt;ai-sre-observability&lt;/b&gt;&lt;br&gt;Observability Stack&lt;br&gt;&lt;br&gt;Prometheus&lt;br&gt;Grafana&lt;br&gt;Metrics Aggregation" vertex="1">
+        <mxCell id="observability" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#1a1a1a;arcSize=14;spacing=8;fontSize=14;" value="&lt;b&gt;ai-sre-observability&lt;/b&gt;&lt;br&gt;Observability Stack&lt;br&gt;&lt;br&gt;Prometheus&lt;br&gt;Grafana" vertex="1">
           <mxGeometry height="142" width="188" x="40" y="381" as="geometry" />
         </mxCell>
         <mxCell id="openai" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#1a1a1a;fontSize=14;" value="&lt;b&gt;OpenAI&lt;/b&gt;" vertex="1">
@@ -28,8 +28,10 @@
         <mxCell id="deepseek" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#1a1a1a;fontSize=14;" value="&lt;b&gt;DeepSeek&lt;/b&gt;" vertex="1">
           <mxGeometry height="43" width="82" x="481" y="720" as="geometry" />
         </mxCell>
-        <mxCell id="edge-ui-backend" edge="1" parent="1" source="ui" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#000000;strokeWidth=2;fontSize=14;labelBackgroundColor=#ffffff;" target="backend" value="HTTP&lt;br&gt;(LoadBalancer)">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="edge-ui-backend" edge="1" parent="1" source="ui" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#000000;strokeWidth=2;fontSize=14;labelBackgroundColor=#ffffff;" target="backend" value="HTTP">
+          <mxGeometry relative="1" x="0.0061" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
         <mxCell id="edge-backend-fred" edge="1" parent="1" source="backend" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#000000;strokeWidth=2;fontSize=14;labelBackgroundColor=#ffffff;" target="fred" value="HTTP">
           <mxGeometry relative="1" as="geometry">
@@ -75,7 +77,7 @@
         <mxCell id="ESkWSSyW7yAq6f9zJrb0-6" edge="1" parent="1" source="ESkWSSyW7yAq6f9zJrb0-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="deepseek">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="ESkWSSyW7yAq6f9zJrb0-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#D6B656;fontColor=#1a1a1a;arcSize=14;spacing=8;fontSize=14;" value="&lt;b&gt;ai-gateway-service&lt;/b&gt;&lt;br&gt;&lt;br&gt;Model Routing&lt;br&gt;API Key Mgmt&lt;div&gt;Security Guardrails&lt;/div&gt;" vertex="1">
+        <mxCell id="ESkWSSyW7yAq6f9zJrb0-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#D6B656;fontColor=#1a1a1a;arcSize=14;spacing=8;fontSize=14;" value="&lt;b&gt;ai-gateway-service&lt;/b&gt;&lt;br&gt;&lt;br&gt;Model Routing&lt;br&gt;Key Management&lt;div&gt;Security Guardrails&lt;/div&gt;" vertex="1">
           <mxGeometry height="120" width="210" x="360" y="550" as="geometry" />
         </mxCell>
         <mxCell id="ESkWSSyW7yAq6f9zJrb0-4" edge="1" parent="1" source="ESkWSSyW7yAq6f9zJrb0-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="ESkWSSyW7yAq6f9zJrb0-1">
