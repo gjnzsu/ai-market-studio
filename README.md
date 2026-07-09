@@ -115,7 +115,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 | **Kong Gateway for AI** | `http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1` (internal) | ✓ Running | 2 |
 | **RAG Service** | `http://34.10.130.210` (`RAG_SERVICE_URL`) | ✓ Running | 1 |
 | **AI SRE Observability** | `http://ai-sre-observability:8080` (internal) | ✓ Running | 1 |
-| **Prometheus** | http://136.113.33.154:9090 | ✓ Running | 1 |
+| **Prometheus** | http://34.27.33.20:9090 | ✓ Running | 1 |
 | **Grafana** | http://136.114.77.0 | ✓ Running | 1 |
 
 **GKE Cluster:** `helloworld-cluster` (us-central1)
@@ -200,8 +200,8 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ### Feature 07 - Market Insight Summary
 - Ask in natural language: *"Give me a market insight on EUR/USD and GBP/USD"*
-- Legacy mode answers market insight requests through the approved low-level market data tools.
-- Workflow mode replaces the deprecated `generate_market_insight` tool with `generate_market_briefing`.
+- `/api/chat` is workflow-only; market insight requests are handled by the intent-level `generate_market_briefing` workflow.
+- The deprecated `generate_market_insight` tool is no longer an approved model-facing tool.
 - Market briefings coordinate FX rates, news, FRED indicators, and internal research behind one intent-level workflow result.
 - Responses keep the existing `reply`, `data`, and `tool_used` shape for frontend compatibility.
 
@@ -219,24 +219,27 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Recent local E2E result:** Workflow-mode FX carry briefing fetched `DFF=3.62` and `DGS10=4.47` from FRED, both dated 2026-06-01
 
 ### Feature 09 - AI Gateway Integration (2026-04-13)
-- **Centralized LLM Management**: All OpenAI API calls route through internal AI Gateway service
-- **Multi-Provider Support**: Seamless routing to OpenAI (gpt-4o, gpt-4o-mini) or DeepSeek (deepseek-chat)
+- **Centralized LLM Management**: All provider chat-completion calls route through Kong Gateway to the internal AI Gateway service
+- **Multi-Provider Support**: Seamless routing to OpenAI (`gpt-5.4`, `gpt-4o`, `gpt-4o-mini`) or DeepSeek (`deepseek-chat`)
 - **Dynamic Model Selection**: Switch models via ConfigMap without code changes
 - **Cost Optimization**: Route queries to cost-effective models (gpt-4o-mini, deepseek-chat) based on complexity
 - **Centralized LLM Key Management**: OpenAI/DeepSeek provider keys are managed by the gateway; non-LLM connector keys such as FRED stay with the backend
 - **Single Observability Point**: All LLM requests logged and monitored at gateway level
+- **Gateway Guardrails**: `ai-gateway-service` owns first-pass PII masking, prompt safety policy, response safety policy, and guardrail observability while preserving the OpenAI-compatible success contract
 - **Architecture**: Backend → Kong Gateway (ClusterIP) → AI Gateway Service → OpenAI/DeepSeek
 - **Gateway Endpoint**: `http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1` (internal)
-- **Available Models**: `gpt-4o` (default), `gpt-4o-mini`, `deepseek-chat`
+- **Available Models**: `gpt-5.4` (current), `gpt-4o`, `gpt-4o-mini`, `deepseek-chat`
 - **Model Switching**: Update `OPENAI_MODEL` in ConfigMap, rolling restart deployment
 - **Rollback**: Easy revert to direct OpenAI calls via ConfigMap change
 
 ### Feature 10 - AI SRE Observability (2026-04-23)
 - **Real-time LLM Cost Tracking**: Automatic tracking of token usage and costs for every user query
 - **Prometheus Metrics**: Exposes `llm_requests_total`, `llm_tokens_total`, `llm_token_cost_usd_total` metrics
-- **Grafana Dashboards**: Pre-built dashboards for LLM Cost & Usage, Service Overview, and Request Tracing
+- **Business Attribution Metrics**: Emits `business_metric_total{metric_name="ai_cost_attribution_requests_total"}` for use-case and feature request attribution
+- **Grafana Dashboards**: Pre-built dashboards for LLM Cost & Usage, Service Overview, Request Tracing, and AI Market Studio Cost Attribution
 - **Token Accumulation**: Tracks prompt + completion tokens across multi-round agent conversations
-- **Cost Calculation**: Automatic cost calculation based on model pricing (gpt-4o: $5/$15 per 1M tokens)
+- **Cost Calculation**: Automatic cost calculation based on configured model pricing; prompt and completion token costs are tracked separately and as total cost
+- **Double-counting Control**: App-specific cost panels use gateway-sourced metrics filtered by `service="ai-gateway-service"` and `consumer="ai-market-studio"` rather than adding backend and gateway technical costs together
 - **Graceful Degradation**: SDK continues working even if observability service is unavailable
 - **Performance**: <10ms overhead per conversation, non-blocking async metrics submission
 - **Architecture**: Backend SDK → Observability Service → Prometheus → Grafana
@@ -270,6 +273,15 @@ The application is deployed on Google Kubernetes Engine (GKE):
 - **Rule metadata**: Source grounding, data-gap reporting, synthetic source disclosure, and research-only framing are named runtime rules rather than implicit workflow assumptions.
 - **No API breakage**: `/api/chat` workflow responses keep the existing `playbook`, `source_grounding`, `data_gaps`, `specialist_data`, and `carry_metrics` shape.
 
+### Feature 14 - AI Cost Attribution MVP (2026-07-09)
+- **Application context**: `/api/chat` accepts optional `client_context` without breaking existing callers.
+- **Stable request correlation**: The backend generates or preserves a request ID and propagates it as `X-Request-ID` to the AI gateway path.
+- **Ownership headers**: Backend traffic includes low-cardinality attribution headers such as `X-Consumer-Service`, `X-AI-Application-ID`, `X-AI-Project-ID`, `X-AI-Team-ID`, `X-AI-Use-Case`, and `X-AI-Feature`.
+- **MVP use cases**: AI calls are classified as `fx-data-query`, `fx-advisory-report`, or `chat-dashboard-generation`.
+- **Cost source of truth**: Token and cost totals come from gateway LLM metrics; business attribution metrics are request counters and must not be summed as cost.
+- **Dashboard interpretation**: Low-volume KPI panels use last-hour request counts, while rate panels keep `rate(...[5m])` for traffic trend and status breakdowns.
+- **Documentation**: Detailed query and dashboard guidance lives in `docs/ai-cost-attribution-mvp.md`.
+
 ---
 
 ## Runtime Traffic Boundaries
@@ -284,8 +296,9 @@ Runtime traffic follows these boundaries:
 - LLM traffic goes from Backend API -> Kong Gateway OSS (`ai-gateway-kong.ai-gateway.svc.cluster.local/v1`) -> AI Gateway Service -> OpenAI/DeepSeek.
 - Tool and market-data traffic stays inside backend connectors: FX rates, historical rates, RSS/news with mock fallback, FRED, RAG, and correlation inputs are not routed through Kong.
 - PDF export stays inside the backend API: the browser posts the current reply and structured data to `/api/export/pdf`, and the backend renders the binary PDF with `reportlab`.
-- Backend telemetry is batched to AI SRE Observability; Prometheus scrapes metrics and Grafana renders the three monitoring dashboards.
+- Backend telemetry is batched to AI SRE Observability; Prometheus scrapes metrics and Grafana renders service, tracing, LLM cost, and application cost attribution dashboards.
 - Kubernetes ConfigMaps and Secrets own runtime wiring such as `OPENAI_BASE_URL`, selected model, connector keys, and workflow-only agent mode.
+- AI cost attribution uses low-cardinality business labels only; raw user, session, conversation, prompt, and currency-pair values are kept out of Prometheus labels.
 
 **Workflow-mode GPT-5.4 tools:** `collect_market_context`, `analyze_market_context`, `generate_market_briefing`
 
@@ -897,6 +910,20 @@ ai-market-studio/ (Backend API)
 
 ---
 
+## OpenSpec Documentation Closure
+
+Every OpenSpec change should include documentation review before it is archived. At minimum, the archive checklist should confirm:
+
+- Root `README.md` reflects any user-visible feature, platform capability, runtime boundary, deployment topology, or dashboard behavior introduced by the change.
+- A focused document under `docs/` exists when the change needs PromQL, operational guidance, architecture detail, or troubleshooting notes that would make the README too dense.
+- Main specs under `openspec/specs/` are synchronized before the change is moved into `openspec/changes/archive/`.
+- Archived `proposal.md`, `design.md`, `tasks.md`, and delta specs remain available for audit history.
+- Quality-gate commands and any deployment or dashboard verification are captured in the final change summary.
+
+This keeps the README as the current product and platform entry point while preserving detailed design history in OpenSpec.
+
+---
+
 ## Roadmap
 
 | Priority | Theme | Features | Status |
@@ -906,11 +933,13 @@ ai-market-studio/ (Backend API)
 | P2 - Done | Output Generation | PDF report generation via Export to PDF button, email delivery pending | ✅ Complete |
 | P3 - Done | Intelligence & Economic Data | RAG research integration (Feature 05), FRED interest rates (Feature 08), economic indicator queries | ✅ Complete |
 | P4 - Done | Data Breadth & Observability | Direct FRED connector, AI Gateway service (OpenAI + DeepSeek), AI SRE Observability (LLM cost tracking) | ✅ Complete |
-| P5 - Done | Agent Workflow Foundation | Opt-in workflow mode, intent-level market workflows, workflow guardrails, archived OpenSpec specs | ✅ Complete |
-| P6 - In Progress | Platform & Simulation | Financial analysis playbooks implemented for workflow-mode briefings; custom agent creation, OCR/document ingestion for scanned PDFs, and paper-trading simulation remain future work | 🔄 In Progress |
-| P7 - Planned | Execution & Risk | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls | 🔄 Planned |
+| P5 - Done | Agent Workflow Foundation | Workflow-only chat, intent-level market workflows, workflow guardrails, archived OpenSpec specs | ✅ Complete |
+| P6 - Done | Platform Playbooks | Financial analysis playbooks, runtime primitives, source grounding, and synthetic FX carry demo metrics | ✅ Complete |
+| P7 - Done | Gateway & Cost Governance | Kong-fronted AI gateway routing, gateway guardrails, and application-level AI cost attribution dashboards | ✅ Complete |
+| P8 - Planned | Simulation & Documents | Custom agent creation, OCR/document ingestion for scanned PDFs, and paper-trading simulation | 🔄 Planned |
+| P9 - Planned | Execution & Risk | Broker connectivity, pre-trade risk checks, account permissions, audit logs, kill switch controls | 🔄 Planned |
 
-**Note:** Feature 11 is an internal workflow foundation, not user-facing custom agent creation. Future custom agent work should build on the opt-in workflow mode rather than exposing low-level internal agent tools directly.
+**Note:** Feature 11 is an internal workflow foundation, not user-facing custom agent creation. Future custom agent work should build on the workflow-only intent layer rather than exposing low-level internal agent tools directly.
 
 ### Completed in P3/P4 (Phase 2026-04-12)
 
@@ -943,9 +972,9 @@ ai-market-studio/ (Backend API)
 ✅ **P4 - AI SRE Observability Integration** (2026-04-23)
 - Real-time LLM cost tracking via observability SDK
 - Automatic token usage monitoring (prompt + completion tokens)
-- Cost calculation: gpt-4o pricing ($5/$15 per 1M tokens)
+- Cost calculation: configured model pricing with prompt, completion, and total token-cost breakdowns
 - Prometheus metrics: `llm_requests_total`, `llm_tokens_total`, `llm_token_cost_usd_total`
-- Grafana dashboards: LLM Cost & Usage, Service Overview, Request Tracing
+- Grafana dashboards: LLM Cost & Usage, Service Overview, Request Tracing, AI Market Studio Cost Attribution
 - Performance: <10ms overhead, non-blocking async metrics submission
 - Graceful degradation: continues working if observability service unavailable
 - GKE deployment: `default` namespace, 1 replica
@@ -969,9 +998,16 @@ ai-market-studio/ (Backend API)
 - Added source grounding and `data_gaps` for unavailable specialist inputs.
 - Added deterministic synthetic forward curve and implied-volatility assumptions for `fx_carry` demo metrics.
 - Verified `/api/chat` workflow e2e with `fx_carry`, OpenAI tool calling, and live FRED data (`DFF`, `DGS10`).
-- OpenSpec change is implemented and validated; archive it after final review.
+- OpenSpec changes for playbooks, synthetic specialist data, and runtime primitives are implemented, validated, and archived.
 
-> Recommendation: keep P5 simulation-only. Add live FX execution in P6 only after authentication, RBAC, audit logging, and pre-trade risk controls are in place.
+✅ **P7 - Gateway and Cost Governance** (2026-07-09)
+- Kong Gateway is the configured GKE route for backend LLM traffic to `ai-gateway-service`.
+- `ai-gateway-service` provides request PII masking, prompt safety checks, response safety checks, and structured guardrail telemetry.
+- AI Market Studio propagates request correlation and business attribution headers to the gateway path.
+- AI SRE Observability exposes application-level cost, token, request, and attribution dashboards.
+- Cost dashboards avoid double-counting by treating gateway LLM metrics as the app-specific cost source and business metrics as companion attribution counters.
+
+> Recommendation: keep simulation and execution separate. Add live FX execution only after authentication, RBAC, audit logging, and pre-trade risk controls are in place.
 
 ---
 
@@ -1006,7 +1042,7 @@ ai-market-studio/ (Backend API)
 
 **Observability Stack:**
 - AI SRE Observability: http://ai-sre-observability:8080 (internal)
-- Prometheus: http://136.113.33.154:9090
+- Prometheus: http://34.27.33.20:9090
 - Grafana: http://136.114.77.0
 
 **Documentation:**
