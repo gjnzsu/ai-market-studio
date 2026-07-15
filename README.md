@@ -164,12 +164,12 @@ The application is deployed on Google Kubernetes Engine (GKE):
 
 ![Conversational Dashboard](docs/screenshots/shot_08_inline_chart.png)
 
-### Feature 05 - Research Report RAG Query
+### Feature 05 - Research Report RAG Retrieval
 - Ask in natural language: *"Search internal research docs for deployment checklist"*, *"Find internal research about RAG ingestion"*
-- GPT-5.4 calls the `get_internal_research` tool, which queries the external RAG service configured by `RAG_SERVICE_URL`
-- `RAGConnector` normalizes service responses into `{type: "rag", answer, sources[]}` so the chat UI can render cited source names inline
-- Source names are derived from `title` first, then `document_id`, while preserving source metadata such as `source_type`, `excerpt`, and `score`
-- Research-report/PDF ingestion is handled by the external RAG service; this repo currently provides the query and citation UI layer
+- GPT-5.4 calls the `get_internal_research` tool, which retrieves grounded evidence from the external RAG service configured by `RAG_SERVICE_URL`; GPT-5.4 then generates the final answer
+- `RAGConnector` normalizes service responses into `{type: "rag", answer: "", sources[], evidence[]}` so the chat UI can render deduplicated citations while the application LLM receives all matched chunks
+- Source names are derived from `title` first, then `document_id`, while preserving chunk content and metadata such as `source_type`, `score`, and `source_url`
+- Research-report/PDF ingestion is handled by the external RAG service; this repo provides the retrieval, application-level answer generation, and citation UI layers
 
 ### Feature 06 - Export to PDF
 - Ask a question that returns structured data (market insight, workflow briefing, dashboard, news, or research), then click **Export to PDF**
@@ -437,7 +437,7 @@ At the time of this README update, the backend service is externally reachable a
 - An [OpenAI API key](https://platform.openai.com/)
 - An [exchangerate.host API key](https://exchangerate.host/) if you want live FX data
 - A [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html) if you want FRED interest-rate data
-- Access to a deployed RAG service that supports `POST /query` with `{"question": "..."}`
+- Access to a deployed RAG service that supports `POST /retrieve` with `{"query": "...", "top_k": 5}`
 
 ### 1. Clone and install
 
@@ -510,12 +510,14 @@ If the RAG tool is selected, the assistant response should include a **Sources**
 
 ## RAG Service Integration
 
-### Query flow
+### Retrieval flow
 1. The user asks a research-document question in `/api/chat`.
-2. GPT-4o selects `get_internal_research`.
-3. `backend/connectors/rag_connector.py` sends `POST {RAG_SERVICE_URL}/query` with `{"question": "..."}`.
-4. The connector normalizes the service response to `type="rag"`, `answer`, and `sources[].name`.
-5. `frontend/index.html` renders the answer and source list in the assistant chat bubble.
+2. The configured application LLM selects `get_internal_research`.
+3. `backend/connectors/rag_connector.py` sends `POST {RAG_SERVICE_URL}/retrieve` with `{"query": "...", "top_k": 5}`.
+4. The RAG service returns relevant chunks and metadata without generating an answer.
+5. The application LLM uses the bounded evidence excerpts to generate the final response.
+6. The connector normalizes the service response to `type="rag"`, an empty compatibility `answer`, and evidence-rich `sources`.
+7. `frontend/index.html` renders the application LLM's reply and the normalized source list in the assistant chat bubble.
 
 ### Research report ingestion
 - Ingest PDFs/research reports into the external RAG service before querying from AI Market Studio.
@@ -603,7 +605,7 @@ kubectl get service ai-market-studio -o wide
 | `FRED_API_KEY` | optional | FRED API key. Required for `get_interest_rate`, FRED-backed market briefings, and FX carry/macro playbooks that require FRED data |
 | `USE_MOCK_CONNECTOR` | `false` | Use synthetic FX data instead of live exchangerate.host API |
 | `USE_MOCK_NEWS_CONNECTOR` | `false` | Use synthetic news data instead of live RSS feeds |
-| `RAG_SERVICE_URL` | `http://localhost:8000` | Base URL of the external RAG service; `RAGConnector` calls `POST {RAG_SERVICE_URL}/query` |
+| `RAG_SERVICE_URL` | `http://localhost:8000` | Base URL of the external RAG service; `RAGConnector` calls `POST {RAG_SERVICE_URL}/retrieve` |
 | `ENABLE_AGENT_WORKFLOW_MODE` | `false` | Enables workflow-only `/api/chat`; when disabled, chat returns 403, and legacy mode remains unsupported |
 | `AGENT_WORKFLOW_TIMEOUT_SECONDS` | `20.0` | Timeout for workflow-mode chat requests |
 | `AGENT_WORKFLOW_MAX_ROUNDS` | `2` | Maximum LLM/tool rounds for workflow-mode requests |

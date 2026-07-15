@@ -125,8 +125,24 @@ def _summarise_tool_result(result: dict) -> dict:
     if rtype == "news":
         return {"headlines": [n["title"] for n in result.get("items", [])]}
     if result.get("type") == "rag":
-        sources_list = [s["name"] for s in result.get("sources", [])]
-        return {"type": "rag", "sources": sources_list}
+        sources = result.get("sources", [])
+        sources_list = [source["name"] for source in sources]
+        evidence = []
+        for source in result.get("evidence") or sources:
+            content = source.get("content", "")
+            if not content:
+                continue
+            evidence.append(
+                {
+                    "title": source["name"],
+                    "content": content[:1_200],
+                    "score": source.get("score"),
+                    "source_url": source.get("source_url", ""),
+                }
+            )
+            if len(evidence) == 5:
+                break
+        return {"type": "rag", "sources": sources_list, "evidence": evidence}
     return result
 
 

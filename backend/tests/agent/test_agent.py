@@ -2,7 +2,7 @@ import json
 import logging
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from backend.agent.agent import WORKFLOW_SYSTEM_PROMPT, run_agent
+from backend.agent.agent import WORKFLOW_SYSTEM_PROMPT, _summarise_tool_result, run_agent
 from backend.connectors.fred_connector import InterestRateData
 from backend.connectors.mock_connector import MockConnector
 
@@ -35,6 +35,37 @@ def make_response(content=None, tool_calls=None, finish_reason=None):
     response = MagicMock()
     response.choices = [choice]
     return response
+
+
+def test_rag_tool_summary_includes_bounded_retrieval_evidence():
+    long_content = "A" * 1_500
+    sources = [
+        {
+            "name": f"Research {index}",
+            "content": long_content if index == 0 else f"Evidence {index}",
+            "score": 0.9 - index * 0.01,
+            "source_url": f"https://example.test/{index}",
+        }
+        for index in range(6)
+    ]
+
+    summary = _summarise_tool_result(
+        {
+            "type": "rag",
+            "sources": [{"name": "Research 0"}],
+            "evidence": sources,
+        }
+    )
+
+    assert summary["sources"] == ["Research 0"]
+    assert len(summary["evidence"]) == 5
+    assert summary["evidence"][0] == {
+        "title": "Research 0",
+        "content": "A" * 1_200,
+        "score": 0.9,
+        "source_url": "https://example.test/0",
+    }
+    assert all(item["title"] != "Research 5" for item in summary["evidence"])
 
 
 @pytest.mark.asyncio

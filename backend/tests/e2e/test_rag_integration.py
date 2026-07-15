@@ -62,20 +62,25 @@ def test_chat_returns_normalized_rag_sources(app_client, monkeypatch):
     monkeypatch.setattr("backend.agent.agent.AsyncOpenAI", lambda **kwargs: mock_openai)
 
     rag_payload = {
-        "answer": "Refer to the deployment checklist.",
-        "sources": [
+        "results": [
             {
+                "content": "Refer to the deployment checklist.",
                 "document_id": "doc-789",
-                "source_type": "pdf",
-                "title": "Deployment Checklist",
+                "chunk_id": "doc-789:0",
+                "metadata": {
+                    "source_type": "pdf",
+                    "title": "Deployment Checklist",
+                },
                 "score": 0.88,
+                "source_url": "https://example.test/deployment-checklist",
             }
         ],
-        "model": "gpt-4o",
     }
 
     with respx.mock(base_url="http://34.10.130.210") as respx_mock:
-        respx_mock.post("/query").mock(return_value=httpx.Response(200, json=rag_payload))
+        respx_mock.post("/retrieve").mock(
+            return_value=httpx.Response(200, json=rag_payload)
+        )
 
         response = app_client.post(
             "/api/chat",
@@ -86,6 +91,9 @@ def test_chat_returns_normalized_rag_sources(app_client, monkeypatch):
     data = response.json()
     assert data["tool_used"] == "get_internal_research"
     assert data["data"]["type"] == "rag"
-    assert data["data"]["answer"] == "Refer to the deployment checklist."
+    assert data["data"]["answer"] == ""
     assert data["data"]["sources"][0]["name"] == "Deployment Checklist"
     assert data["data"]["sources"][0]["document_id"] == "doc-789"
+    assert data["data"]["sources"][0]["content"] == (
+        "Refer to the deployment checklist."
+    )

@@ -69,7 +69,12 @@ async def test_synthesize_with_rag_source():
     sources = {
         "rag": {
             "data": {
-                "answer": "The Federal Reserve is expected to maintain rates."
+                "sources": [
+                    {
+                        "name": "Federal Reserve Outlook",
+                        "content": "The Federal Reserve is expected to maintain rates.",
+                    }
+                ]
             }
         }
     }
@@ -78,7 +83,9 @@ async def test_synthesize_with_rag_source():
 
     assert "synthesis" in result
     assert len(result["key_insights"]) == 1
-    assert "Research:" in result["key_insights"][0]
+    assert result["key_insights"][0] == (
+        "Research evidence: The Federal Reserve is expected to maintain rates."
+    )
 
 
 @pytest.mark.asyncio
@@ -88,7 +95,16 @@ async def test_synthesize_max_sources_limit():
         "rates": {"data": [{"date": "2026-04-01", "rate": 1.0800}, {"date": "2026-04-26", "rate": 1.0850}]},
         "news": {"data": [{"title": "EUR strengthens", "url": "http://example.com/1"}]},
         "fred": {"data": {"series_id": "DFF", "value": 3.64}},
-        "rag": {"data": {"answer": "Market analysis shows positive trends."}}
+        "rag": {
+            "data": {
+                "sources": [
+                    {
+                        "name": "Market Analysis",
+                        "content": "Market analysis shows positive trends.",
+                    }
+                ]
+            }
+        }
     }
 
     result = await synthesize_research(sources=sources, max_sources=2)

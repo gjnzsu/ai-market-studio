@@ -211,12 +211,16 @@ def _analyze_rag_source(rag_data: Dict[str, Any]) -> Optional[str]:
     try:
         data = rag_data.get("data", {})
 
-        if isinstance(data, dict) and "answer" in data:
-            answer = data["answer"]
-            # Truncate if too long
-            if len(answer) > 150:
-                answer = answer[:147] + "..."
-            return f"Research: {answer}"
+        if isinstance(data, dict):
+            for source in data.get("evidence") or data.get("sources", []):
+                if not isinstance(source, dict):
+                    continue
+                content = source.get("content") or source.get("excerpt")
+                if not content:
+                    continue
+                if len(content) > 150:
+                    content = content[:147] + "..."
+                return f"Research evidence: {content}"
 
         return None
 
