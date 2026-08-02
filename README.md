@@ -1,4 +1,4 @@
-﻿# AI Market Studio - Backend API
+# AI Market Studio - Backend API
 
 Backend API for the AI Market Studio conversational FX market data platform.
 
