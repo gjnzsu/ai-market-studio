@@ -19,6 +19,7 @@ Comprehensive documentation for AI Market Studio, an FX trading copilot for prof
 
 ### Architecture & Design
 - **[Architecture Design](./architecture_design.md)** — 5-layer architecture (Chat UI → Backend API → AI Agent → Data Connector → Market Data Sources)
+- **[User Workflow Request Call Chain](./user-workflow-request-call-chain.md)** — End-to-end use case from `/api/chat` through the agent runtime, Kong, AI Gateway, LLM tool selection, local workflow execution, and response generation
 - **[Data Design](./data_design.md)** — Data models, connector abstractions, caching strategy, quota management
 - **[Implementation Plan](./implementation_plan.md)** — Feature implementation roadmap and technical specifications
 
