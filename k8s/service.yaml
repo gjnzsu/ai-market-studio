@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: ai-market-studio
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: ai-market-studio
   ports:
