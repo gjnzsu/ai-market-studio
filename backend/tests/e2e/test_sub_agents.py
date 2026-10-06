@@ -88,23 +88,48 @@ async def test_research_synthesizer_agent():
 
 @pytest.mark.asyncio
 async def test_sub_agent_orchestration_workflow():
-    """Test full orchestration: collect → analyze → synthesize."""
+    """Test bounded market collection with an offline provider fixture."""
+    from unittest.mock import AsyncMock
+    from openai.types.chat import ChatCompletion
     from backend.agent.agent import run_agent
     from backend.connectors.mock_connector import MockConnector
     from backend.connectors.news_connector import MockNewsConnector
 
-    # Test with simple query that uses legacy tools
+    client = AsyncMock()
+    client.chat.completions.create.side_effect = [
+        ChatCompletion.model_validate({
+            "id": "offline-tool", "created": 0, "model": "fixture", "object": "chat.completion",
+            "choices": [{"index": 0, "finish_reason": "tool_calls", "message": {
+                "role": "assistant", "content": None, "tool_calls": [{
+                    "id": "collect", "type": "function", "function": {
+                        "name": "collect_market_context",
+                        "arguments": '{"pairs":["EUR/USD"],"sources":["rates"]}',
+                    },
+                }],
+            }}],
+        }),
+        ChatCompletion.model_validate({
+            "id": "offline-final", "created": 0, "model": "fixture", "object": "chat.completion",
+            "choices": [{"index": 0, "finish_reason": "stop", "message": {
+                "role": "assistant", "content": "EUR/USD data collected.",
+            }}],
+        }),
+    ]
     result = await run_agent(
         message="What is EUR/USD rate?",
         history=[],
         connector=MockConnector(),
         news_connector=MockNewsConnector(),
+        client=client,
     )
 
     # Verify agent completed
     assert result is not None
     assert "reply" in result
-    assert result["reply"] is not None
+    assert result["reply"] == "EUR/USD data collected."
+    assert result["tool_used"] == "collect_market_context"
+    assert result["data"]["type"] == "market_context"
+    assert client.chat.completions.create.await_count == 2
 
 
 @pytest.mark.asyncio

@@ -1,12 +1,15 @@
+param([string]$PythonExecutable = "python")
+
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Push-Location $repoRoot
 try {
-    uv run --with ruff==0.8.0 ruff check backend tests
+    & $PythonExecutable -m ruff check backend
+    if ($LASTEXITCODE -ne 0) { throw "Lint failed with exit code $LASTEXITCODE" }
 
     $env:PYTHONPATH = "."
-    uv run pytest `
+    & $PythonExecutable -m pytest `
         backend\tests\unit `
         backend\tests\agent `
         backend\tests\e2e\test_chat_api.py `
@@ -17,6 +20,7 @@ try {
         backend\tests\e2e\test_correlation_integration.py `
         backend\tests\e2e\test_sub_agents.py `
         -q
+    if ($LASTEXITCODE -ne 0) { throw "Tests failed with exit code $LASTEXITCODE" }
 }
 finally {
     Pop-Location

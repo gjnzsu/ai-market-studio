@@ -276,6 +276,7 @@ The application is deployed on Google Kubernetes Engine (GKE):
 ### Feature 14 - AI Cost Attribution MVP (2026-07-09)
 - **Application context**: `/api/chat` accepts optional `client_context` without breaking existing callers.
 - **Stable request correlation**: The backend generates or preserves a request ID and propagates it as `X-Request-ID` to the AI gateway path.
+- **Agent execution identity**: Every `run_agent` invocation generates a fresh UUID v4 `X-AI-Run-ID`, uses stable `X-AI-Agent-ID: market-briefing-agent`, and propagates both on every completion round without mutating shared client defaults.
 - **Ownership headers**: Backend traffic includes low-cardinality attribution headers such as `X-Consumer-Service`, `X-AI-Application-ID`, `X-AI-Project-ID`, `X-AI-Team-ID`, `X-AI-Use-Case`, and `X-AI-Feature`.
 - **MVP use cases**: AI calls are classified as `fx-data-query`, `fx-advisory-report`, or `chat-dashboard-generation`.
 - **Cost source of truth**: Token and cost totals come from gateway LLM metrics; business attribution metrics are request counters and must not be summed as cost.
@@ -1005,7 +1006,7 @@ This keeps the README as the current product and platform entry point while pres
 ✅ **P7 - Gateway and Cost Governance** (2026-07-09)
 - Kong Gateway is the configured GKE route for backend LLM traffic to `ai-gateway-service`.
 - `ai-gateway-service` provides request PII masking, prompt safety checks, response safety checks, and structured guardrail telemetry.
-- AI Market Studio propagates request correlation and business attribution headers to the gateway path.
+- AI Market Studio propagates request correlation, business attribution, stable agent identity, and per-invocation run identity to every gateway completion call.
 - AI SRE Observability exposes application-level cost, token, request, and attribution dashboards.
 - Cost dashboards avoid double-counting by treating gateway LLM metrics as the app-specific cost source and business metrics as companion attribution counters.
 

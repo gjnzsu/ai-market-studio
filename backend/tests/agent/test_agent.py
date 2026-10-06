@@ -1,10 +1,68 @@
 import json
 import logging
+import asyncio
+from types import SimpleNamespace
+from uuid import UUID
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from backend.agent.agent import WORKFLOW_SYSTEM_PROMPT, _summarise_tool_result, run_agent
 from backend.connectors.fred_connector import InterestRateData
 from backend.connectors.mock_connector import MockConnector
+from backend.models import ChatClientContext
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("observed", [False, True])
+async def test_finops_headers_cover_every_round_without_mutating_injected_client(monkeypatch, observed):
+    obs = MagicMock() if observed else None
+    if obs:
+        obs.track_llm_call.return_value = AsyncMock()
+    monkeypatch.setattr("backend.agent.agent.get_client", lambda: obs)
+    client = AsyncMock()
+    client.default_headers = {"X-Custom": "untouched"}
+    client.chat.completions.create.side_effect = [
+        make_response(tool_calls=[make_tool_call("collect_market_context", {"pairs": ["EUR/USD"], "sources": ["rates"]})]),
+        make_response(content="done"),
+    ]
+    context = ChatClientContext(application_id="custom-app", project_id="custom-project", team_id="custom-team", use_case="custom-use", feature="custom-feature")
+    result = await run_agent("query", client=client, connector=MockConnector(), request_id="repeated-request", client_context=context)
+    assert result["reply"] == "done"
+    headers = [call.kwargs.get("extra_headers", {}) for call in client.chat.completions.create.call_args_list]
+    assert len(headers) == 2
+    for header in headers:
+        assert header.get("X-AI-Agent-ID") == "market-briefing-agent"
+        assert UUID(header["X-AI-Run-ID"]).version == 4
+        assert header["X-AI-Run-ID"] != "repeated-request"
+        assert header["X-Request-ID"] == "repeated-request"
+        assert header["X-AI-Application-ID"] == "custom-app"
+        assert header["X-AI-Project-ID"] == "custom-project"
+        assert header["X-AI-Team-ID"] == "custom-team"
+        assert header["X-AI-Use-Case"] == "custom-use"
+        assert header["X-AI-Feature"] == "custom-feature"
+    assert headers[0]["X-AI-Run-ID"] == headers[1]["X-AI-Run-ID"]
+    assert client.default_headers == {"X-Custom": "untouched"}
+
+
+@pytest.mark.asyncio
+async def test_finops_repeated_request_and_concurrent_shared_client_get_independent_runs(monkeypatch):
+    monkeypatch.setattr("backend.agent.agent.get_client", lambda: None)
+    recorded = []
+
+    async def create(**kwargs):
+        recorded.append(kwargs.get("extra_headers", {}).copy())
+        await asyncio.sleep(0)
+        return make_response(content="done")
+
+    client = SimpleNamespace(default_headers={"X-Custom": "untouched"}, chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    await run_agent("first", client=client, request_id="same-request")
+    await asyncio.gather(*(run_agent(str(index), client=client, request_id="same-request") for index in range(3)))
+    assert len(recorded) == 4
+    assert all(header.get("X-AI-Agent-ID") == "market-briefing-agent" for header in recorded)
+    run_ids = [header["X-AI-Run-ID"] for header in recorded]
+    assert len(set(run_ids)) == 4
+    assert all(UUID(run_id).version == 4 for run_id in run_ids)
+    assert all(header["X-Request-ID"] == "same-request" for header in recorded)
+    assert client.default_headers == {"X-Custom": "untouched"}
 
 
 def make_tool_call(name: str, args: dict, call_id: str = "call_001"):
