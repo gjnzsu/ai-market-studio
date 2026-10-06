@@ -68,7 +68,8 @@ async def test_run_agent_configures_gateway_base_url_and_consumer_header(monkeyp
     assert captured_kwargs["base_url"] == (
         "http://ai-gateway-kong.ai-gateway.svc.cluster.local/v1"
     )
-    headers = captured_kwargs["default_headers"]
+    assert "default_headers" not in captured_kwargs
+    headers = mock_openai.chat.completions.create.call_args.kwargs["extra_headers"]
     assert headers["X-Consumer-Service"] == "ai-market-studio"
     assert headers["X-Request-ID"]
     assert headers["X-AI-Application-ID"] == "ai-market-studio"
@@ -76,6 +77,8 @@ async def test_run_agent_configures_gateway_base_url_and_consumer_header(monkeyp
     assert headers["X-AI-Team-ID"] == "markets"
     assert headers["X-AI-Use-Case"] == "fx-data-query"
     assert headers["X-AI-Feature"] == "query-result-generation"
+    assert headers["X-AI-Agent-ID"] == "market-briefing-agent"
+    assert headers["X-AI-Run-ID"] != headers["X-Request-ID"]
 
 
 def test_chat_via_gateway(app_client, monkeypatch):

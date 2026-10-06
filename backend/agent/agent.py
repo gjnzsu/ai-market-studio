@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from typing import Literal, Optional
 
 from openai import AsyncOpenAI
@@ -284,18 +285,22 @@ async def run_agent(
         data=None,
         context=client_context,
     )
+    call_headers = attribution_headers(
+        context=client_context,
+        request_id=request_id,
+        use_case=header_use_case,
+        feature=header_feature,
+    )
+    call_headers.update({
+        "X-AI-Agent-ID": "market-briefing-agent",
+        "X-AI-Run-ID": str(uuid.uuid4()),
+    })
 
     if client is None:
         import httpx
         client = AsyncOpenAI(
             api_key=settings.openai_api_key.get_secret_value(),
             base_url=settings.openai_base_url,
-            default_headers=attribution_headers(
-                context=client_context,
-                request_id=request_id,
-                use_case=header_use_case,
-                feature=header_feature,
-            ),
             http_client=httpx.AsyncClient(trust_env=False),
         )
 
@@ -342,6 +347,7 @@ async def run_agent(
                     messages=messages,
                     tools=tool_definitions,
                     tool_choice="auto",
+                    extra_headers=call_headers.copy(),
                 )
 
                 # Accumulate tokens
@@ -420,6 +426,7 @@ async def run_agent(
                 messages=messages,
                 tools=tool_definitions,
                 tool_choice="auto",
+                extra_headers=call_headers.copy(),
             )
 
             choice = response.choices[0]
